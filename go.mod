@@ -2,7 +2,7 @@ module perun.network/perun-stellar-backend
 
 go 1.19
 
-require github.com/stellar/go v0.0.0-20230718034032-95c2976a11f2
+require github.com/stellar/go v0.0.0-20230801100123-5ded27e97f53
 
 require (
 	github.com/stretchr/testify v1.7.0
