@@ -46,6 +46,10 @@ func (a Account) Address() wallet.Address {
 	return types.NewParticipant(a.ParticipantAddress, a.privateKey.Public().(ed25519.PublicKey))
 }
 
+func (a Account) Participant() *types.Participant {
+	return types.NewParticipant(a.ParticipantAddress, a.privateKey.Public().(ed25519.PublicKey))
+}
+
 // SignData signs the given data with the account's private key.
 func (a Account) SignData(data []byte) ([]byte, error) {
 	if len(a.privateKey) != ed25519.PrivateKeySize {
