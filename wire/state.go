@@ -5,6 +5,7 @@ import (
 	"errors"
 	xdr3 "github.com/stellar/go-xdr/xdr3"
 	"github.com/stellar/go/xdr"
+	"perun.network/go-perun/channel"
 	"perun.network/perun-stellar-backend/wire/scval"
 )
 
@@ -141,3 +142,28 @@ func StateFromScVal(v xdr.ScVal) (State, error) {
 	err := (&s).FromScVal(v)
 	return s, err
 }
+
+func MakeState(state channel.State) (State, error) {
+	// TODO: Put these checks into a compatibility layer
+	if err := state.Valid(); err != nil {
+		return State{}, err
+	}
+	if !channel.IsNoApp(state.App) {
+		return State{}, errors.New("expected NoApp")
+	}
+	if !channel.IsNoData(state.Data) {
+		return State{}, errors.New("expected NoData")
+	}
+	balances, err := MakeBalances(state.Allocation)
+	if err != nil {
+		return State{}, err
+	}
+	return State{
+		ChannelID: state.ID[:],
+		Balances:  balances,
+		Version:   xdr.Uint64(state.Version),
+		Finalized: state.IsFinal,
+	}, nil
+}
+
+// TODO: Check if ToState is needed

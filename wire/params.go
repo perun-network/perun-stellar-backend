@@ -5,6 +5,9 @@ import (
 	"errors"
 	xdr3 "github.com/stellar/go-xdr/xdr3"
 	"github.com/stellar/go/xdr"
+	"perun.network/go-perun/channel"
+	"perun.network/go-perun/wallet"
+	"perun.network/perun-stellar-backend/wallet/types"
 	"perun.network/perun-stellar-backend/wire/scval"
 )
 
@@ -139,4 +142,79 @@ func ParamsFromScVal(v xdr.ScVal) (Params, error) {
 	var p Params
 	err := (&p).FromScVal(v)
 	return p, err
+}
+
+func MakeParams(params channel.Params) (Params, error) {
+	if !params.LedgerChannel {
+		return Params{}, errors.New("expected ledger channel")
+	}
+	if params.VirtualChannel {
+		return Params{}, errors.New("expected non-virtual channel")
+	}
+	if !channel.IsNoApp(params.App) {
+		return Params{}, errors.New("expected no app")
+	}
+
+	if len(params.Parts) != 2 {
+		return Params{}, errors.New("expected exactly two participants")
+	}
+
+	participantA, err := types.ToParticipant(params.Parts[0])
+	if err != nil {
+		return Params{}, err
+	}
+	a, err := MakeParticipant(*participantA)
+	if err != nil {
+		return Params{}, err
+	}
+	participantB, err := types.ToParticipant(params.Parts[1])
+	if err != nil {
+		return Params{}, err
+	}
+	b, err := MakeParticipant(*participantB)
+	if err != nil {
+		return Params{}, err
+	}
+	nonce := MakeNonce(params.Nonce)
+	return Params{
+		A:                 a,
+		B:                 b,
+		Nonce:             nonce,
+		ChallengeDuration: xdr.Uint64(params.ChallengeDuration),
+	}, nil
+}
+
+func MustMakeParams(params channel.Params) Params {
+	p, err := MakeParams(params)
+	if err != nil {
+		panic(err)
+	}
+	return p
+}
+
+func ToParams(params Params) (channel.Params, error) {
+	participantA, err := ToParticipant(params.A)
+	if err != nil {
+		return channel.Params{}, err
+	}
+	participantB, err := ToParticipant(params.B)
+	if err != nil {
+		return channel.Params{}, err
+	}
+	return channel.Params{
+		LedgerChannel:     true,
+		VirtualChannel:    false,
+		App:               channel.NoApp(),
+		Parts:             []wallet.Address{&participantA, &participantB},
+		Nonce:             ToNonce(params.Nonce),
+		ChallengeDuration: uint64(params.ChallengeDuration),
+	}, nil
+}
+
+func MakeNonce(nonce channel.Nonce) xdr.ScBytes {
+	return nonce.FillBytes(make([]byte, NonceLength))
+}
+
+func ToNonce(bytes xdr.ScBytes) channel.Nonce {
+	return channel.NonceFromBytes(bytes[:])
 }

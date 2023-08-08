@@ -2,7 +2,9 @@ package wire_test
 
 import (
 	"github.com/stretchr/testify/require"
+	"perun.network/perun-stellar-backend/wallet"
 	"perun.network/perun-stellar-backend/wire"
+	pkgtest "polycry.pt/poly-go/test"
 	"testing"
 )
 
@@ -15,4 +17,16 @@ func TestParticipant(t *testing.T) {
 	res, err := p.MarshalBinary()
 	require.NoError(t, err)
 	require.Equal(t, x, res)
+}
+
+func TestParticipantConversion(t *testing.T) {
+	rng := pkgtest.Prng(t)
+	acc, _, err := wallet.NewRandomAccount(rng)
+	require.NoError(t, err)
+	p := *acc.Participant()
+	wp, err := wire.MakeParticipant(p)
+	require.NoError(t, err)
+	res, err := wire.ToParticipant(wp)
+	require.NoError(t, err)
+	require.True(t, p.Equal(&res))
 }

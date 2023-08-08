@@ -2,9 +2,12 @@ package wire
 
 import (
 	"bytes"
+	"crypto/ed25519"
 	"errors"
 	xdr3 "github.com/stellar/go-xdr/xdr3"
+	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/xdr"
+	"perun.network/perun-stellar-backend/wallet/types"
 	"perun.network/perun-stellar-backend/wire/scval"
 )
 
@@ -101,4 +104,49 @@ func ParticipantFromScVal(v xdr.ScVal) (Participant, error) {
 	var p Participant
 	err := (&p).FromScVal(v)
 	return p, err
+}
+
+func MakeParticipant(participant types.Participant) (Participant, error) {
+	addr, err := MakeAccountAddress(&participant.Address)
+	if err != nil {
+		return Participant{}, err
+	}
+	if len(participant.PublicKey) != PubKeyLength {
+		return Participant{}, errors.New("invalid public key length")
+	}
+	pubKey := xdr.ScBytes(participant.PublicKey)
+	return Participant{
+		Addr:   addr,
+		PubKey: pubKey,
+	}, nil
+}
+
+func MakeAccountAddress(kp keypair.KP) (xdr.ScAddress, error) {
+	accountId, err := xdr.AddressToAccountId(kp.Address())
+	if err != nil {
+		return xdr.ScAddress{}, err
+	}
+	return xdr.NewScAddress(xdr.ScAddressTypeScAddressTypeAccount, accountId)
+}
+
+func ToAccountAddress(address xdr.ScAddress) (keypair.FromAddress, error) {
+	if address.Type != xdr.ScAddressTypeScAddressTypeAccount {
+		return keypair.FromAddress{}, errors.New("invalid address type")
+	}
+	kp, err := keypair.ParseAddress(address.AccountId.Address())
+	if err != nil {
+		return keypair.FromAddress{}, err
+	}
+	return *kp, nil
+}
+
+func ToParticipant(participant Participant) (types.Participant, error) {
+	kp, err := ToAccountAddress(participant.Addr)
+	if err != nil {
+		return types.Participant{}, err
+	}
+	if len(participant.PubKey) != ed25519.PublicKeySize {
+		return types.Participant{}, errors.New("invalid public key length")
+	}
+	return *types.NewParticipant(kp, ed25519.PublicKey(participant.PubKey)), nil
 }

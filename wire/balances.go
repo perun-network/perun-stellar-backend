@@ -2,11 +2,17 @@ package wire
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	xdr3 "github.com/stellar/go-xdr/xdr3"
 	"github.com/stellar/go/xdr"
+	"math/big"
+	"perun.network/go-perun/channel"
+	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/wire/scval"
 )
+
+var MaxBalance = new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 127), big.NewInt(1))
 
 type Balances struct {
 	BalA  xdr.Int128Parts
@@ -122,4 +128,101 @@ func (b *Balances) UnmarshalBinary(data []byte) error {
 	d := xdr3.NewDecoder(bytes.NewReader(data))
 	_, err := b.DecodeFrom(d)
 	return err
+}
+
+func MakeBalances(alloc channel.Allocation) (Balances, error) {
+	// TODO: Move all these checks into a compatibility layer
+	if err := alloc.Valid(); err != nil {
+		return Balances{}, err
+	}
+	// single asset
+	if len(alloc.Assets) != 1 {
+		return Balances{}, errors.New("expected exactly one asset")
+	}
+
+	// No sub-channels
+	if len(alloc.Locked) != 0 {
+		return Balances{}, errors.New("expected no locked funds")
+	}
+	asset := alloc.Assets[0]
+	sa, err := types.ToStellarAsset(asset)
+	if err != nil {
+		return Balances{}, err
+	}
+	token, err := sa.MakeScAddress()
+	if err != nil {
+		return Balances{}, err
+	}
+
+	if alloc.NumParts() != 2 {
+		return Balances{}, errors.New("expected exactly two parts")
+	}
+
+	balA := alloc.Balance(0, asset)
+	xdrBalA, err := MakeInt128Parts(balA)
+	if err != nil {
+		return Balances{}, err
+	}
+
+	balB := alloc.Balance(1, asset)
+	xdrBalB, err := MakeInt128Parts(balB)
+	if err != nil {
+		return Balances{}, err
+	}
+
+	return Balances{
+		BalA:  xdrBalA,
+		BalB:  xdrBalB,
+		Token: token,
+	}, nil
+}
+
+func ToAllocation(b Balances) (*channel.Allocation, error) {
+	asset, err := types.NewStellarAssetFromScAddress(b.Token)
+	if err != nil {
+		return nil, err
+	}
+	alloc := channel.NewAllocation(2, asset)
+
+	balA, err := ToBigInt(b.BalA)
+	if err != nil {
+		return nil, err
+	}
+	alloc.SetBalance(0, asset, balA)
+
+	balB, err := ToBigInt(b.BalB)
+	if err != nil {
+		return nil, err
+	}
+	alloc.SetBalance(1, asset, balB)
+	if err = alloc.Valid(); err != nil {
+		return nil, err
+	}
+	return alloc, nil
+}
+
+// MakeInt128Parts converts a big.Int to xdr.Int128Parts.
+// It returns an error if the big.Int is negative or too large.
+func MakeInt128Parts(i *big.Int) (xdr.Int128Parts, error) {
+	if i.Sign() < 0 {
+		return xdr.Int128Parts{}, errors.New("expected non-negative balance")
+	}
+	if i.Cmp(MaxBalance) > 0 {
+		return xdr.Int128Parts{}, errors.New("balance too large")
+	}
+	b := make([]byte, 16)
+	b = i.FillBytes(b)
+	hi := binary.BigEndian.Uint64(b[:8])
+	lo := binary.BigEndian.Uint64(b[8:])
+	return xdr.Int128Parts{
+		Hi: xdr.Int64(hi),
+		Lo: xdr.Uint64(lo),
+	}, nil
+}
+
+func ToBigInt(i xdr.Int128Parts) (*big.Int, error) {
+	b := make([]byte, 16)
+	binary.BigEndian.PutUint64(b[:8], uint64(i.Hi))
+	binary.BigEndian.PutUint64(b[8:], uint64(i.Lo))
+	return new(big.Int).SetBytes(b), nil
 }

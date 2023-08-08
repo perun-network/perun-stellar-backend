@@ -117,3 +117,11 @@ func ChannelFromScVal(v xdr.ScVal) (Channel, error) {
 	err := (&p).FromScVal(v)
 	return p, err
 }
+
+func MakeChannel(p Params, s State, c Control) Channel {
+	return Channel{
+		Params:  p,
+		State:   s,
+		Control: c,
+	}
+}
