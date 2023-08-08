@@ -1,4 +1,4 @@
-package wallet
+package types
 
 import (
 	"crypto/ed25519"
@@ -89,6 +89,14 @@ func AsParticipant(address wallet.Address) *Participant {
 		panic("ParticipantAddress has invalid type")
 	}
 	return p
+}
+
+func ToParticipant(address wallet.Address) (*Participant, error) {
+	p, ok := address.(*Participant)
+	if !ok {
+		return nil, fmt.Errorf("address has invalid type")
+	}
+	return p, nil
 }
 
 func PublicKeyFromKeyPair(kp keypair.KP) (ed25519.PublicKey, error) {

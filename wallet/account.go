@@ -6,6 +6,7 @@ import (
 	"github.com/stellar/go/keypair"
 	"math/rand"
 	"perun.network/go-perun/wallet"
+	"perun.network/perun-stellar-backend/wallet/types"
 )
 
 // Account is used for signing channel state.
@@ -42,7 +43,7 @@ func NewRandomAccount(rng *rand.Rand) (*Account, *keypair.Full, error) {
 
 // Address returns the Participant this account belongs to.
 func (a Account) Address() wallet.Address {
-	return NewParticipant(a.ParticipantAddress, a.privateKey.Public().(ed25519.PublicKey))
+	return types.NewParticipant(a.ParticipantAddress, a.privateKey.Public().(ed25519.PublicKey))
 }
 
 // SignData signs the given data with the account's private key.
