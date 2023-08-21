@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"perun.network/go-perun/wallet"
+	"perun.network/perun-stellar-backend/wallet/types"
 )
 
 // SignatureLength is the length of a signature in bytes.
@@ -19,7 +20,7 @@ func init() {
 }
 
 func (b backend) NewAddress() wallet.Address {
-	return &Participant{}
+	return &types.Participant{}
 }
 
 // DecodeSig decodes a signature of length SignatureLength from the reader.
@@ -32,7 +33,7 @@ func (b backend) DecodeSig(reader io.Reader) (wallet.Sig, error) {
 }
 
 func (b backend) VerifySignature(msg []byte, sig wallet.Sig, a wallet.Address) (bool, error) {
-	p, ok := a.(*Participant)
+	p, ok := a.(*types.Participant)
 	if !ok {
 		return false, errors.New("Participant has invalid type")
 	}

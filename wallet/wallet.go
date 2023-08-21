@@ -5,6 +5,7 @@ import (
 	"github.com/stellar/go/keypair"
 	"math/rand"
 	"perun.network/go-perun/wallet"
+	"perun.network/perun-stellar-backend/wallet/types"
 	"polycry.pt/poly-go/sync"
 )
 
@@ -14,7 +15,7 @@ type EphemeralWallet struct {
 }
 
 func (e *EphemeralWallet) Unlock(a wallet.Address) (wallet.Account, error) {
-	addr, ok := a.(*Participant)
+	addr, ok := a.(*types.Participant)
 	if !ok {
 		return nil, errors.New("incorrect Participant type")
 	}
@@ -44,7 +45,7 @@ func (e *EphemeralWallet) AddNewAccount(rng *rand.Rand) (*Account, *keypair.Full
 func (e *EphemeralWallet) AddAccount(acc *Account) error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
-	k := AsParticipant(acc.Address()).String()
+	k := types.AsParticipant(acc.Address()).String()
 	_, ok := e.accounts[k]
 	if ok {
 		return errors.New("account already exists")

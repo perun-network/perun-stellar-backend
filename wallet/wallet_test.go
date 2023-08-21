@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	gptest "perun.network/go-perun/wallet/test"
 	"perun.network/perun-stellar-backend/wallet"
+	"perun.network/perun-stellar-backend/wallet/types"
 	pkgtest "polycry.pt/poly-go/test"
 	"testing"
 )
@@ -43,7 +44,7 @@ func setup(rng *rand.Rand) *gptest.Setup {
 	if err != nil {
 		panic(err)
 	}
-	z, err := wallet.ZeroAddress()
+	z, err := types.ZeroAddress()
 	if err != nil {
 		panic(err)
 	}

@@ -12,6 +12,8 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/stellar/go v0.0.0-20230718034032-95c2976a11f2 h1:puur8PRJFs+o3CFEUf5FF/w3kOVAd1bvK9PU9jr3ouA=
 github.com/stellar/go v0.0.0-20230718034032-95c2976a11f2/go.mod h1:iTkyf5zUHlaIjZjyxaLLXLv+YHqg3etsqn8AOQ+DvG8=
+github.com/stellar/go v0.0.0-20230801100123-5ded27e97f53 h1:U/W5fqYM9zgmLpLT3jGOY9LbkinXaaqkW+P8bzBTO+0=
+github.com/stellar/go v0.0.0-20230801100123-5ded27e97f53/go.mod h1:m9ABBUAExq/TfafyQrLie0owyyAR6IYCRhujttELLHU=
 github.com/stellar/go-xdr v0.0.0-20211103144802-8017fc4bdfee h1:fbVs0xmXpBvVS4GBeiRmAE3Le70ofAqFMch1GTiq/e8=
 github.com/stellar/go-xdr v0.0.0-20211103144802-8017fc4bdfee/go.mod h1:yoxyU/M8nl9LKeWIoBrbDPQ7Cy+4jxRcWcOayZ4BMps=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
