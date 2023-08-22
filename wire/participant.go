@@ -5,9 +5,10 @@ import (
 	"crypto/ed25519"
 	"errors"
 	xdr3 "github.com/stellar/go-xdr/xdr3"
-	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/xdr"
+	assettypes "perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/wallet/types"
+
 	"perun.network/perun-stellar-backend/wire/scval"
 )
 
@@ -107,7 +108,7 @@ func ParticipantFromScVal(v xdr.ScVal) (Participant, error) {
 }
 
 func MakeParticipant(participant types.Participant) (Participant, error) {
-	addr, err := MakeAccountAddress(&participant.Address)
+	addr, err := assettypes.MakeAccountAddress(&participant.Address)
 	if err != nil {
 		return Participant{}, err
 	}
@@ -121,27 +122,8 @@ func MakeParticipant(participant types.Participant) (Participant, error) {
 	}, nil
 }
 
-func MakeAccountAddress(kp keypair.KP) (xdr.ScAddress, error) {
-	accountId, err := xdr.AddressToAccountId(kp.Address())
-	if err != nil {
-		return xdr.ScAddress{}, err
-	}
-	return xdr.NewScAddress(xdr.ScAddressTypeScAddressTypeAccount, accountId)
-}
-
-func ToAccountAddress(address xdr.ScAddress) (keypair.FromAddress, error) {
-	if address.Type != xdr.ScAddressTypeScAddressTypeAccount {
-		return keypair.FromAddress{}, errors.New("invalid address type")
-	}
-	kp, err := keypair.ParseAddress(address.AccountId.Address())
-	if err != nil {
-		return keypair.FromAddress{}, err
-	}
-	return *kp, nil
-}
-
 func ToParticipant(participant Participant) (types.Participant, error) {
-	kp, err := ToAccountAddress(participant.Addr)
+	kp, err := assettypes.ToAccountAddress(participant.Addr)
 	if err != nil {
 		return types.Participant{}, err
 	}
