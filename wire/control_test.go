@@ -1,4 +1,4 @@
-package test
+package wire_test
 
 import (
 	"github.com/stretchr/testify/require"

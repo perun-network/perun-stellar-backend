@@ -93,10 +93,6 @@ func MakeAccountAddress(kp keypair.KP) (xdr.ScAddress, error) {
 }
 
 func MakeContractAddress(contractID xdr.Hash) (xdr.ScAddress, error) {
-	if len(contractID) != HashLenXdr {
-		return xdr.ScAddress{}, errors.New("invalid contractID length for xdr.Hash")
-	}
-
 	return xdr.NewScAddress(xdr.ScAddressTypeScAddressTypeContract, contractID)
 }
 

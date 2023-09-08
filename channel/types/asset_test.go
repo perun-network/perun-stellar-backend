@@ -1,10 +1,11 @@
 package types_test
 
 import (
-	"bytes"
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/xdr"
+	"github.com/stretchr/testify/require"
 	"perun.network/perun-stellar-backend/channel/types"
+
 	"testing"
 )
 
@@ -15,30 +16,20 @@ func TestMarshalAndUnmarshalBinary(t *testing.T) {
 	asset := types.NewStellarAsset(hash)
 
 	data, err := asset.MarshalBinary()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	newAsset := &types.StellarAsset{}
 	err = newAsset.UnmarshalBinary(data)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	if !bytes.Equal([]byte(newAsset.ContractID().HexString()), []byte(asset.ContractID().HexString())) {
-		t.Fatalf("expected %x, got %x", asset.ContractID(), newAsset.ContractID())
-	}
+	require.Equal(t, asset.ContractID().HexString(), newAsset.ContractID().HexString(), "Mismatched ContractID. Expected %x, got %x", asset.ContractID(), newAsset.ContractID())
 }
 
 func TestMakeAccountAddress(t *testing.T) {
 	kp, _ := keypair.Random()
 
 	address, err := types.MakeAccountAddress(kp)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	if address.Type != xdr.ScAddressTypeScAddressTypeAccount {
-		t.Fatalf("expected account address type, got %v", address.Type)
-	}
+	require.Equal(t, xdr.ScAddressTypeScAddressTypeAccount, address.Type, "Expected account address type, got %v", address.Type)
 }
