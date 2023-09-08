@@ -55,6 +55,9 @@ func (p Params) ToScVal() (xdr.ScVal, error) {
 		},
 		[]xdr.ScVal{a, b, nonce, challengeDuration},
 	)
+	if err != nil {
+		return xdr.ScVal{}, err
+	}
 	return scval.WrapScMap(m)
 }
 

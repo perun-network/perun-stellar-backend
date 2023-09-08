@@ -7,20 +7,28 @@ import (
 	"perun.network/go-perun/channel"
 )
 
-const AddressLen = 32
+const HashLenXdr = 32
 
 type StellarAsset struct {
-	address keypair.FromAddress
+	contractID xdr.Hash
+}
+
+func (s StellarAsset) ContractID() xdr.Hash {
+	return s.contractID
+}
+
+func NewStellarAsset(contractID xdr.Hash) *StellarAsset {
+	return &StellarAsset{contractID: contractID}
 }
 
 func (s StellarAsset) MarshalBinary() (data []byte, err error) {
-	return s.address.MarshalBinary()
+	return s.contractID.MarshalBinary()
 }
 
-func (s StellarAsset) UnmarshalBinary(data []byte) error {
-	var addr [AddressLen]byte
+func (s *StellarAsset) UnmarshalBinary(data []byte) error {
+	var addr [HashLenXdr]byte
 	copy(addr[:], data)
-	err := s.address.UnmarshalBinary(data)
+	err := s.contractID.UnmarshalBinary(data)
 	if err != nil {
 		panic(err)
 	}
@@ -33,7 +41,8 @@ func (s StellarAsset) Equal(asset channel.Asset) bool {
 }
 
 func (s StellarAsset) MakeScAddress() (xdr.ScAddress, error) {
-	scvAddr, err := MakeAccountAddress(&s.address)
+	hash := s.contractID
+	scvAddr, err := MakeContractAddress(hash)
 	if err != nil {
 		panic(err)
 	}
@@ -41,11 +50,12 @@ func (s StellarAsset) MakeScAddress() (xdr.ScAddress, error) {
 }
 
 func (s *StellarAsset) FromScAddress(address xdr.ScAddress) error {
-	addr, err := ToAccountAddress(address)
-	if err != nil {
-		panic(err)
+	addrType := address.Type
+	if addrType != xdr.ScAddressTypeScAddressTypeContract {
+		return errors.New("invalid address type")
 	}
-	s.address = addr
+
+	s.contractID = *address.ContractId
 	return nil
 }
 
@@ -80,6 +90,14 @@ func MakeAccountAddress(kp keypair.KP) (xdr.ScAddress, error) {
 		return xdr.ScAddress{}, err
 	}
 	return xdr.NewScAddress(xdr.ScAddressTypeScAddressTypeAccount, accountId)
+}
+
+func MakeContractAddress(contractID xdr.Hash) (xdr.ScAddress, error) {
+	if len(contractID) != HashLenXdr {
+		return xdr.ScAddress{}, errors.New("invalid contractID length for xdr.Hash")
+	}
+
+	return xdr.NewScAddress(xdr.ScAddressTypeScAddressTypeContract, contractID)
 }
 
 func ToAccountAddress(address xdr.ScAddress) (keypair.FromAddress, error) {

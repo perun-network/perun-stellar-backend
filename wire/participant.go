@@ -32,6 +32,9 @@ func (p Participant) ToScVal() (xdr.ScVal, error) {
 		return xdr.ScVal{}, errors.New("invalid public key length")
 	}
 	pubKey, err := scval.WrapScBytes(p.PubKey)
+	if err != nil {
+		return xdr.ScVal{}, err
+	}
 	m, err := MakeSymbolScMap(
 		[]xdr.ScSymbol{
 			SymbolParticipantAddr,
@@ -39,6 +42,9 @@ func (p Participant) ToScVal() (xdr.ScVal, error) {
 		},
 		[]xdr.ScVal{addr, pubKey},
 	)
+	if err != nil {
+		return xdr.ScVal{}, err
+	}
 	return scval.WrapScMap(m)
 }
 
@@ -63,6 +69,9 @@ func (p *Participant) FromScVal(v xdr.ScVal) error {
 		return err
 	}
 	pubKey, ok := pubKeyVal.GetBytes()
+	if !ok {
+		return errors.New("expected bytes")
+	}
 	if len(pubKey) != PubKeyLength {
 		return errors.New("invalid public key length")
 	}

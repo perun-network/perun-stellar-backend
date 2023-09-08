@@ -41,6 +41,21 @@ func NewRandomAccount(rng *rand.Rand) (*Account, *keypair.Full, error) {
 	return acc, kp, nil
 }
 
+func NewRandomAddress(rng *rand.Rand) wallet.Address {
+	kp, err := keypair.Random()
+	if err != nil {
+		panic(err)
+	}
+	acc, err := NewRandomAccountWithAddress(rng, kp.FromAddress())
+	if err != nil {
+		panic(err)
+	}
+
+	addr := acc.Address()
+
+	return addr
+}
+
 // Address returns the Participant this account belongs to.
 func (a Account) Address() wallet.Address {
 	return types.NewParticipant(a.ParticipantAddress, a.privateKey.Public().(ed25519.PublicKey))

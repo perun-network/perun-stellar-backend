@@ -70,6 +70,9 @@ func (c Control) ToScVal() (xdr.ScVal, error) {
 		},
 		[]xdr.ScVal{fundedA, fundedB, closed, withdrawnA, withdrawnB, disputed, timestamp},
 	)
+	if err != nil {
+		return xdr.ScVal{}, err
+	}
 	return scval.WrapScMap(m)
 }
 
