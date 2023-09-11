@@ -207,7 +207,7 @@ func ToState(stellarState State) (channel.State, error) {
 
 	PerunState := channel.State{ID: ChanID,
 		Version:    uint64(stellarState.Version),
-		Allocation: Alloc,
+		Allocation: *Alloc,
 		IsFinal:    stellarState.Finalized,
 		App:        channel.NoApp(),
 		Data:       channel.NoData(),
@@ -220,10 +220,10 @@ func ToState(stellarState State) (channel.State, error) {
 	return PerunState, nil
 }
 
-func convertAsset(contractID xdr.ScAddress) ([]channel.Asset, error) {
+func convertAsset(contractID xdr.ScAddress) (channel.Asset, error) {
 	stellarAsset, err := types.NewStellarAssetFromScAddress(contractID)
 	if err != nil {
 		return nil, err
 	}
-	return []channel.Asset{stellarAsset}, nil
+	return stellarAsset, nil
 }

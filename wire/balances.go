@@ -227,18 +227,13 @@ func ToBigInt(i xdr.Int128Parts) (*big.Int, error) {
 	return new(big.Int).SetBytes(b), nil
 }
 
-func makeAllocation(assets []channel.Asset, balA, balB *big.Int) (channel.Allocation, error) {
-	balanceForAssets := []channel.Bal{balA, balB}
-
-	alloc := channel.Allocation{
-		Assets: assets,
-		Balances: [][]channel.Bal{
-			balanceForAssets,
-		},
-	}
+func makeAllocation(asset channel.Asset, balA, balB *big.Int) (*channel.Allocation, error) {
+	alloc := channel.NewAllocation(2, asset)
+	alloc.SetBalance(0, asset, balA)
+	alloc.SetBalance(1, asset, balB)
 
 	if err := alloc.Valid(); err != nil {
-		return channel.Allocation{}, err
+		return nil, err
 	}
 
 	return alloc, nil

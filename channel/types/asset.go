@@ -30,7 +30,7 @@ func (s *StellarAsset) UnmarshalBinary(data []byte) error {
 	copy(addr[:], data)
 	err := s.contractID.UnmarshalBinary(data)
 	if err != nil {
-		panic(err)
+		return errors.New("could not unmarshal contract id")
 	}
 	return nil
 }
@@ -44,7 +44,7 @@ func (s StellarAsset) MakeScAddress() (xdr.ScAddress, error) {
 	hash := s.contractID
 	scvAddr, err := MakeContractAddress(hash)
 	if err != nil {
-		panic(err)
+		return xdr.ScAddress{}, errors.New("could not generate contract address")
 	}
 	return scvAddr, nil
 }
