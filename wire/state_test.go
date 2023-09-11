@@ -3,7 +3,11 @@ package wire_test
 import (
 	"fmt"
 	"github.com/stretchr/testify/require"
+	"math/big"
+	"perun.network/go-perun/channel"
+	ptest "perun.network/go-perun/channel/test"
 	"perun.network/perun-stellar-backend/wire"
+	polytest "polycry.pt/poly-go/test"
 	"testing"
 )
 
@@ -17,4 +21,62 @@ func TestState(t *testing.T) {
 	res, err := state.MarshalBinary()
 	require.NoError(t, err)
 	require.Equal(t, x, res)
+}
+
+func TestStateConversion(t *testing.T) {
+	rng := polytest.Prng(t)
+	perunFirstState := *ptest.NewRandomState(rng,
+		ptest.WithNumParts(2),
+		ptest.WithNumAssets(1),
+		ptest.WithNumLocked(0),
+		ptest.WithoutApp(),
+		ptest.WithBalancesInRange(big.NewInt(0).Mul(big.NewInt(1), big.NewInt(100_000_000)), big.NewInt(0).Mul(big.NewInt(1), big.NewInt(100_000_000))),
+	)
+
+	stellarFirstState, err := wire.MakeState(perunFirstState)
+	require.NoError(t, err)
+
+	perunLastState, err := wire.ToState(stellarFirstState)
+	require.NoError(t, err)
+
+	validatePerunStates(t, perunFirstState, perunLastState)
+
+	stellarLastState, err := wire.MakeState(perunLastState)
+	require.NoError(t, err)
+
+	checkStellarStateEquality(t, stellarFirstState, stellarLastState)
+}
+
+func validatePerunStates(t *testing.T, first, last channel.State) {
+	checkAssetsEquality(t, first, last)
+	checkNoLockedAmount(t, first)
+	checkNoLockedAmount(t, last)
+	checkPerunStateEquality(t, first, last)
+}
+
+func checkAssetsEquality(t *testing.T, first, last channel.State) {
+	for i, asset := range first.Allocation.Assets {
+		require.True(t, asset.Equal(last.Allocation.Assets[i]))
+	}
+}
+
+func checkNoLockedAmount(t *testing.T, state channel.State) {
+	if len(state.Allocation.Locked) != 0 {
+		t.Fatal("locked amount should be empty")
+	}
+}
+
+func checkPerunStateEquality(t *testing.T, first, last channel.State) {
+	require.Equal(t, first.IsFinal, last.IsFinal)
+	require.Equal(t, first.ID, last.ID)
+	require.Equal(t, first.Version, last.Version)
+}
+
+func checkStellarStateEquality(t *testing.T, first, last wire.State) {
+	require.Equal(t, first.Version, last.Version)
+	require.Equal(t, first.ChannelID, last.ChannelID)
+	require.Equal(t, first.Finalized, last.Finalized)
+	require.Equal(t, first.Balances.BalA, last.Balances.BalA)
+	require.Equal(t, first.Balances.BalB, last.Balances.BalB)
+	require.Equal(t, first.Balances.Token, last.Balances.Token)
 }

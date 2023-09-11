@@ -3,9 +3,11 @@ package wire
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	xdr3 "github.com/stellar/go-xdr/xdr3"
 	"github.com/stellar/go/xdr"
 	"perun.network/go-perun/channel"
+	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/wire/scval"
 )
 
@@ -22,7 +24,7 @@ type State struct {
 	ChannelID xdr.ScBytes
 	Balances  Balances
 	Version   xdr.Uint64
-	Finalized bool // Bool
+	Finalized bool
 }
 
 func (s State) ToScVal() (xdr.ScVal, error) {
@@ -54,6 +56,9 @@ func (s State) ToScVal() (xdr.ScVal, error) {
 		},
 		[]xdr.ScVal{channelID, balances, version, finalized},
 	)
+	if err != nil {
+		return xdr.ScVal{}, err
+	}
 	return scval.WrapScMap(m)
 }
 
@@ -166,4 +171,59 @@ func MakeState(state channel.State) (State, error) {
 	}, nil
 }
 
-// TODO: Check if ToState is needed
+func scBytesToByteArray(bytesXdr xdr.ScBytes) ([types.HashLenXdr]byte, error) {
+	if len(bytesXdr) != types.HashLenXdr {
+		return [types.HashLenXdr]byte{}, fmt.Errorf("expected length of %d bytes, got %d", types.HashLenXdr, len(bytesXdr))
+	}
+	var arr [types.HashLenXdr]byte
+	copy(arr[:], bytesXdr[:types.HashLenXdr])
+	return arr, nil
+}
+
+func ToState(stellarState State) (channel.State, error) {
+	ChanID, err := scBytesToByteArray(stellarState.ChannelID)
+	if err != nil {
+		return channel.State{}, err
+	}
+
+	BalA, err := ToBigInt(stellarState.Balances.BalA)
+	if err != nil {
+		return channel.State{}, err
+	}
+	BalB, err := ToBigInt(stellarState.Balances.BalB)
+	if err != nil {
+		return channel.State{}, err
+	}
+
+	Assets, err := convertAsset(stellarState.Balances.Token)
+	if err != nil {
+		return channel.State{}, err
+	}
+
+	Alloc, err := makeAllocation(Assets, BalA, BalB)
+	if err != nil {
+		return channel.State{}, err
+	}
+
+	PerunState := channel.State{ID: ChanID,
+		Version:    uint64(stellarState.Version),
+		Allocation: *Alloc,
+		IsFinal:    stellarState.Finalized,
+		App:        channel.NoApp(),
+		Data:       channel.NoData(),
+	}
+
+	if PerunState.Valid() != nil {
+		return channel.State{}, err
+	}
+
+	return PerunState, nil
+}
+
+func convertAsset(contractID xdr.ScAddress) (channel.Asset, error) {
+	stellarAsset, err := types.NewStellarAssetFromScAddress(contractID)
+	if err != nil {
+		return nil, err
+	}
+	return stellarAsset, nil
+}

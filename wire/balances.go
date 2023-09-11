@@ -226,3 +226,15 @@ func ToBigInt(i xdr.Int128Parts) (*big.Int, error) {
 	binary.BigEndian.PutUint64(b[8:], uint64(i.Lo))
 	return new(big.Int).SetBytes(b), nil
 }
+
+func makeAllocation(asset channel.Asset, balA, balB *big.Int) (*channel.Allocation, error) {
+	alloc := channel.NewAllocation(2, asset)
+	alloc.SetBalance(0, asset, balA)
+	alloc.SetBalance(1, asset, balB)
+
+	if err := alloc.Valid(); err != nil {
+		return nil, err
+	}
+
+	return alloc, nil
+}

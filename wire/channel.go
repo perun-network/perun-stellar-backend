@@ -41,6 +41,9 @@ func (c Channel) ToScVal() (xdr.ScVal, error) {
 		},
 		[]xdr.ScVal{params, state, control},
 	)
+	if err != nil {
+		return xdr.ScVal{}, err
+	}
 	return scval.WrapScMap(m)
 }
 

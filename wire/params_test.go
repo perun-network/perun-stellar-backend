@@ -2,7 +2,15 @@ package wire_test
 
 import (
 	"github.com/stretchr/testify/require"
+	"math/big"
+	"perun.network/go-perun/channel"
+	ptest "perun.network/go-perun/channel/test"
+	schannel "perun.network/perun-stellar-backend/channel"
+
+	_ "perun.network/perun-stellar-backend/wallet/test"
 	"perun.network/perun-stellar-backend/wire"
+
+	pkgtest "polycry.pt/poly-go/test"
 	"testing"
 )
 
@@ -14,4 +22,53 @@ func TestParams(t *testing.T) {
 	res, err := p.MarshalBinary()
 	require.NoError(t, err)
 	require.Equal(t, x, res)
+}
+
+func TestParamsConversion(t *testing.T) {
+	rng := pkgtest.Prng(t)
+
+	numParts := 2
+
+	perunFirstParams := *ptest.NewRandomParams(rng, ptest.WithNumLocked(0).Append(
+		ptest.WithNumParts(numParts),
+		ptest.WithBalancesInRange(big.NewInt(0), big.NewInt(1<<60)),
+		ptest.WithLedgerChannel(true),
+		ptest.WithVirtualChannel(false),
+		ptest.WithNumAssets(1),
+		ptest.WithoutApp(),
+	))
+
+	stellarFirstParams, err := wire.MakeParams(perunFirstParams)
+	require.NoError(t, err)
+
+	perunLastParams, err := wire.ToParams(stellarFirstParams)
+	require.NoError(t, err)
+
+	checkPerunParamsEquality(t, perunFirstParams, perunLastParams, numParts)
+
+	stellarLastParams, err := wire.MakeParams(perunLastParams)
+	require.NoError(t, err)
+
+	checkStellarParamsEquality(t, stellarFirstParams, stellarLastParams)
+}
+
+func checkPerunParamsEquality(t *testing.T, first, last channel.Params, numParts int) {
+	require.Equal(t, first.ID(), schannel.Backend.CalcID(&last))
+
+	for i := 0; i < numParts; i++ {
+		require.True(t, last.Parts[i].Equal(first.Parts[i]))
+	}
+
+	require.Equal(t, first.ChallengeDuration, last.ChallengeDuration)
+	require.Equal(t, first.Nonce, last.Nonce)
+	require.Equal(t, first.App, last.App)
+	require.Equal(t, first.LedgerChannel, last.LedgerChannel)
+	require.Equal(t, first.VirtualChannel, last.VirtualChannel)
+}
+
+func checkStellarParamsEquality(t *testing.T, first, last wire.Params) {
+	require.Equal(t, first.A, last.A)
+	require.Equal(t, first.B, last.B)
+	require.Equal(t, first.ChallengeDuration, last.ChallengeDuration)
+	require.Equal(t, first.Nonce, last.Nonce)
 }
