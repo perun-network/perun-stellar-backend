@@ -1,0 +1,20 @@
+version: '3'
+services:
+  soroban-rpc:
+    platform: linux/amd64
+    image: ${SOROBAN_RPC_IMAGE:-stellar/soroban-rpc}
+    depends_on:
+      - core
+    restart: on-failure
+    ports:
+      - "8080:8080"
+    environment:
+      - ENDPOINT=:8080
+      - NETWORK_PASSPHRASE=Standalone Network ; February 2017
+      - CAPTIVE_CORE_CONFIG_PATH=/captive-core.cfg
+      - HISTORY_ARCHIVE_URLS=http://core:1570
+      - CHECKPOINT_FREQUENCY=8
+      - LOG_LEVEL=debug
+    volumes:
+      - ./captive-core-integration-tests.soroban-rpc.cfg:/captive-core.cfg
+

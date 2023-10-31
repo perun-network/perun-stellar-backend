@@ -231,6 +231,7 @@ func makeAllocation(asset channel.Asset, balA, balB *big.Int) (*channel.Allocati
 	alloc := channel.NewAllocation(2, asset)
 	alloc.SetBalance(0, asset, balA)
 	alloc.SetBalance(1, asset, balB)
+	alloc.Locked = make([]channel.SubAlloc, 0)
 
 	if err := alloc.Valid(); err != nil {
 		return nil, err
