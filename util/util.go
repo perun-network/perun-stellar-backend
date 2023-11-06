@@ -9,24 +9,21 @@ import (
 	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/wallet"
 
-	//pkgtest "polycry.pt/poly-go/test"
 	"crypto/rand"
 	"encoding/binary"
 	mathrand "math/rand"
 )
 
-const PerunContractPath = "./testdata/perun_soroban_contract.wasm"
-
-func Deploy(stellarEnv *env.IntegrationTestEnv, kpAlice *keypair.Full, hzDeployer horizon.Account) xdr.ScAddress {
+func Deploy(stellarEnv *env.IntegrationTestEnv, kp *keypair.Full, hz horizon.Account, contractPath string) xdr.ScAddress {
 	// Install contract
-	installContractOp := channel.AssembleInstallContractCodeOp(kpAlice.Address(), PerunContractPath)
-	preFlightOp, minFee := stellarEnv.PreflightHostFunctions(&hzDeployer, *installContractOp)
-	_ = stellarEnv.MustSubmitOperationsWithFee(&hzDeployer, kpAlice, minFee, &preFlightOp)
+	installContractOp := channel.AssembleInstallContractCodeOp(kp.Address(), contractPath)
+	preFlightOp, minFee := stellarEnv.PreflightHostFunctions(&hz, *installContractOp)
+	_ = stellarEnv.MustSubmitOperationsWithFee(&hz, kp, minFee, &preFlightOp)
 
 	// Create the contract
-	createContractOp := channel.AssembleCreateContractOp(kpAlice.Address(), PerunContractPath, "a1", stellarEnv.GetPassPhrase())
-	preFlightOp, minFee = stellarEnv.PreflightHostFunctions(&hzDeployer, *createContractOp)
-	_, err := stellarEnv.SubmitOperationsWithFee(&hzDeployer, kpAlice, minFee, &preFlightOp)
+	createContractOp := channel.AssembleCreateContractOp(kp.Address(), contractPath, "a1", stellarEnv.GetPassPhrase())
+	preFlightOp, minFee = stellarEnv.PreflightHostFunctions(&hz, *createContractOp)
+	_, err := stellarEnv.SubmitOperationsWithFee(&hz, kp, minFee, &preFlightOp)
 	if err != nil {
 		panic(err)
 	}

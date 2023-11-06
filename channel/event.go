@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/stellar/go/xdr"
+	"log"
 	pchannel "perun.network/go-perun/channel"
 	"perun.network/perun-stellar-backend/wire"
 	"time"
@@ -104,99 +105,99 @@ type StellarEvent struct {
 	ChannelState wire.Channel
 }
 
-func (e StellarEvent) GetType() EventType {
+func (e *StellarEvent) GetType() EventType {
 	return e.Type
 }
 
-func (e OpenEvent) GetChannel() wire.Channel {
+func (e *OpenEvent) GetChannel() wire.Channel {
 	return e.Channel
 }
 
-func (e OpenEvent) ID() pchannel.ID {
+func (e *OpenEvent) ID() pchannel.ID {
 	return e.IDV
 }
-func (e OpenEvent) Version() Version {
+func (e *OpenEvent) Version() Version {
 	return e.VersionV
 }
-func (e OpenEvent) Tstamp() uint64 {
+func (e *OpenEvent) Tstamp() uint64 {
 	return e.Timestamp
 }
 
-func (e OpenEvent) Timeout() pchannel.Timeout {
+func (e *OpenEvent) Timeout() pchannel.Timeout {
 	when := time.Now().Add(10 * time.Second)
 	pollInterval := 1 * time.Second
 	return NewTimeout(when, pollInterval)
 }
 
-func (e WithdrawnEvent) GetChannel() wire.Channel {
+func (e *WithdrawnEvent) GetChannel() wire.Channel {
 	return e.Channel
 }
 
-func (e WithdrawnEvent) ID() pchannel.ID {
+func (e *WithdrawnEvent) ID() pchannel.ID {
 	return e.IDV
 }
-func (e WithdrawnEvent) Version() Version {
+func (e *WithdrawnEvent) Version() Version {
 	return e.VersionV
 }
 func (e WithdrawnEvent) Tstamp() uint64 {
 	return e.Timestamp
 }
 
-func (e WithdrawnEvent) Timeout() pchannel.Timeout {
+func (e *WithdrawnEvent) Timeout() pchannel.Timeout {
 	when := time.Now().Add(10 * time.Second)
 	pollInterval := 1 * time.Second
 	return NewTimeout(when, pollInterval)
 }
 
-func (e CloseEvent) GetChannel() wire.Channel {
+func (e *CloseEvent) GetChannel() wire.Channel {
 	return e.Channel
 }
 
-func (e CloseEvent) ID() pchannel.ID {
+func (e *CloseEvent) ID() pchannel.ID {
 	return e.IDV
 }
-func (e CloseEvent) Version() Version {
+func (e *CloseEvent) Version() Version {
 	return e.VersionV
 }
-func (e CloseEvent) Tstamp() uint64 {
+func (e *CloseEvent) Tstamp() uint64 {
 	return e.Timestamp
 }
 
-func (e CloseEvent) Timeout() pchannel.Timeout {
+func (e *CloseEvent) Timeout() pchannel.Timeout {
 	when := time.Now().Add(10 * time.Second)
 	pollInterval := 1 * time.Second
 	return NewTimeout(when, pollInterval)
 }
 
-func (e FundEvent) Timeout() pchannel.Timeout {
+func (e *FundEvent) Timeout() pchannel.Timeout {
 	when := time.Now().Add(10 * time.Second)
 	pollInterval := 1 * time.Second
 	return NewTimeout(when, pollInterval)
 }
 
-func (e FundEvent) ID() pchannel.ID {
+func (e *FundEvent) ID() pchannel.ID {
 	return e.IDV
 }
-func (e FundEvent) Version() Version {
+func (e *FundEvent) Version() Version {
 	return e.VersionV
 }
-func (e FundEvent) Tstamp() uint64 {
+func (e *FundEvent) Tstamp() uint64 {
 	return e.Timestamp
 }
 
-func (e DisputedEvent) Timeout() pchannel.Timeout {
+func (e *DisputedEvent) Timeout() pchannel.Timeout {
 	when := time.Now().Add(10 * time.Second)
 	pollInterval := 1 * time.Second
 	return NewTimeout(when, pollInterval)
 }
 
-func (e DisputedEvent) ID() pchannel.ID {
+func (e *DisputedEvent) ID() pchannel.ID {
 	return e.IDV
 }
-func (e DisputedEvent) Version() Version {
+func (e *DisputedEvent) Version() Version {
 	return e.VersionV
 }
-func (e DisputedEvent) Tstamp() uint64 {
+func (e *DisputedEvent) Tstamp() uint64 {
 	return e.Timestamp
 }
 
@@ -252,7 +253,11 @@ func DecodeEvents(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 				Channel: openEventchanStellar,
 			}
 
-			evs = append(evs, openEvent)
+			evs = append(evs, &openEvent)
+			log.Println("OpenEvent: ", openEvent)
+			log.Println("OpenEvent-Params: ", openEvent.Channel.Params)
+			log.Println("OpenEvent-State: ", openEvent.Channel.State)
+			log.Println("OpenEvent-Control: ", openEvent.Channel.Control)
 
 		case EventTypeFundChannel:
 			fundEventchanStellar, _, err := GetChannelBoolFromEvents(ev.Body.V0.Data)
@@ -263,7 +268,7 @@ func DecodeEvents(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 			fundEvent := FundEvent{
 				Channel: fundEventchanStellar,
 			}
-			evs = append(evs, fundEvent)
+			evs = append(evs, &fundEvent)
 
 		case EventTypeClosed:
 			closedEventchanStellar, err := GetChannelFromEvents(ev.Body.V0.Data)
@@ -274,7 +279,16 @@ func DecodeEvents(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 			closeEvent := CloseEvent{
 				Channel: closedEventchanStellar,
 			}
-			evs = append(evs, closeEvent)
+			evs = append(evs, &closeEvent)
+		case EventTypeWithdrawn:
+			withdrawnEventchanStellar, err := GetChannelFromEvents(ev.Body.V0.Data)
+			if err != nil {
+				return []PerunEvent{}, err
+			}
+			withdrawnEvent := WithdrawnEvent{
+				Channel: withdrawnEventchanStellar,
+			}
+			evs = append(evs, &withdrawnEvent)
 		}
 
 	}
@@ -341,7 +355,7 @@ func checkOpen(cState controlsState) error {
 	return nil
 }
 
-func (e CloseEvent) EventDataFromChannel(chanState wire.Channel, timestamp uint64) error {
+func (e *CloseEvent) EventDataFromChannel(chanState wire.Channel, timestamp uint64) error {
 
 	chanID := chanState.State.ChannelID
 	var cid [32]byte
@@ -354,7 +368,7 @@ func (e CloseEvent) EventDataFromChannel(chanState wire.Channel, timestamp uint6
 	return nil
 }
 
-func (e FundEvent) EventDataFromChannel(chanState wire.Channel, timestamp uint64) error {
+func (e *FundEvent) EventDataFromChannel(chanState wire.Channel, timestamp uint64) error {
 
 	chanID := chanState.State.ChannelID
 	var cid [32]byte
@@ -367,7 +381,7 @@ func (e FundEvent) EventDataFromChannel(chanState wire.Channel, timestamp uint64
 	return nil
 }
 
-func (e WithdrawnEvent) EventDataFromChannel(chanState wire.Channel, timestamp uint64) error {
+func (e *WithdrawnEvent) EventDataFromChannel(chanState wire.Channel, timestamp uint64) error {
 
 	chanID := chanState.State.ChannelID
 	var cid [32]byte
@@ -380,7 +394,7 @@ func (e WithdrawnEvent) EventDataFromChannel(chanState wire.Channel, timestamp u
 	return nil
 }
 
-func (e DisputedEvent) EventDataFromChannel(chanState wire.Channel, timestamp uint64) error {
+func (e *DisputedEvent) EventDataFromChannel(chanState wire.Channel, timestamp uint64) error {
 
 	chanID := chanState.State.ChannelID
 	var cid [32]byte

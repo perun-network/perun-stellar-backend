@@ -3,12 +3,11 @@ package channel
 import (
 	"context"
 	"errors"
-	//"fmt"
+	"fmt"
 	"github.com/stellar/go/keypair"
 	"log"
 	pchannel "perun.network/go-perun/channel"
 	"perun.network/perun-stellar-backend/channel/env"
-	//"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/wallet"
 	"perun.network/perun-stellar-backend/wire"
 
@@ -27,19 +26,18 @@ type Funder struct {
 	pollingInterval time.Duration
 }
 
-func NewFunder(acc *wallet.Account, stellarClient *env.StellarClient) *Funder {
+func NewFunder(acc *wallet.Account, kp *keypair.Full, stellarClient *env.StellarClient) *Funder {
 	return &Funder{
-		//integrEnv:       *env.NewBackendEnv(),
 		stellarClient:   stellarClient,
 		acc:             acc,
+		kpFull:          kp,
 		maxIters:        MaxIterationsUntilAbort,
 		pollingInterval: DefaultPollingInterval,
 	}
 }
 
-func (f Funder) Fund(ctx context.Context, req pchannel.FundingReq) error {
+func (f *Funder) Fund(ctx context.Context, req pchannel.FundingReq) error {
 	log.Println("Fund called")
-
 	switch req.Idx {
 	case 0:
 		return f.fundPartyA(ctx, req)
@@ -50,21 +48,29 @@ func (f Funder) Fund(ctx context.Context, req pchannel.FundingReq) error {
 	}
 }
 
-func (f Funder) fundPartyA(ctx context.Context, req pchannel.FundingReq) error {
+func (f *Funder) fundPartyA(ctx context.Context, req pchannel.FundingReq) error {
+	fmt.Println("req: polling for party A: ", req)
+
 	err := f.OpenChannel(ctx, req.Params, req.State)
 	if err != nil {
-		return err
-	}
 
+		return errors.New("error while opening channel in party A")
+	}
+	fmt.Println("opened channel in party A, checking state")
+	chanState, err := f.GetChannelState(ctx, req.Params, req.State)
+	fmt.Println("chanState after opening channel: ", chanState)
+	if err != nil {
+		return errors.New("error while polling for opened channel A")
+	}
+	fmt.Println("polled chanState for PartyA: ", chanState.Control.FundedA, chanState.Control.FundedB)
 	// fund the channel:
+
+	fmt.Println("funding channel in party A: ", req.Params, "state: ", req.State)
 
 	err = f.FundChannel(ctx, req.Params, req.State, false)
 	if err != nil {
 		return err
 	}
-
-	// look for channel ID in events
-	//chanID := req.State.ID
 
 	// await response from party B
 
@@ -74,10 +80,12 @@ polling:
 		case <-ctx.Done():
 			return f.AbortChannel(ctx, req.Params, req.State)
 		case <-time.After(f.pollingInterval):
+			fmt.Println("Party A: Polling for opened channel...")
 			chanState, err := f.GetChannelState(ctx, req.Params, req.State)
 			if err != nil {
 				continue polling
 			}
+			fmt.Println("Party A: chanState.Control.FundedA && chanState.Control.FundedB: ", chanState.Control.FundedA, chanState.Control.FundedB)
 
 			if chanState.Control.FundedA && chanState.Control.FundedB {
 				return nil
@@ -88,9 +96,14 @@ polling:
 	return f.AbortChannel(ctx, req.Params, req.State)
 }
 
-func (f Funder) fundPartyB(ctx context.Context, req pchannel.FundingReq) error {
-polling:
+func (f *Funder) fundPartyB(ctx context.Context, req pchannel.FundingReq) error {
+	fmt.Println("req: polling for party B: ", req)
+	// err := f.OpenChannel(ctx, req.Params, req.State)
+	// if err != nil {
+	// 	return errors.New("error while opening channel in party A")
+	// }
 
+polling:
 	for {
 		select {
 		case <-ctx.Done():
@@ -98,6 +111,7 @@ polling:
 		case <-time.After(f.pollingInterval):
 			log.Println("Party B: Polling for opened channel...")
 			chanState, err := f.GetChannelState(ctx, req.Params, req.State)
+			fmt.Println("polled chanState for PartyB: ", chanState.Control.FundedA, chanState.Control.FundedB)
 			if err != nil {
 				log.Println("Party B: Error while polling for opened channel:", err)
 				continue polling
@@ -112,17 +126,22 @@ polling:
 	}
 }
 
-func (f Funder) OpenChannel(ctx context.Context, params *pchannel.Params, state *pchannel.State) error {
+func (f *Funder) OpenChannel(ctx context.Context, params *pchannel.Params, state *pchannel.State) error {
 
 	//env := f.integrEnv
 
 	contractAddress := f.stellarClient.GetContractIDAddress()
 	kp := f.kpFull
-	reqAlice := f.stellarClient.GetHorizonAcc()
+	hz := f.stellarClient.GetHorizonAcc()
 
 	// generate tx to open the channel
 	openTxArgs := env.BuildOpenTxArgs(params, state)
-	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction(reqAlice, "open", openTxArgs, contractAddress, kp)
+	fmt.Println("openTxArgs: ", openTxArgs)
+
+	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction(hz, "open", openTxArgs, contractAddress, kp)
+	if err != nil {
+		return errors.New("error while invoking and processing host function: open")
+	}
 
 	// invokeHostFunctionOp := env.BuildContractCallOp(reqAlice, "open", openTxArgs, contractAddress)
 
@@ -146,33 +165,29 @@ func (f Funder) OpenChannel(ctx context.Context, params *pchannel.Params, state 
 	return nil
 }
 
-func (f Funder) FundChannel(ctx context.Context, params *pchannel.Params, state *pchannel.State, funderIdx bool) error {
+func (f *Funder) FundChannel(ctx context.Context, params *pchannel.Params, state *pchannel.State, funderIdx bool) error {
 
 	//env := f.integrEnv
 
 	contractAddress := f.stellarClient.GetContractIDAddress()
 	kp := f.kpFull
-	reqAlice := f.stellarClient.GetHorizonAcc()
+	hzAcc := f.stellarClient.GetHorizonAcc()
 	chanId := state.ID
 
 	// generate tx to open the channel
-	openTxArgs, err := env.BuildFundTxArgs(chanId, funderIdx)
-	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction(reqAlice, "fund", openTxArgs, contractAddress, kp)
+	fundTxArgs, err := env.BuildFundTxArgs(chanId, funderIdx)
+	if err != nil {
+		return errors.New("error while building fund tx")
+	}
+	fmt.Println("funderchan args: ", contractAddress, kp, hzAcc, chanId, fundTxArgs, funderIdx)
 
-	// invokeHostFunctionOp := env.BuildContractCallOp(reqAlice, "open", openTxArgs, contractAddress)
+	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction(hzAcc, "fund", fundTxArgs, contractAddress, kp)
+	if err != nil {
+		return errors.New("error while invoking and processing host function: fund")
+	}
 
-	// preFlightOp, minFee := f.integrEnv.PreflightHostFunctions(&reqAlice, *invokeHostFunctionOp)
+	fmt.Println("txMeta in fund: ", txMeta)
 
-	// tx, err := f.integrEnv.SubmitOperationsWithFee(&reqAlice, kp, minFee, &preFlightOp)
-	// if err != nil {
-	// 	return errors.New("error while submitting operations with fee")
-	// }
-
-	// read out decoded Events and interpret them
-	// txMeta, err := env.DecodeTxMeta(tx)
-	// if err != nil {
-	// 	return errors.New("error while decoding tx meta")
-	// }
 	_, err = DecodeEvents(txMeta)
 	if err != nil {
 		return errors.New("error while decoding events")
@@ -215,7 +230,7 @@ func (f Funder) FundChannel(ctx context.Context, params *pchannel.Params, state 
 // 	return nil
 // }
 
-func (f Funder) AbortChannel(ctx context.Context, params *pchannel.Params, state *pchannel.State) error {
+func (f *Funder) AbortChannel(ctx context.Context, params *pchannel.Params, state *pchannel.State) error {
 
 	contractAddress := f.stellarClient.GetContractIDAddress()
 	kp := f.kpFull
@@ -226,20 +241,6 @@ func (f Funder) AbortChannel(ctx context.Context, params *pchannel.Params, state
 	openTxArgs, err := env.BuildGetChannelTxArgs(chanId)
 	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction(reqAlice, "abort_funding", openTxArgs, contractAddress, kp)
 
-	// invokeHostFunctionOp := env.BuildContractCallOp(reqAlice, "open", openTxArgs, contractAddress)
-
-	// preFlightOp, minFee := f.integrEnv.PreflightHostFunctions(&reqAlice, *invokeHostFunctionOp)
-
-	// tx, err := f.integrEnv.SubmitOperationsWithFee(&reqAlice, kp, minFee, &preFlightOp)
-	// if err != nil {
-	// 	return errors.New("error while submitting operations with fee")
-	// }
-
-	// read out decoded Events and interpret them
-	// txMeta, err := env.DecodeTxMeta(tx)
-	// if err != nil {
-	// 	return errors.New("error while decoding tx meta")
-	// }
 	_, err = DecodeEvents(txMeta)
 	if err != nil {
 		return errors.New("error while decoding events")
@@ -248,59 +249,23 @@ func (f Funder) AbortChannel(ctx context.Context, params *pchannel.Params, state
 	return nil
 }
 
-// func (f Funder) Abort(ctx context.Context, params *pchannel.Params, state *pchannel.State) error {
-
-// 	//env := f.integrEnv
-// 	contractAddress := f.integrEnv.GetContractIDAddress()
-// 	kp := f.kpFull
-// 	reqAlice := f.integrEnv.AccountDetails(kp)
-// 	// generate tx to open the channel
-// 	openTxArgs := env.BuildGetChannelTxArgs(chanId)
-// 	invokeHostFunctionOp := env.BuildContractCallOp(reqAlice, "abort_channel", openTxArgs, contractAddress)
-
-// 	preFlightOp, minFee := f.integrEnv.PreflightHostFunctions(&reqAlice, *invokeHostFunctionOp)
-
-// 	tx, err := f.integrEnv.SubmitOperationsWithFee(&reqAlice, kp, minFee, &preFlightOp)
-// 	if err != nil {
-// 		return errors.New("error while submitting operations with fee")
-// 	}
-
-// 	// read out decoded Events and interpret them
-// 	txMeta, err := env.DecodeTxMeta(tx)
-// 	if err != nil {
-// 		return errors.New("error while decoding tx meta")
-// 	}
-// 	_, err = DecodeEvents(txMeta)
-// 	if err != nil {
-// 		return errors.New("error while decoding events")
-// 	}
-
-// 	return nil
-// }
-
-func (f Funder) GetChannelState(ctx context.Context, params *pchannel.Params, state *pchannel.State) (wire.Channel, error) {
-
-	//env := f.integrEnv
+func (f *Funder) GetChannelState(ctx context.Context, params *pchannel.Params, state *pchannel.State) (wire.Channel, error) {
 
 	contractAddress := f.stellarClient.GetContractIDAddress()
 	kp := f.kpFull
-	reqAlice := f.stellarClient.GetHorizonAcc()
+	hz := f.stellarClient.GetHorizonAcc()
 	chanId := state.ID
 
 	// generate tx to open the channel
-	openTxArgs, err := env.BuildGetChannelTxArgs(chanId)
-	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction(reqAlice, "abort_funding", openTxArgs, contractAddress, kp)
+	getchTxArgs, err := env.BuildGetChannelTxArgs(chanId)
+	if err != nil {
+		return wire.Channel{}, errors.New("error while building get_channel tx")
+	}
 
-	// invokeHostFunctionOp := env.BuildContractCallOp(reqAlice, "open", openTxArgs, contractAddress)
-
-	// preFlightOp, minFee := f.integrEnv.PreflightHostFunctions(&reqAlice, *invokeHostFunctionOp)
-
-	// tx, err := f.integrEnv.SubmitOperationsWithFee(&reqAlice, kp, minFee, &preFlightOp)
-	// if err != nil {
-	// 	return errors.New("error while submitting operations with fee")
-	// }
-
-	// read out decoded Events and interpret them
+	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction(hz, "get_channel", getchTxArgs, contractAddress, kp)
+	if err != nil {
+		return wire.Channel{}, errors.New("error while processing and submitting get_channel tx")
+	}
 
 	retVal := txMeta.V3.SorobanMeta.ReturnValue
 	var getChan wire.Channel
@@ -312,39 +277,3 @@ func (f Funder) GetChannelState(ctx context.Context, params *pchannel.Params, st
 	return getChan, nil
 
 }
-
-// func (f Funder) GetChannelState(ctx context.Context, params *pchannel.Params, state *pchannel.State) (wire.Channel, error) {
-
-// 	//env := f.integrEnv
-// 	contractAddress := f.integrEnv.GetContractIDAddress()
-// 	kp := f.kpFull
-// 	acc := f.integrEnv.AccountDetails(kp)
-// 	chanID := state.ID
-// 	// generate tx to open the channel
-// 	getChTxArgs, err := env.BuildGetChannelTxArgs(chanID)
-// 	if err != nil {
-// 		return wire.Channel{}, errors.New("error while building fund tx")
-// 	}
-// 	invokeHostFunctionOp := env.BuildContractCallOp(acc, "get_channel", getChTxArgs, contractAddress)
-
-// 	preFlightOp, minFee := f.integrEnv.PreflightHostFunctions(&acc, *invokeHostFunctionOp)
-
-// 	tx, err := f.integrEnv.SubmitOperationsWithFee(&acc, kp, minFee, &preFlightOp)
-// 	if err != nil {
-// 		return wire.Channel{}, errors.New("error while submitting operations with fee")
-// 	}
-
-// 	txMeta, err := env.DecodeTxMeta(tx)
-// 	if err != nil {
-// 		return wire.Channel{}, errors.New("error while decoding tx meta")
-// 	}
-
-// 	retVal := txMeta.V3.SorobanMeta.ReturnValue
-// 	var getChan wire.Channel
-
-// 	err = getChan.FromScVal(retVal)
-// 	if err != nil {
-// 		return wire.Channel{}, errors.New("error while decoding return value")
-// 	}
-// 	return wire.Channel{}, nil
-// }

@@ -9,6 +9,7 @@ import (
 
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
+
 	"strconv"
 )
 
@@ -51,14 +52,6 @@ func (c PaymentChannel) SendPayment(amount int64) {
 		panic(err) // We panic on error to keep the code simple.
 	}
 }
-
-// func (p *PaymentClient) SendPaymentToPeer(amount float64) {
-// 	if !p.HasOpenChannel() {
-// 		return
-// 	}
-// 	amountInt64 := int64(amount)
-// 	p.Channel.SendPayment(amountInt64)
-// }
 
 // Settle settles the payment channel and withdraws the funds.
 func (c PaymentChannel) Settle() {

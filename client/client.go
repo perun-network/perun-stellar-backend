@@ -1,21 +1,21 @@
 package client
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"github.com/stellar/go/keypair"
+	//"github.com/stellar/go/protocols/horizon"
 	"math/big"
-	"perun.network/go-perun/wire/net/simple"
-
-	"errors"
 	pchannel "perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/watcher/local"
 	"perun.network/go-perun/wire"
+	"perun.network/go-perun/wire/net/simple"
 
 	"perun.network/perun-stellar-backend/channel"
-	"perun.network/perun-stellar-backend/channel/types"
-
 	"perun.network/perun-stellar-backend/channel/env"
+	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/wallet"
 )
 
@@ -25,9 +25,8 @@ type PaymentClient struct {
 	currency    pchannel.Asset
 	channels    chan *PaymentChannel
 	Channel     *PaymentChannel
-	//ICConn      *chanconn.Connector
-	wAddr   wire.Address
-	balance *big.Int
+	wAddr       wire.Address
+	balance     *big.Int
 }
 
 func SetupPaymentClient(
@@ -36,17 +35,16 @@ func SetupPaymentClient(
 	acc *wallet.Account,
 	stellarKp *keypair.Full,
 	stellarTokenID types.StellarAsset,
-	//acc *wallet.Account,
 	bus *wire.LocalBus,
+	//hzAcc *horizon.Account,
 
 ) (*PaymentClient, error) {
 
 	// Connect to Perun pallet and get funder + adjudicator from it.
 
 	perunConn := env.NewStellarClient(stellarEnv, stellarKp)
-
-	funder := channel.NewFunder(acc, perunConn)
-	adj := channel.NewAdjudicator(acc, perunConn)
+	funder := channel.NewFunder(acc, stellarKp, perunConn)
+	adj := channel.NewAdjudicator(acc, stellarKp, perunConn)
 
 	// Setup dispute watcher.
 	watcher, err := local.NewWatcher(adj)
@@ -60,7 +58,6 @@ func SetupPaymentClient(
 	if err != nil {
 		return nil, errors.New("creating client")
 	}
-	//asset := types.NewStellarAsset(big.NewInt(int64(chainID)), common.Address(assetaddr))
 
 	// Create client and start request handler.
 	c := &PaymentClient{
@@ -68,9 +65,8 @@ func SetupPaymentClient(
 		account:     acc,
 		currency:    &stellarTokenID,
 		channels:    make(chan *PaymentChannel, 1),
-		//ICConn:      perunConn,
-		wAddr:   wireAddr,
-		balance: big.NewInt(0),
+		wAddr:       wireAddr,
+		balance:     big.NewInt(0),
 	}
 
 	//go c.PollBalances()
@@ -88,115 +84,59 @@ func (c *PaymentClient) startWatching(ch *client.Channel) {
 	}()
 }
 
-// func SetupPaymentClient(
-// 	name string,
-// 	w *wallet.FsWallet, // w is the wallet used to resolve addresses to accounts for channels.
-// 	bus *wire.LocalBus,
-// 	perunID string,
-// 	ledgerID string,
-// 	host string,
-// 	port int,
-// 	accountPath string,
-// ) (*PaymentClient, error) {
+// OpenChannel opens a new channel with the specified peer and funding.
+func (c *PaymentClient) OpenChannel(peer wire.Address, amount float64) { //*PaymentChannel
+	// We define the channel participants. The proposer has always index 0. Here
+	// we use the on-chain addresses as off-chain addresses, but we could also
+	// use different ones.
 
-// 	acc := w.NewAccount()
+	participants := []wire.Address{c.WireAddress(), peer}
 
-// 	// Connect to Perun pallet and get funder + adjudicator from it.
+	// We create an initial allocation which defines the starting balances.
+	initBal := big.NewInt(int64(amount))
 
-// 	perunConn := chanconn.NewICConnector(perunID, ledgerID, accountPath, host, port)
+	initAlloc := pchannel.NewAllocation(2, c.currency)
+	initAlloc.SetAssetBalances(c.currency, []pchannel.Bal{
+		initBal, // Our initial balance.
+		initBal, // Peer's initial balance.
+	})
 
-// 	funder := channel.NewFunder(acc, perunConn)
-// 	adj := channel.NewAdjudicator(acc, perunConn)
+	// Prepare the channel proposal by defining the channel parameters.
+	challengeDuration := uint64(10) // On-chain challenge duration in seconds.
+	proposal, err := client.NewLedgerChannelProposal(
+		challengeDuration,
+		c.account.Address(),
+		initAlloc,
+		participants,
+	)
+	if err != nil {
+		panic(err)
+	}
 
-// 	// Setup dispute watcher.
-// 	watcher, err := local.NewWatcher(adj)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("intializing watcher: %w", err)
-// 	}
+	// Send the proposal.
+	ch, err := c.perunClient.ProposeChannel(context.TODO(), proposal)
+	if err != nil {
+		panic(err)
+	}
 
-// 	// Setup Perun client.
-// 	wireAddr := simple.NewAddress(acc.Address().String())
-// 	perunClient, err := client.New(wireAddr, bus, funder, adj, w, watcher)
-// 	if err != nil {
-// 		return nil, errors.WithMessage(err, "creating client")
-// 	}
+	// Start the on-chain event watcher. It automatically handles disputes.
+	c.startWatching(ch)
+	c.Channel = newPaymentChannel(ch, c.currency)
+	//c.Channel.ch.OnUpdate(c.NotifyAllState)
+	//c.NotifyAllState(nil, ch.State())
 
-// 	// Create client and start request handler.
-// 	c := &PaymentClient{
-// 		Name:        name,
-// 		perunClient: perunClient,
-// 		account:     &acc,
-// 		currency:    channel.Asset,
-// 		channels:    make(chan *PaymentChannel, 1),
-// 		ICConn:      perunConn,
-// 		wAddr:       wireAddr,
-// 		balance:     big.NewInt(0),
-// 	}
+}
 
-// 	go c.PollBalances()
-// 	go perunClient.Handle(c, c)
-// 	return c, nil
-// }
+// AcceptedChannel returns the next accepted channel.
+func (c *PaymentClient) AcceptedChannel() *PaymentChannel {
+	return <-c.channels
+}
 
-// // SetupPaymentClient creates a new payment client.
-// func SetupPaymentClient(
-// 	bus wire.Bus, // bus is used of off-chain communication.
-// 	w *swallet.Wallet, // w is the wallet used for signing transactions.
-// 	acc common.Address, // acc is the address of the account to be used for signing transactions.
-// 	eaddress *ethwallet.Address, // eaddress is the address of the Ethereum account to be used for signing transactions.
-// 	nodeURL string, // nodeURL is the URL of the blockchain node.
-// 	chainID uint64, // chainID is the identifier of the blockchain.
-// 	adjudicator common.Address, // adjudicator is the address of the adjudicator.
-// 	assetaddr ethwallet.Address, // asset is the address of the asset holder for our payment channels.
-// ) (*PaymentClient, error) {
-// 	// Create Ethereum client and contract backend.
-// 	cb, err := CreateContractBackend(nodeURL, chainID, w)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("creating contract backend: %w", err)
-// 	}
+func (p *PaymentClient) WireAddress() wire.Address {
+	return p.wAddr
+}
 
-// 	// Validate contracts.
-// 	err = ethchannel.ValidateAdjudicator(context.TODO(), cb, adjudicator)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("validating adjudicator: %w", err)
-// 	}
-// 	err = ethchannel.ValidateAssetHolderETH(context.TODO(), cb, common.Address(assetaddr), adjudicator)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("validating adjudicator: %w", err)
-// 	}
-
-// 	// Setup funder.
-// 	funder := ethchannel.NewFunder(cb)
-// 	dep := ethchannel.NewETHDepositor()
-// 	ethAcc := accounts.Account{Address: acc}
-// 	asset := ethchannel.NewAsset(big.NewInt(int64(chainID)), common.Address(assetaddr))
-// 	funder.RegisterAsset(*asset, dep, ethAcc)
-
-// 	// Setup adjudicator.
-// 	adj := ethchannel.NewAdjudicator(cb, adjudicator, acc, ethAcc)
-
-// 	// Setup dispute watcher.
-// 	watcher, err := local.NewWatcher(adj)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("intializing watcher: %w", err)
-// 	}
-
-// 	// Setup Perun client.
-// 	waddr := &ethwire.Address{Address: eaddress}
-// 	perunClient, err := client.New(waddr, bus, funder, adj, w, watcher)
-// 	if err != nil {
-// 		return nil, errors.WithMessage(err, "creating client")
-// 	}
-
-// 	// Create client and start request handler.
-// 	c := &PaymentClient{
-// 		perunClient: perunClient,
-// 		account:     eaddress,
-// 		waddress:    waddr,
-// 		currency:    asset,
-// 		channels:    make(chan *PaymentChannel, 1),
-// 	}
-// 	go perunClient.Handle(c, c)
-
-// 	return c, nil
-// }
+// Shutdown gracefully shuts down the client.
+func (c *PaymentClient) Shutdown() {
+	c.perunClient.Close()
+}

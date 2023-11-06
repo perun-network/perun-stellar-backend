@@ -3,11 +3,12 @@ package channel
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/stellar/go/keypair"
 	//"github.com/stellar/go/protocols/horizon"
 	"github.com/stellar/go/xdr"
-
 	"perun.network/go-perun/log"
+	"reflect"
 
 	pchannel "perun.network/go-perun/channel"
 	pwallet "perun.network/go-perun/wallet"
@@ -23,8 +24,7 @@ import (
 var ErrChannelAlreadyClosed = errors.New("nonce values was out of range")
 
 type Adjudicator struct {
-	log log.Embedding
-	//integrEnv       env.IntegrationTestEnv
+	log             log.Embedding
 	stellarClient   *env.StellarClient
 	acc             *wallet.Account
 	kpFull          *keypair.Full
@@ -34,21 +34,23 @@ type Adjudicator struct {
 
 // NewAdjudicator returns a new Adjudicator.
 
-func NewAdjudicator(acc *wallet.Account, stellarClient *env.StellarClient) *Adjudicator {
+func NewAdjudicator(acc *wallet.Account, kp *keypair.Full, stellarClient *env.StellarClient) *Adjudicator {
 	return &Adjudicator{
 		stellarClient:   stellarClient,
 		acc:             acc,
+		kpFull:          kp,
 		maxIters:        MaxIterationsUntilAbort,
 		pollingInterval: DefaultPollingInterval,
+		log:             log.MakeEmbedding(log.Default()),
 	}
 }
 
-func (a Adjudicator) Subscribe(ctx context.Context, cid pchannel.ID) (pchannel.AdjudicatorSubscription, error) {
+func (a *Adjudicator) Subscribe(ctx context.Context, cid pchannel.ID) (pchannel.AdjudicatorSubscription, error) {
 	c := a.stellarClient
 	return NewAdjudicatorSub(ctx, cid, c), nil
 }
 
-func (a Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq, smap pchannel.StateMap) error {
+func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq, smap pchannel.StateMap) error {
 
 	cid := req.Tx.ID
 
@@ -90,23 +92,29 @@ func (a Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq, 
 		}
 
 		err = a.withdraw(ctx, req)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func (a Adjudicator) waitForClosed(ctx context.Context, evsub *AdjEventSub, cid pchannel.ID) error {
+func (a *Adjudicator) waitForClosed(ctx context.Context, evsub *AdjEventSub, cid pchannel.ID) error {
 	a.log.Log().Tracef("Waiting for the channel closing event")
+	fmt.Println("Waiting for the channel closing event")
+
 loop:
 	for {
 
 		select {
 		case event := <-evsub.Events():
-
+			fmt.Println("reflect.TypeOf(event): ", reflect.TypeOf(event))
 			_, ok := event.(*CloseEvent)
 
 			if !ok {
 				continue loop
 			}
+			fmt.Println("closeevent received: ", event)
 
 			evsub.Close()
 			return nil
@@ -122,7 +130,7 @@ loop:
 	}
 }
 
-func (a Adjudicator) BuildWithdrawTxArgs(req pchannel.AdjudicatorReq) (xdr.ScVec, error) {
+func (a *Adjudicator) BuildWithdrawTxArgs(req pchannel.AdjudicatorReq) (xdr.ScVec, error) {
 
 	// build withdrawalargs
 	chanIDStellar := req.Tx.ID[:]
@@ -140,7 +148,7 @@ func (a Adjudicator) BuildWithdrawTxArgs(req pchannel.AdjudicatorReq) (xdr.ScVec
 
 }
 
-func (a Adjudicator) withdraw(ctx context.Context, req pchannel.AdjudicatorReq) error {
+func (a *Adjudicator) withdraw(ctx context.Context, req pchannel.AdjudicatorReq) error {
 
 	contractAddress := a.stellarClient.GetContractIDAddress()
 	kp := a.kpFull
@@ -153,35 +161,10 @@ func (a Adjudicator) withdraw(ctx context.Context, req pchannel.AdjudicatorReq) 
 		return errors.New("error while building fund tx")
 	}
 	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction(hzAcc, "withdraw", withdrawTxArgs, contractAddress, kp)
+	if err != nil {
+		return errors.New("error while invoking and processing host function: withdraw")
+	}
 
-	// build withdrawalargs
-
-	// env := a.integrEnv
-	// contractAddress := env.GetContractIDAddress()
-	// kp := a.kpFull
-	// acc := env.AccountDetails(kp)
-	// generate tx to open the channel
-
-	// call fct.
-	// contractAddr := a.integrEnv.GetContractIDAddress()
-	// //caller := a.integrEnv.Client()
-	// kp := a.kpFull
-	// acc := a.integrEnv.AccountDetails(kp)
-
-	// invokeHostFunctionOp := env.BuildContractCallOp(acc, "withdraw", withdrawTxArgs, contractAddr)
-
-	// preFlightOp, minFee := a.integrEnv.PreflightHostFunctions(&acc, *invokeHostFunctionOp)
-
-	// tx, err := a.integrEnv.SubmitOperationsWithFee(&acc, kp, minFee, &preFlightOp)
-	// if err != nil {
-	// 	return errors.New("error while submitting operations with fee")
-	// }
-
-	// // read out decoded Events and interpret them
-	// txMeta, err := env.DecodeTxMeta(tx)
-	// if err != nil {
-	// 	return errors.New("error while decoding tx meta")
-	// }
 	_, err = DecodeEvents(txMeta)
 	if err != nil {
 		return errors.New("error while decoding events")
@@ -190,9 +173,8 @@ func (a Adjudicator) withdraw(ctx context.Context, req pchannel.AdjudicatorReq) 
 	return nil
 }
 
-func (a Adjudicator) Close(ctx context.Context, id pchannel.ID, state *pchannel.State, sigs []pwallet.Sig, params *pchannel.Params) error {
-	//env := a.integrEnv
-
+func (a *Adjudicator) Close(ctx context.Context, id pchannel.ID, state *pchannel.State, sigs []pwallet.Sig, params *pchannel.Params) error {
+	fmt.Println("Close called")
 	contractAddress := a.stellarClient.GetContractIDAddress()
 	kp := a.kpFull
 	hzAcc := a.stellarClient.GetHorizonAcc()
@@ -201,29 +183,9 @@ func (a Adjudicator) Close(ctx context.Context, id pchannel.ID, state *pchannel.
 		return errors.New("error while building fund tx")
 	}
 	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction(hzAcc, "close", closeTxArgs, contractAddress, kp)
-
-	// contractAddress := a.integrEnv.GetContractIDAddress()
-	// kp := a.kpFull
-	// acc := a.integrEnv.AccountDetails(kp)
-	// // generate tx to open the channel
-	// fundTxArgs, err := BuildCloseTxArgs(*state, sigs)
-	// if err != nil {
-	// 	return errors.New("error while building fund tx")
-	// }
-	// invokeHostFunctionOp := env.BuildContractCallOp(acc, "close", fundTxArgs, contractAddress)
-
-	// preFlightOp, minFee := a.integrEnv.PreflightHostFunctions(&acc, *invokeHostFunctionOp)
-
-	// tx, err := a.integrEnv.SubmitOperationsWithFee(&acc, kp, minFee, &preFlightOp)
-	// if err != nil {
-	// 	return errors.New("error while submitting operations with fee")
-	// }
-
-	// // read out decoded Events and interpret them
-	// txMeta, err := env.DecodeTxMeta(tx)
-	// if err != nil {
-	// 	return errors.New("error while decoding tx meta")
-	// }
+	if err != nil {
+		return errors.New("error while invoking and processing host function: close")
+	}
 	_, err = DecodeEvents(txMeta)
 	if err != nil {
 		return errors.New("error while decoding events")
@@ -232,12 +194,12 @@ func (a Adjudicator) Close(ctx context.Context, id pchannel.ID, state *pchannel.
 }
 
 // Register registers and disputes a channel.
-func (a Adjudicator) Register(ctx context.Context, req pchannel.AdjudicatorReq, states []pchannel.SignedState) error {
+func (a *Adjudicator) Register(ctx context.Context, req pchannel.AdjudicatorReq, states []pchannel.SignedState) error {
 	panic("implement me")
 }
 
-func (a Adjudicator) ForceClose(ctx context.Context, id pchannel.ID, state *pchannel.State, sigs []pwallet.Sig, params *pchannel.Params) error {
-
+func (a *Adjudicator) ForceClose(ctx context.Context, id pchannel.ID, state *pchannel.State, sigs []pwallet.Sig, params *pchannel.Params) error {
+	fmt.Println("ForceClose called")
 	contractAddress := a.stellarClient.GetContractIDAddress()
 	kp := a.kpFull
 	hzAcc := a.stellarClient.GetHorizonAcc()
@@ -246,30 +208,9 @@ func (a Adjudicator) ForceClose(ctx context.Context, id pchannel.ID, state *pcha
 		return errors.New("error while building fund tx")
 	}
 	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction(hzAcc, "force_close", forceCloseTxArgs, contractAddress, kp)
-
-	// //env := a.integrEnv
-	// contractAddress := a.integrEnv.GetContractIDAddress()
-	// kp := a.kpFull
-	// acc := a.integrEnv.AccountDetails(kp)
-	// // generate tx to open the channel
-	// fundTxArgs, err := BuildCloseTxArgs(*state, sigs)
-	// if err != nil {
-	// 	return errors.New("error while building fund tx")
-	// }
-	// invokeHostFunctionOp := env.BuildContractCallOp(acc, "force_close", fundTxArgs, contractAddress)
-
-	// preFlightOp, minFee := a.integrEnv.PreflightHostFunctions(&acc, *invokeHostFunctionOp)
-
-	// tx, err := a.integrEnv.SubmitOperationsWithFee(&acc, kp, minFee, &preFlightOp)
-	// if err != nil {
-	// 	return errors.New("error while submitting operations with fee")
-	// }
-
-	// // read out decoded Events and interpret them
-	// txMeta, err := env.DecodeTxMeta(tx)
-	// if err != nil {
-	// 	return errors.New("error while decoding tx meta")
-	// }
+	if err != nil {
+		return errors.New("error while invoking and processing host function")
+	}
 	_, err = DecodeEvents(txMeta)
 	if err != nil {
 		return errors.New("error while decoding events")

@@ -1,10 +1,10 @@
 package env
 
 import (
+	"fmt"
 	"github.com/stellar/go/protocols/horizon"
 	"github.com/stellar/go/txnbuild"
 	"github.com/stellar/go/xdr"
-
 	pchannel "perun.network/go-perun/channel"
 	"perun.network/perun-stellar-backend/wire"
 	"perun.network/perun-stellar-backend/wire/scval"
@@ -77,8 +77,10 @@ func BuildGetChannelTxArgs(chanID pchannel.ID) (xdr.ScVec, error) {
 	copy(chanid[:], chanIDStellar)
 	channelID, err := scval.WrapScBytes(chanIDStellar)
 	if err != nil {
-		return xdr.ScVec{}, err
+		panic(err)
 	}
+
+	fmt.Println("channelID in Wire version", channelID.Bytes)
 
 	getChannelArgs := xdr.ScVec{
 		channelID,
@@ -101,8 +103,6 @@ func BuildForceCloseTxArgs(chanID pchannel.ID) (xdr.ScVec, error) {
 	}
 	return getChannelArgs, nil
 }
-
-//InvokeAndProcessHostFunction(horizonAcc horizon.Account, fname string, callTxArgs xdr.ScVec, contractAddr xdr.ScAddress, kp *keypair.Full)
 
 func DecodeTxMeta(tx horizon.Transaction) (xdr.TransactionMeta, error) {
 	var transactionMeta xdr.TransactionMeta

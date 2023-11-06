@@ -8,6 +8,8 @@ import (
 	"perun.network/perun-stellar-backend/util"
 )
 
+const PerunContractPath = "./testdata/perun_soroban_contract.wasm"
+
 func main() {
 
 	// Create a Backend to interact with the Stellar network: integration test environment from the stellar/go sdk
@@ -28,9 +30,9 @@ func main() {
 
 	// Deploy the contract
 
-	contractIDAddress := util.Deploy(stellarEnv, kpDeployer, hzDeployer)
-
-	fmt.Println("Deployed contractIDAddress: ", contractIDAddress)
+	contractIDAddress := util.Deploy(stellarEnv, kpDeployer, hzDeployer, PerunContractPath)
+	stellarEnv.SetContractIDAddress(contractIDAddress)
+	//fmt.Println("Deployed contractIDAddress: ", contractIDAddress)
 
 	// Generate L2 accounts for the payment channel
 	wAlice, accAlice, _ := util.MakeRandPerunWallet()
@@ -47,6 +49,15 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println("alicePerun, bobPerun: ", alicePerun, bobPerun)
+	alicePerun.OpenChannel(bobPerun.WireAddress(), 1000)
+	aliceChannel := alicePerun.Channel
+	bobChannel := bobPerun.AcceptedChannel()
+	fmt.Println("All funded", alicePerun, bobPerun)
+
+	aliceChannel.Settle()
+	bobChannel.Settle()
+
+	alicePerun.Shutdown()
+	bobPerun.Shutdown()
 
 }

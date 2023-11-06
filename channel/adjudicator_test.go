@@ -1,17 +1,14 @@
 package channel_test
 
 import (
+	"context"
 	"fmt"
-
-	"github.com/stellar/go/xdr"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	pchannel "perun.network/go-perun/channel"
 	pwallet "perun.network/go-perun/wallet"
-	pkgtest "polycry.pt/poly-go/test"
 
 	chtest "perun.network/perun-stellar-backend/channel/test"
-	//client "perun.network/perun-stellar-backend/client"
-	"perun.network/perun-stellar-backend/wallet"
+	"perun.network/perun-stellar-backend/util"
 
 	_ "perun.network/perun-stellar-backend/wallet/test"
 	"perun.network/perun-stellar-backend/wire"
@@ -25,156 +22,79 @@ import (
 func TestCloseChannel(t *testing.T) {
 	itest := env.NewBackendEnv()
 
-	kps, _ := itest.CreateAccounts(2, "10000000")
+	kps, _ := itest.CreateAccounts(3, "100000000")
 
 	kpAlice := kps[0]
 	kpBob := kps[1]
+	kpDeployer := kps[2]
 
-	reqAlice := itest.AccountDetails(kpAlice)
-	reqBob := itest.AccountDetails(kpBob)
+	// reqAlice := itest.AccountDetails(kpAlice)
+	// reqBob := itest.AccountDetails(kpBob)
+	reqDeployer := itest.AccountDetails(kpDeployer)
 
-	fmt.Println("reqAlice, reqBob: ", reqAlice.Balances, reqBob.Balances)
+	//fmt.Println("reqAlice, reqBob: ", reqAlice.Balances, reqBob.Balances)
+	contractAddr := util.Deploy(itest, kpDeployer, reqDeployer, PerunContractPath)
+	itest.SetContractIDAddress(contractAddr)
+	fmt.Println("contractID: ", contractAddr)
 
-	installContractOp := channel.AssembleInstallContractCodeOp(kpAlice.Address(), channel.PerunContractPath)
-	preFlightOp, minFee := itest.PreflightHostFunctions(&reqAlice, *installContractOp)
-	_ = itest.MustSubmitOperationsWithFee(&reqAlice, kpAlice, minFee, &preFlightOp)
-
-	// Create the contract
-
-	createContractOp := channel.AssembleCreateContractOp(kpAlice.Address(), channel.PerunContractPath, "a1", itest.GetPassPhrase())
-	preFlightOp, minFee = itest.PreflightHostFunctions(&reqAlice, *createContractOp)
-	_, err := itest.SubmitOperationsWithFee(&reqAlice, kpAlice, minFee, &preFlightOp)
-
-	require.NoError(t, err)
-
-	// contract has been deployed, now invoke 'open' fn on the contract
-	contractID := preFlightOp.Ext.SorobanData.Resources.Footprint.ReadWrite[0].MustContractData().Contract.ContractId
-	require.NotNil(t, contractID)
-	contractIDAddress := xdr.ScAddress{
-		Type:       xdr.ScAddressTypeScAddressTypeContract,
-		ContractId: contractID,
-	}
-
-	// make L2 Accounts for signing states:
-
-	rng := pkgtest.Prng(t)
-
-	wAlice := wallet.NewEphemeralWallet()
-	accAlice, _, err := wAlice.AddNewAccount(rng)
-	require.NoError(t, err)
+	//perunFirstParams, perunFirstState := chtest.NewParamsState(t)
+	wAlice, accAlice, _ := util.MakeRandPerunWallet()
+	wBob, accBob, _ := util.MakeRandPerunWallet()
 	addrAlice := accAlice.Address()
-
-	wBob := wallet.NewEphemeralWallet()
-	accBob, _, err := wBob.AddNewAccount(rng)
-	require.NoError(t, err)
 	addrBob := accBob.Address()
-
 	addrList := []pwallet.Address{addrAlice, addrBob}
-
-	// invoke open-channel function
-
 	perunFirstParams, perunFirstState := chtest.NewParamsWithAddressState(t, addrList)
+	fmt.Println("perunFirstParams, perunFirstState: ", perunFirstParams, perunFirstState)
 
-	openArgs := env.BuildOpenTxArgs(perunFirstParams, perunFirstState)
+	freqAlice := pchannel.NewFundingReq(perunFirstParams, perunFirstState, 0, perunFirstState.Balances)
+	fmt.Println("freqAlice: ", freqAlice)
+	freqBob := pchannel.NewFundingReq(perunFirstParams, perunFirstState, 1, perunFirstState.Balances)
+	fmt.Println("freqBob: ", freqBob)
+	freqs := []*pchannel.FundingReq{freqAlice, freqBob}
+	fmt.Println("freqs: ", freqs)
 
-	invokeHostFunctionOp := env.BuildContractCallOp(reqAlice, "open", openArgs, contractIDAddress)
+	// Creating the client and funders as pointers
+	aliceClient := env.NewStellarClient(itest, kpAlice)
+	bobClient := env.NewStellarClient(itest, kpBob)
 
-	preFlightOp, minFee = itest.PreflightHostFunctions(&reqAlice, *invokeHostFunctionOp)
-
-	tx, err := itest.SubmitOperationsWithFee(&reqAlice, kpAlice, minFee, &preFlightOp)
-	require.NoError(t, err)
-
-	clientTx, err := itest.Client().TransactionDetail(tx.Hash)
-	fmt.Println("clientTx: ", clientTx)
-	require.NoError(t, err)
-
-	assert.Equal(t, tx.Hash, clientTx.Hash)
-	var txResult xdr.TransactionResult
-	err = xdr.SafeUnmarshalBase64(clientTx.ResultXdr, &txResult)
-	require.NoError(t, err)
-
-	opResults, ok := txResult.OperationResults()
-
-	assert.True(t, ok)
-	assert.Equal(t, len(opResults), 1)
-	invokeHostFunctionResult, ok := opResults[0].MustTr().GetInvokeHostFunctionResult()
-	assert.True(t, ok)
-	assert.Equal(t, invokeHostFunctionResult.Code, xdr.InvokeHostFunctionResultCodeInvokeHostFunctionSuccess)
-
-	txMeta, err := env.DecodeTxMeta(tx)
-	require.NoError(t, err)
-
-	perunEvents, err := channel.DecodeEvents(txMeta)
-	require.NoError(t, err)
-
-	fmt.Println("perunEvents: ", perunEvents)
-
-	// fund the channel after it is open
-
+	aliceFunder := channel.NewFunder(accAlice, kpAlice, aliceClient)
+	bobFunder := channel.NewFunder(accBob, kpBob, bobClient)
+	funders := []*channel.Funder{aliceFunder, bobFunder}
+	fmt.Println("funders: ", funders)
 	chanID := perunFirstParams.ID()
-	aliceIdx := false
+	//aliceIdx := false
+	//fundArgsAlice, err := env.BuildFundTxArgs(chanID, aliceIdx)
+	//require.NoError(t, err)
 
-	fundArgsAlice, err := env.BuildFundTxArgs(chanID, aliceIdx)
+	// Calling the function
+	err := chtest.FundAll(context.TODO(), funders, freqs)
 	require.NoError(t, err)
+	fmt.Println("Funded all")
+	fmt.Println("aliceFunder: ", aliceFunder)
+	fmt.Println("aliceFunder: ", wBob, accBob, wAlice)
 
-	invokeHostFunctionOpFund := env.BuildContractCallOp(reqAlice, "fund", fundArgsAlice, contractIDAddress)
-
-	preFlightOpFund, minFeeFund := itest.PreflightHostFunctions(&reqAlice, *invokeHostFunctionOpFund)
-
-	txFund, err := itest.SubmitOperationsWithFee(&reqAlice, kpAlice, minFeeFund, &preFlightOpFund)
-	fmt.Println("minFeeFund: ", minFeeFund)
-	require.NoError(t, err)
-
-	txMetaFund, err := env.DecodeTxMeta(txFund)
-	require.NoError(t, err)
-
-	perunEventsFund, err := channel.DecodeEvents(txMetaFund)
-	require.NoError(t, err)
-	fmt.Println("perunEventsFund: ", perunEventsFund)
-
-	bobIdx := true
-	fundArgsBob, err := env.BuildFundTxArgs(chanID, bobIdx)
-	require.NoError(t, err)
-	invokeHostFunctionOpFund2 := env.BuildContractCallOp(reqBob, "fund", fundArgsBob, contractIDAddress)
-
-	preFlightOpFund2, minFeeFund2 := itest.PreflightHostFunctions(&reqBob, *invokeHostFunctionOpFund2)
-	fmt.Println("minFeeFund2: ", minFeeFund2)
-
-	txFund2, err := itest.SubmitOperationsWithFee(&reqBob, kpBob, minFeeFund2, &preFlightOpFund2)
-
-	require.NoError(t, err)
-	txMetaFund2, err := env.DecodeTxMeta(txFund2)
-	require.NoError(t, err)
-	fmt.Println("txMetaFund2: ", txMetaFund2)
-	perunEventsFund2, err := channel.DecodeEvents(txMetaFund2)
-	require.NoError(t, err)
-	fmt.Println("perunEventsFund2: ", perunEventsFund2)
-
-	// qurey channel state
+	hzAliceGetCh := aliceClient.GetHorizonAcc()
 
 	getChannelArgs, err := env.BuildGetChannelTxArgs(chanID)
 	require.NoError(t, err)
 
-	invokeHostFunctionOpGetCh := env.BuildContractCallOp(reqAlice, "get_channel", getChannelArgs, contractIDAddress)
-	preFlightOpGetCh, minFeeGetCh := itest.PreflightHostFunctions(&reqAlice, *invokeHostFunctionOpGetCh)
-	txGetCh, err := itest.SubmitOperationsWithFee(&reqAlice, kpAlice, minFeeGetCh, &preFlightOpGetCh)
+	txMetaGetChAfterFunding, err := aliceClient.InvokeAndProcessHostFunction(hzAliceGetCh, "get_channel", getChannelArgs, contractAddr, kpAlice)
 	require.NoError(t, err)
 
-	txMetaGetCh, err := env.DecodeTxMeta(txGetCh)
-	require.NoError(t, err)
-	fmt.Println("txMetaGetCh: ", txMetaGetCh)
-	retVal := txMetaGetCh.V3.SorobanMeta.ReturnValue
-	fmt.Println("retVal: ", retVal)
+	retVal := txMetaGetChAfterFunding.V3.SorobanMeta.ReturnValue
+	fmt.Println("retVal txMetaGetChAfterFunding: ", retVal)
 
-	var getChan wire.Channel
+	var getChanAfterFunding wire.Channel
 
-	err = getChan.FromScVal(retVal)
+	err = getChanAfterFunding.FromScVal(retVal)
 	require.NoError(t, err)
-	fmt.Println("getChan: ", getChan)
+	fmt.Println("getChanAfterFunding: ", getChanAfterFunding)
+
+	fmt.Println("getChan.Control.FundedA, getChan.Control.FundedA: ", getChanAfterFunding.Control.FundedA, getChanAfterFunding.Control.FundedA)
 
 	// close the channel
 
-	currStellarState := getChan.State
+	currStellarState := getChanAfterFunding.State
 
 	currStellarState.Finalized = true
 
@@ -196,12 +116,15 @@ func TestCloseChannel(t *testing.T) {
 
 	closeArgs, err := channel.BuildCloseTxArgs(currPerunState, sigs)
 	require.NoError(t, err)
+	hzAliceGClose := aliceClient.GetHorizonAcc()
 
-	invokeHostFunctionOpClose := env.BuildContractCallOp(reqAlice, "close", closeArgs, contractIDAddress)
+	invokeHostFunctionOpClose := env.BuildContractCallOp(hzAliceGClose, "close", closeArgs, contractAddr)
 
-	preFlightOpClose, minFeeClose := itest.PreflightHostFunctions(&reqAlice, *invokeHostFunctionOpClose)
+	preFlightOpClose, minFeeClose := itest.PreflightHostFunctions(&hzAliceGClose, *invokeHostFunctionOpClose)
 
-	txClose, err := itest.SubmitOperationsWithFee(&reqAlice, kpAlice, minFeeClose, &preFlightOpClose)
+	fmt.Println("minFeeClose: ", minFeeClose)
+
+	txClose, err := itest.SubmitOperationsWithFee(&hzAliceGClose, kpAlice, minFeeClose, &preFlightOpClose)
 
 	require.NoError(t, err)
 
@@ -215,5 +138,131 @@ func TestCloseChannel(t *testing.T) {
 	fmt.Println("perunEventsClose: ", perunEventsClose)
 
 	// now both users can withdraw their funds
+
+}
+
+func TestWithdrawChannel(t *testing.T) {
+	itest := env.NewBackendEnv()
+
+	kps, _ := itest.CreateAccounts(3, "100000000")
+
+	kpAlice := kps[0]
+	kpBob := kps[1]
+	kpDeployer := kps[2]
+
+	reqDeployer := itest.AccountDetails(kpDeployer)
+
+	//fmt.Println("reqAlice, reqBob: ", reqAlice.Balances, reqBob.Balances)
+	contractAddr := util.Deploy(itest, kpDeployer, reqDeployer, PerunContractPath)
+	itest.SetContractIDAddress(contractAddr)
+
+	//perunFirstParams, perunFirstState := chtest.NewParamsState(t)
+	_, accAlice, _ := util.MakeRandPerunWallet()
+	_, accBob, _ := util.MakeRandPerunWallet()
+
+	addrAlice := accAlice.Address()
+	addrBob := accBob.Address()
+	addrList := []pwallet.Address{addrAlice, addrBob}
+	perunFirstParams, perunFirstState := chtest.NewParamsWithAddressState(t, addrList)
+
+	freqAlice := pchannel.NewFundingReq(perunFirstParams, perunFirstState, 0, perunFirstState.Balances)
+	freqBob := pchannel.NewFundingReq(perunFirstParams, perunFirstState, 1, perunFirstState.Balances)
+	freqs := []*pchannel.FundingReq{freqAlice, freqBob}
+
+	// Creating the client and funders as pointers
+	aliceClient := env.NewStellarClient(itest, kpAlice)
+	bobClient := env.NewStellarClient(itest, kpBob)
+
+	aliceFunder := channel.NewFunder(accAlice, kpAlice, aliceClient)
+	bobFunder := channel.NewFunder(accBob, kpBob, bobClient)
+	funders := []*channel.Funder{aliceFunder, bobFunder}
+	chanID := perunFirstParams.ID()
+
+	// Calling the function
+	err := chtest.FundAll(context.TODO(), funders, freqs)
+	require.NoError(t, err)
+	fmt.Println("Channel fully funded")
+
+	hzAliceGetCh := aliceClient.GetHorizonAcc()
+
+	getChannelArgs, err := env.BuildGetChannelTxArgs(chanID)
+	require.NoError(t, err)
+
+	txMetaGetChAfterFunding, err := aliceClient.InvokeAndProcessHostFunction(hzAliceGetCh, "get_channel", getChannelArgs, contractAddr, kpAlice)
+	require.NoError(t, err)
+
+	retVal := txMetaGetChAfterFunding.V3.SorobanMeta.ReturnValue
+
+	var getChanAfterFunding wire.Channel
+
+	err = getChanAfterFunding.FromScVal(retVal)
+	require.NoError(t, err)
+
+	// close the channel
+
+	currStellarState := getChanAfterFunding.State
+
+	currStellarState.Finalized = true
+
+	currPerunState, err := wire.ToState(currStellarState)
+
+	require.NoError(t, err)
+
+	sigA, err := channel.Backend.Sign(accAlice, &currPerunState)
+	require.NoError(t, err)
+
+	sigB, err := channel.Backend.Sign(accBob, &currPerunState)
+	require.NoError(t, err)
+
+	sigs := []pwallet.Sig{sigA, sigB}
+
+	closeArgs, err := channel.BuildCloseTxArgs(currPerunState, sigs)
+	require.NoError(t, err)
+	hzAliceGClose := aliceClient.GetHorizonAcc()
+
+	invokeHostFunctionOpClose := env.BuildContractCallOp(hzAliceGClose, "close", closeArgs, contractAddr)
+
+	preFlightOpClose, minFeeClose := itest.PreflightHostFunctions(&hzAliceGClose, *invokeHostFunctionOpClose)
+
+	txClose, err := itest.SubmitOperationsWithFee(&hzAliceGClose, kpAlice, minFeeClose, &preFlightOpClose)
+
+	require.NoError(t, err)
+
+	txMetaClose, err := env.DecodeTxMeta(txClose)
+
+	require.NoError(t, err)
+
+	_, err = channel.DecodeEvents(txMetaClose)
+	require.NoError(t, err)
+
+	hzAliceWithdraw := aliceClient.GetHorizonAcc()
+	waArgs, err := env.BuildFundTxArgs(chanID, false)
+	require.NoError(t, err)
+	invokeHostFunctionOpWA := env.BuildContractCallOp(hzAliceWithdraw, "withdraw", waArgs, contractAddr)
+	preFlightOpWA, minFeeWA := itest.PreflightHostFunctions(&hzAliceWithdraw, *invokeHostFunctionOpWA)
+	txWithdrawAlice, err := itest.SubmitOperationsWithFee(&hzAliceWithdraw, kpAlice, minFeeWA, &preFlightOpWA)
+	require.NoError(t, err)
+
+	txMetaWA, err := env.DecodeTxMeta(txWithdrawAlice)
+
+	require.NoError(t, err)
+	_, err = channel.DecodeEvents(txMetaWA)
+	require.NoError(t, err)
+
+	hzBobWithdraw := bobClient.GetHorizonAcc()
+	wbArgs, err := env.BuildFundTxArgs(chanID, true)
+	require.NoError(t, err)
+	invokeHostFunctionOpWB := env.BuildContractCallOp(hzBobWithdraw, "withdraw", wbArgs, contractAddr)
+	preFlightOpWB, minFeeWB := itest.PreflightHostFunctions(&hzBobWithdraw, *invokeHostFunctionOpWB)
+	txWithdrawBob, err := itest.SubmitOperationsWithFee(&hzBobWithdraw, kpBob, minFeeWB, &preFlightOpWB)
+	require.NoError(t, err)
+
+	txMetaWB, err := env.DecodeTxMeta(txWithdrawBob)
+
+	require.NoError(t, err)
+	perunEventsWB, err := channel.DecodeEvents(txMetaWB)
+	require.NoError(t, err)
+
+	fmt.Println("perunEventsWB: ", perunEventsWB)
 
 }

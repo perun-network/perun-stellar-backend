@@ -2,7 +2,6 @@ package env
 
 import (
 	"errors"
-	"fmt"
 	"github.com/stellar/go/clients/horizonclient"
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/protocols/horizon"
@@ -20,7 +19,6 @@ const SorobanRPCPort = 8080
 type IntegrationTestEnv struct {
 	testEnv           *testenv.Test
 	contractIDAddress xdr.ScAddress
-	stellarClient     *StellarClient
 }
 
 func NewBackendEnv() *IntegrationTestEnv {
@@ -44,9 +42,9 @@ func NewIntegrationEnv(t *testing.T) *IntegrationTestEnv {
 	return &itest
 }
 
-// func (it *IntegrationTestEnv) GetStellarClient() *StellarClient {
-// 	return it.stellarClient
-// }
+func (it *IntegrationTestEnv) SetContractIDAddress(contractIDAddress xdr.ScAddress) {
+	it.contractIDAddress = contractIDAddress
+}
 
 func (it *IntegrationTestEnv) CreateAccounts(numAccounts int, initBalance string) ([]*keypair.Full, []txnbuild.Account) {
 	kps, accs := it.testEnv.CreateAccounts(numAccounts, initBalance)
@@ -117,25 +115,5 @@ func (it *IntegrationTestEnv) InvokeAndProcessHostFunction(horizonAcc horizon.Ac
 		return xdr.TransactionMeta{}, errors.New("error while decoding tx meta")
 	}
 
-	fmt.Println("txMeta: ", txMeta)
-
-	// // Decode events
-	// _, err = DecodeSorEvents(txMeta)
-	// if err != nil {
-	// 	return errors.New("error while decoding events")
-	// }
-
 	return txMeta, nil
-}
-
-func (it *IntegrationTestEnv) GetChannelState(getChanArgs xdr.ScVec) (xdr.TransactionMeta, error) {
-	// query channel state
-	kp := it.stellarClient.account
-
-	acc := it.AccountDetails(kp)
-	chanState, err := it.InvokeAndProcessHostFunction(acc, "get_channel", getChanArgs, xdr.ScAddress{}, nil)
-	if err != nil {
-		return xdr.TransactionMeta{}, err
-	}
-	return chanState, nil
 }
