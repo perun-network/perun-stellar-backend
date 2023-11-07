@@ -52,9 +52,9 @@ func (a *Adjudicator) Subscribe(ctx context.Context, cid pchannel.ID) (pchannel.
 
 func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq, smap pchannel.StateMap) error {
 
-	cid := req.Tx.ID
+	//cid := req.Tx.ID
 
-	txSigner := a.stellarClient
+	//txSigner := a.stellarClient
 
 	if req.Tx.State.IsFinal {
 		log.Println("Withdraw called")
@@ -62,19 +62,32 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 
 		// a.isConcluded
 
-		evSub := NewAdjudicatorSub(ctx, req.Tx.ID, txSigner)
-		defer evSub.Close()
+		//evSub := NewAdjudicatorSub(ctx, req.Tx.ID, txSigner)
+		//defer evSub.Close()
 
 		err := a.Close(ctx, req.Tx.ID, req.Tx.State, req.Tx.Sigs, req.Params)
 		if err != nil {
-			if err == ErrChannelAlreadyClosed {
-				return a.withdraw(ctx, req)
-			} else {
+			getChanArgs, err := env.BuildGetChannelTxArgs(req.Tx.ID)
+			if err != nil {
+				panic(err)
+			}
+			chanControl, err := a.stellarClient.GetChannelState(getChanArgs)
+			if err != nil {
 				return err
 			}
+
+			if chanControl.Control.Closed {
+				return a.withdraw(ctx, req)
+			}
+
+			// if err == ErrChannelAlreadyClosed {
+			// 	return a.withdraw(ctx, req)
+			// } else {
+			// 	return err
+			// }
 		}
 		//close has been called, now we wait for the event
-		err = a.waitForClosed(ctx, evSub, cid)
+		//err = a.waitForClosed(ctx, evSub, cid)
 		if err != nil {
 			return err
 		}
@@ -83,6 +96,7 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 
 	} else {
 		err := a.ForceClose(ctx, req.Tx.ID, req.Tx.State, req.Tx.Sigs, req.Params)
+		fmt.Println("ForceClose called")
 		if err != nil {
 			if err == ErrChannelAlreadyClosed {
 				return a.withdraw(ctx, req)
@@ -134,6 +148,15 @@ func (a *Adjudicator) BuildWithdrawTxArgs(req pchannel.AdjudicatorReq) (xdr.ScVe
 
 	// build withdrawalargs
 	chanIDStellar := req.Tx.ID[:]
+	partyIdx := req.Idx
+	var withdrawIdx xdr.ScVal
+	if partyIdx == 0 {
+		withdrawIdx = scval.MustWrapBool(false)
+	} else if partyIdx == 1 {
+		withdrawIdx = scval.MustWrapBool(true)
+	} else {
+		panic("partyIdx must be 0 or 1")
+	}
 	var chanid xdr.ScBytes
 	copy(chanid, chanIDStellar)
 	channelID, err := scval.WrapScBytes(chanIDStellar)
@@ -143,6 +166,7 @@ func (a *Adjudicator) BuildWithdrawTxArgs(req pchannel.AdjudicatorReq) (xdr.ScVe
 
 	withdrawArgs := xdr.ScVec{
 		channelID,
+		withdrawIdx,
 	}
 	return withdrawArgs, nil
 

@@ -74,6 +74,7 @@ func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *env.
 }
 
 func (s *AdjEventSub) run(ctx context.Context) {
+	fmt.Println("run() called")
 	s.log.Log().Info("Listening for channel state changes")
 	chanControl, err := s.getChanControl()
 	if err != nil {
@@ -91,9 +92,10 @@ polling:
 		case <-ctx.Done():
 			finish(nil)
 			return
-		case <-s.events:
-			finish(nil)
-			return
+		// could trigger race condition
+		// case <-s.events:
+		// 	finish(nil)
+		// 	return
 		case <-time.After(s.pollInterval):
 
 			newChanControl, err := s.getChanControl()
