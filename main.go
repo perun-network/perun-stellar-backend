@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"perun.network/go-perun/wire"
 	"perun.network/perun-stellar-backend/channel/env"
 	"perun.network/perun-stellar-backend/client"
@@ -22,11 +21,9 @@ func main() {
 	kpBob := kps[1]
 	kpDeployer := kps[2]
 
-	hzAlice := stellarEnv.AccountDetails(kpAlice)
-	hzBob := stellarEnv.AccountDetails(kpBob)
+	_ = stellarEnv.AccountDetails(kpAlice)
+	_ = stellarEnv.AccountDetails(kpBob)
 	hzDeployer := stellarEnv.AccountDetails(kpDeployer)
-
-	fmt.Println("hzAlice, hzBob, hzDeployer: ", hzAlice, hzBob, hzDeployer)
 
 	// Deploy the contract
 
@@ -52,7 +49,6 @@ func main() {
 	alicePerun.OpenChannel(bobPerun.WireAddress(), 1000)
 	aliceChannel := alicePerun.Channel
 	bobChannel := bobPerun.AcceptedChannel()
-	fmt.Println("All funded", alicePerun, bobPerun)
 
 	aliceChannel.Settle()
 	bobChannel.Settle()

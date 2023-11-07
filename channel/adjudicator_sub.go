@@ -44,10 +44,6 @@ type AdjEventSub struct {
 	log           log.Embedding
 }
 
-// func (e *AdjEventSub) GetState() <-chan AdjEvent {
-// 	return e.events
-// }
-
 func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *env.StellarClient) *AdjEventSub {
 	getChanArgs, err := env.BuildGetChannelTxArgs(cid)
 	if err != nil {
@@ -99,12 +95,9 @@ polling:
 		case <-time.After(s.pollInterval):
 
 			newChanControl, err := s.getChanControl()
-			fmt.Println("s.chanControl: ", s.chanControl)
-			fmt.Println("newChanControl: ", newChanControl)
 
 			if err != nil {
-				// if query was not successful, simply repeat
-				//continue polling
+
 				s.panicErr <- err
 			}
 			// decode channel state difference to events
@@ -115,7 +108,6 @@ polling:
 
 			if adjEvent == nil {
 				s.chanControl = newChanControl
-				fmt.Println("No events yet, continuing polling...")
 				s.log.Log().Debug("No events yet, continuing polling...")
 				continue polling
 
@@ -125,7 +117,6 @@ polling:
 				// Store the event
 
 				s.log.Log().Debugf("Found event: %v", adjEvent)
-				fmt.Println("Found event: ", adjEvent)
 				s.events <- adjEvent
 				return
 			}

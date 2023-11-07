@@ -5,15 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"github.com/stellar/go/keypair"
-	//"github.com/stellar/go/protocols/horizon"
 	"github.com/stellar/go/xdr"
 	"perun.network/go-perun/log"
-	"reflect"
 
 	pchannel "perun.network/go-perun/channel"
 	pwallet "perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/channel/env"
-	//"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/wallet"
 
 	"perun.network/perun-stellar-backend/wire"
@@ -52,18 +49,8 @@ func (a *Adjudicator) Subscribe(ctx context.Context, cid pchannel.ID) (pchannel.
 
 func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq, smap pchannel.StateMap) error {
 
-	//cid := req.Tx.ID
-
-	//txSigner := a.stellarClient
-
 	if req.Tx.State.IsFinal {
 		log.Println("Withdraw called")
-		// we listen for the close event
-
-		// a.isConcluded
-
-		//evSub := NewAdjudicatorSub(ctx, req.Tx.ID, txSigner)
-		//defer evSub.Close()
 
 		err := a.Close(ctx, req.Tx.ID, req.Tx.State, req.Tx.Sigs, req.Params)
 		if err != nil {
@@ -80,14 +67,7 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 				return a.withdraw(ctx, req)
 			}
 
-			// if err == ErrChannelAlreadyClosed {
-			// 	return a.withdraw(ctx, req)
-			// } else {
-			// 	return err
-			// }
 		}
-		//close has been called, now we wait for the event
-		//err = a.waitForClosed(ctx, evSub, cid)
 		if err != nil {
 			return err
 		}
@@ -115,20 +95,17 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 
 func (a *Adjudicator) waitForClosed(ctx context.Context, evsub *AdjEventSub, cid pchannel.ID) error {
 	a.log.Log().Tracef("Waiting for the channel closing event")
-	fmt.Println("Waiting for the channel closing event")
 
 loop:
 	for {
 
 		select {
 		case event := <-evsub.Events():
-			fmt.Println("reflect.TypeOf(event): ", reflect.TypeOf(event))
 			_, ok := event.(*CloseEvent)
 
 			if !ok {
 				continue loop
 			}
-			fmt.Println("closeevent received: ", event)
 
 			evsub.Close()
 			return nil
