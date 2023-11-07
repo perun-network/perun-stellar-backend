@@ -7,7 +7,6 @@ import (
 	pchannel "perun.network/go-perun/channel"
 )
 
-// Next implements the AdjudicatorSub.Next function.
 func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 	if s.closer.IsClosed() {
 		return nil
@@ -19,7 +18,6 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 
 	select {
 	case event := <-s.Events():
-		fmt.Println("Event received: ", event)
 		if event == nil {
 			fmt.Println("Event nil received: ", event)
 			return nil

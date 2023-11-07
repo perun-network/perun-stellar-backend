@@ -73,7 +73,7 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 				return err
 			}
 		}
-		// close has been called, now we wait for the event
+		//close has been called, now we wait for the event
 		err = a.waitForClosed(ctx, evSub, cid)
 		if err != nil {
 			return err
@@ -153,7 +153,6 @@ func (a *Adjudicator) withdraw(ctx context.Context, req pchannel.AdjudicatorReq)
 	contractAddress := a.stellarClient.GetContractIDAddress()
 	kp := a.kpFull
 	hzAcc := a.stellarClient.GetHorizonAcc()
-	//chanId := req.Tx.State.ID
 
 	// generate tx to open the channel
 	withdrawTxArgs, err := a.BuildWithdrawTxArgs(req)

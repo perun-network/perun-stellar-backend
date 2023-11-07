@@ -112,6 +112,7 @@ polling:
 			}
 
 			if adjEvent == nil {
+				s.chanControl = newChanControl
 				fmt.Println("No events yet, continuing polling...")
 				s.log.Log().Debug("No events yet, continuing polling...")
 				continue polling
