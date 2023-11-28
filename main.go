@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"perun.network/go-perun/wire"
 	"perun.network/perun-stellar-backend/channel/env"
 	"perun.network/perun-stellar-backend/client"
@@ -8,6 +9,7 @@ import (
 )
 
 const PerunContractPath = "./testdata/perun_soroban_contract.wasm"
+const StellarAssetContractPath = "./testdata/perun_soroban_token.wasm"
 
 func main() {
 
@@ -15,21 +17,19 @@ func main() {
 	stellarEnv := env.NewBackendEnv()
 
 	// Create two Stellar L1 accounts
-	kps, _ := stellarEnv.CreateAccounts(3, "10000000")
+	kps, _ := stellarEnv.CreateAccounts(4, "100000000")
 
 	kpAlice := kps[0]
 	kpBob := kps[1]
-	kpDeployer := kps[2]
+	kpDeployerPerun := kps[2]
+	kpDeployerToken := kps[3]
 
-	_ = stellarEnv.AccountDetails(kpAlice)
-	_ = stellarEnv.AccountDetails(kpBob)
-	hzDeployer := stellarEnv.AccountDetails(kpDeployer)
+	realAssetContractID := util.Deploy(stellarEnv, kpDeployerToken, stellarEnv.AccountDetails(kpDeployerToken), StellarAssetContractPath)
 
-	// Deploy the contract
-
-	contractIDAddress := util.Deploy(stellarEnv, kpDeployer, hzDeployer, PerunContractPath)
+	fmt.Println("Deployed Real Asset Contract ID: ", realAssetContractID)
+	// Deploy the Perun contract
+	contractIDAddress := util.Deploy(stellarEnv, kpDeployerPerun, stellarEnv.AccountDetails(kpDeployerPerun), PerunContractPath)
 	stellarEnv.SetContractIDAddress(contractIDAddress)
-	//fmt.Println("Deployed contractIDAddress: ", contractIDAddress)
 
 	// Generate L2 accounts for the payment channel
 	wAlice, accAlice, _ := util.MakeRandPerunWallet()

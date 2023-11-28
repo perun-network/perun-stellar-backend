@@ -22,8 +22,6 @@ type IntegrationTestEnv struct {
 }
 
 func NewBackendEnv() *IntegrationTestEnv {
-	// Create a dummy testing.T object.
-	// This might not be appropriate depending on your use case.
 	t := &testing.T{}
 
 	cfg := testenv.Config{

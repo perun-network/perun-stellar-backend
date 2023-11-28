@@ -1,7 +1,6 @@
 package env
 
 import (
-	"fmt"
 	"github.com/stellar/go/protocols/horizon"
 	"github.com/stellar/go/txnbuild"
 	"github.com/stellar/go/xdr"
@@ -79,8 +78,6 @@ func BuildGetChannelTxArgs(chanID pchannel.ID) (xdr.ScVec, error) {
 	if err != nil {
 		panic(err)
 	}
-
-	fmt.Println("channelID in Wire version", channelID.Bytes)
 
 	getChannelArgs := xdr.ScVec{
 		channelID,

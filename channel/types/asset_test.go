@@ -5,7 +5,6 @@ import (
 	"github.com/stellar/go/xdr"
 	"github.com/stretchr/testify/require"
 	"perun.network/perun-stellar-backend/channel/types"
-
 	"testing"
 )
 

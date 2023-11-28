@@ -15,7 +15,7 @@ import (
 
 const (
 	DefaultBufferSize                  = 3
-	DefaultSubscriptionPollingInterval = time.Duration(4) * time.Second
+	DefaultSubscriptionPollingInterval = time.Duration(10) * time.Second
 )
 
 type AdjEvent interface {
@@ -29,7 +29,6 @@ type AdjEvent interface {
 
 // AdjudicatorSub implements the AdjudicatorSubscription interface.
 type AdjEventSub struct {
-	//env           *env.IntegrationTestEnv
 	queryChanArgs xdr.ScVec
 	stellarClient *env.StellarClient
 	chanControl   wire.Control
@@ -70,7 +69,6 @@ func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *env.
 }
 
 func (s *AdjEventSub) run(ctx context.Context) {
-	fmt.Println("run() called")
 	s.log.Log().Info("Listening for channel state changes")
 	chanControl, err := s.getChanControl()
 	if err != nil {
@@ -88,10 +86,6 @@ polling:
 		case <-ctx.Done():
 			finish(nil)
 			return
-		// could trigger race condition
-		// case <-s.events:
-		// 	finish(nil)
-		// 	return
 		case <-time.After(s.pollInterval):
 
 			newChanControl, err := s.getChanControl()
@@ -141,35 +135,7 @@ func (s *AdjEventSub) getChanControl() (wire.Control, error) {
 	return chanControl, nil
 }
 
-// func (s *AdjEventSub) chanStateToEvent(newState wire.Control) (AdjEvent, error) {
-// 	// query channel state
-
-// 	currControl := s.chanControl
-// 	//newCControl := wire.Control{}
-// 	newCControl, err := s.getChanControl()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	sameChannel := IdenticalControls(currControl, newCControl)
-
-// 	if sameChannel {
-// 		return CloseEvent{}, nil
-// 	}
-
-// 	// state has changed: we evaluate the differences
-// 	adjEvents, err := DifferencesInControls(currControl, newCControl)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return adjEvents, nil
-
-// }
-
 func DifferencesInControls(controlCurr, controlNext wire.Control) (AdjEvent, error) {
-
-	fmt.Println("controlCurr: ", controlCurr)
-	fmt.Println("controlNext: ", controlNext)
 
 	if controlCurr.FundedA != controlNext.FundedA {
 		if controlCurr.FundedA {

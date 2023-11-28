@@ -15,10 +15,9 @@ import (
 )
 
 const MaxIterationsUntilAbort = 10
-const DefaultPollingInterval = time.Duration(5) * time.Second
+const DefaultPollingInterval = time.Duration(7) * time.Second
 
 type Funder struct {
-	//integrEnv       env.IntegrationTestEnv
 	stellarClient   *env.StellarClient
 	acc             *wallet.Account
 	kpFull          *keypair.Full
@@ -143,20 +142,6 @@ func (f *Funder) OpenChannel(ctx context.Context, params *pchannel.Params, state
 		return errors.New("error while invoking and processing host function: open")
 	}
 
-	// invokeHostFunctionOp := env.BuildContractCallOp(reqAlice, "open", openTxArgs, contractAddress)
-
-	// preFlightOp, minFee := f.integrEnv.PreflightHostFunctions(&reqAlice, *invokeHostFunctionOp)
-
-	// tx, err := f.integrEnv.SubmitOperationsWithFee(&reqAlice, kp, minFee, &preFlightOp)
-	// if err != nil {
-	// 	return errors.New("error while submitting operations with fee")
-	// }
-
-	// read out decoded Events and interpret them
-	// txMeta, err := env.DecodeTxMeta(tx)
-	// if err != nil {
-	// 	return errors.New("error while decoding tx meta")
-	// }
 	_, err = DecodeEvents(txMeta)
 	if err != nil {
 		return errors.New("error while decoding events")
@@ -166,8 +151,6 @@ func (f *Funder) OpenChannel(ctx context.Context, params *pchannel.Params, state
 }
 
 func (f *Funder) FundChannel(ctx context.Context, params *pchannel.Params, state *pchannel.State, funderIdx bool) error {
-
-	//env := f.integrEnv
 
 	contractAddress := f.stellarClient.GetContractIDAddress()
 	kp := f.kpFull
@@ -186,8 +169,6 @@ func (f *Funder) FundChannel(ctx context.Context, params *pchannel.Params, state
 		return errors.New("error while invoking and processing host function: fund")
 	}
 
-	fmt.Println("txMeta in fund: ", txMeta)
-
 	_, err = DecodeEvents(txMeta)
 	if err != nil {
 		return errors.New("error while decoding events")
@@ -195,40 +176,6 @@ func (f *Funder) FundChannel(ctx context.Context, params *pchannel.Params, state
 
 	return nil
 }
-
-// func (f Funder) FundChannel(ctx context.Context, params *pchannel.Params, state *pchannel.State, funderIdx bool) error {
-
-// 	//env := f.integrEnv
-// 	contractAddress := f.integrEnv.GetContractIDAddress()
-// 	kp := f.kpFull
-// 	acc := f.integrEnv.AccountDetails(kp)
-// 	chanID := state.ID
-// 	// generate tx to open the channel
-// 	fundTxArgs, err := env.BuildFundTxArgs(chanID, funderIdx)
-// 	if err != nil {
-// 		return errors.New("error while building fund tx")
-// 	}
-// 	invokeHostFunctionOp := env.BuildContractCallOp(acc, "fund", fundTxArgs, contractAddress)
-
-// 	preFlightOp, minFee := f.integrEnv.PreflightHostFunctions(&acc, *invokeHostFunctionOp)
-
-// 	tx, err := f.integrEnv.SubmitOperationsWithFee(&acc, kp, minFee, &preFlightOp)
-// 	if err != nil {
-// 		return errors.New("error while submitting operations with fee")
-// 	}
-
-// 	// read out decoded Events and interpret them
-// 	txMeta, err := env.DecodeTxMeta(tx)
-// 	if err != nil {
-// 		return errors.New("error while decoding tx meta")
-// 	}
-// 	_, err = DecodeEvents(txMeta)
-// 	if err != nil {
-// 		return errors.New("error while decoding events")
-// 	}
-
-// 	return nil
-// }
 
 func (f *Funder) AbortChannel(ctx context.Context, params *pchannel.Params, state *pchannel.State) error {
 
@@ -239,7 +186,13 @@ func (f *Funder) AbortChannel(ctx context.Context, params *pchannel.Params, stat
 
 	// generate tx to open the channel
 	openTxArgs, err := env.BuildGetChannelTxArgs(chanId)
+	if err != nil {
+		return errors.New("error while building get_channel tx")
+	}
 	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction(reqAlice, "abort_funding", openTxArgs, contractAddress, kp)
+	if err != nil {
+		return errors.New("error while invoking and processing host function: abort_funding")
+	}
 
 	_, err = DecodeEvents(txMeta)
 	if err != nil {

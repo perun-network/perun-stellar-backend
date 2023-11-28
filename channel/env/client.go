@@ -1,13 +1,11 @@
 package env
 
 import (
-	//"context"
 	"errors"
 	"fmt"
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/protocols/horizon"
 	"github.com/stellar/go/xdr"
-	//pchannel "perun.network/go-perun/channel"
 	"perun.network/perun-stellar-backend/wire"
 )
 
@@ -48,18 +46,14 @@ func (s *StellarClient) InvokeAndProcessHostFunction(horizonAcc horizon.Account,
 
 	// Build contract call operation
 	fnameXdr := xdr.ScSymbol(fname)
-	fmt.Println("contractAddr in InvokeAndProcessHostFunction: ", contractAddr)
 	invokeHostFunctionOp := BuildContractCallOp(horizonAcc, fnameXdr, callTxArgs, contractAddr)
 
 	// Preflight host functions
-	fmt.Println("horizonAcc in InvokeAndProcessHostFunction: ", horizonAcc)
 	preFlightOp, minFee := s.stellarEnv.PreflightHostFunctions(&horizonAcc, *invokeHostFunctionOp)
-	fmt.Println("minfee for", fname, ": ", minFee)
 	// Submit operations with fee
 	tx, err := s.stellarEnv.SubmitOperationsWithFee(&horizonAcc, kp, minFee, &preFlightOp)
 	if err != nil {
 		panic(err)
-		//return xdr.TransactionMeta{}, errors.New("error while submitting operations with fee")
 	}
 
 	fmt.Println("tx from ", fname, ": ", tx)
@@ -70,19 +64,10 @@ func (s *StellarClient) InvokeAndProcessHostFunction(horizonAcc horizon.Account,
 		return xdr.TransactionMeta{}, errors.New("error while decoding tx meta")
 	}
 
-	fmt.Println("txMeta from ", fname, ": ", txMeta)
-
-	// // Decode events
-	// _, err = DecodeSorEvents(txMeta)
-	// if err != nil {
-	// 	return errors.New("error while decoding events")
-	// }
-
 	return txMeta, nil
 }
 
 func (s *StellarClient) GetChannelState(chanArgs xdr.ScVec) (wire.Channel, error) {
-	fmt.Println("in GetChannelState")
 	contractAddress := s.stellarEnv.GetContractIDAddress()
 	kp := s.kp
 	hz := s.GetHorizonAcc()
