@@ -9,7 +9,8 @@ import (
 	"perun.network/perun-stellar-backend/wire/scval"
 )
 
-func BuildContractCallOp(caller horizon.Account, fName xdr.ScSymbol, callArgs xdr.ScVec, contractIdAddress xdr.ScAddress) *txnbuild.InvokeHostFunction {
+func BuildContractCallOp(caller horizon.Account, fName xdr.ScSymbol, callArgs xdr.ScVec, contractIdAddress xdr.ScAddress, auth []xdr.SorobanAuthorizationEntry) *txnbuild.InvokeHostFunction {
+
 	return &txnbuild.InvokeHostFunction{
 		HostFunction: xdr.HostFunction{
 			Type: xdr.HostFunctionTypeHostFunctionTypeInvokeContract,
@@ -19,6 +20,7 @@ func BuildContractCallOp(caller horizon.Account, fName xdr.ScSymbol, callArgs xd
 				Args:            callArgs,
 			},
 		},
+		Auth:          auth,
 		SourceAccount: caller.AccountID,
 	}
 }

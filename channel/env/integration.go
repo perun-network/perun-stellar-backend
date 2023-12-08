@@ -17,8 +17,9 @@ const StandaloneAuth = "Standalone Network ; February 2017"
 const SorobanRPCPort = 8080
 
 type IntegrationTestEnv struct {
-	testEnv           *testenv.Test
-	contractIDAddress xdr.ScAddress
+	testEnv      *testenv.Test
+	perunAddress xdr.ScAddress
+	tokenAddress xdr.ScAddress
 }
 
 func NewBackendEnv() *IntegrationTestEnv {
@@ -40,8 +41,12 @@ func NewIntegrationEnv(t *testing.T) *IntegrationTestEnv {
 	return &itest
 }
 
-func (it *IntegrationTestEnv) SetContractIDAddress(contractIDAddress xdr.ScAddress) {
-	it.contractIDAddress = contractIDAddress
+func (it *IntegrationTestEnv) SetPerunAddress(perunAddress xdr.ScAddress) {
+	it.perunAddress = perunAddress
+}
+
+func (it *IntegrationTestEnv) SetTokenAddress(tokenAddress xdr.ScAddress) {
+	it.tokenAddress = tokenAddress
 }
 
 func (it *IntegrationTestEnv) CreateAccounts(numAccounts int, initBalance string) ([]*keypair.Full, []txnbuild.Account) {
@@ -89,14 +94,15 @@ func (it *IntegrationTestEnv) GetPassPhrase() string {
 	return it.testEnv.GetPassPhrase()
 }
 
-func (it *IntegrationTestEnv) GetContractIDAddress() xdr.ScAddress {
-	return it.contractIDAddress
+func (it *IntegrationTestEnv) GetPerunAddress() xdr.ScAddress {
+	return it.perunAddress
 }
 
 func (it *IntegrationTestEnv) InvokeAndProcessHostFunction(horizonAcc horizon.Account, fname string, callTxArgs xdr.ScVec, contractAddr xdr.ScAddress, kp *keypair.Full) (xdr.TransactionMeta, error) {
 	// Build contract call operation
 	fnameXdr := xdr.ScSymbol(fname)
-	invokeHostFunctionOp := BuildContractCallOp(horizonAcc, fnameXdr, callTxArgs, contractAddr)
+	auth := []xdr.SorobanAuthorizationEntry{}
+	invokeHostFunctionOp := BuildContractCallOp(horizonAcc, fnameXdr, callTxArgs, contractAddr, auth)
 
 	// Preflight host functions
 	preFlightOp, minFee := it.PreflightHostFunctions(&horizonAcc, *invokeHostFunctionOp)
@@ -114,4 +120,8 @@ func (it *IntegrationTestEnv) InvokeAndProcessHostFunction(horizonAcc horizon.Ac
 	}
 
 	return txMeta, nil
+}
+
+func (it *IntegrationTestEnv) SubmitOperations(source txnbuild.Account, signer *keypair.Full, ops ...txnbuild.Operation) (horizon.Transaction, error) {
+	return it.testEnv.SubmitOperations(source, signer, ops...)
 }

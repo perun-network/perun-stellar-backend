@@ -201,7 +201,7 @@ func (e *DisputedEvent) Tstamp() uint64 {
 	return e.Timestamp
 }
 
-func DecodeEvents(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
+func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 	evs := make([]PerunEvent, 0)
 
 	txEvents := txMeta.V3.SorobanMeta.Events

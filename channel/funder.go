@@ -2,20 +2,28 @@ package channel
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
 	"errors"
 	"fmt"
+	// "github.com/stellar/go/gxdr"
 	"github.com/stellar/go/keypair"
+	"github.com/stellar/go/xdr"
 	"log"
+	"math/big"
+
 	pchannel "perun.network/go-perun/channel"
 	"perun.network/perun-stellar-backend/channel/env"
+	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/wallet"
 	"perun.network/perun-stellar-backend/wire"
+	"perun.network/perun-stellar-backend/wire/scval"
 
 	"time"
 )
 
-const MaxIterationsUntilAbort = 10
-const DefaultPollingInterval = time.Duration(7) * time.Second
+const MaxIterationsUntilAbort = 20
+const DefaultPollingInterval = time.Duration(6) * time.Second
 
 type Funder struct {
 	stellarClient   *env.StellarClient
@@ -129,20 +137,20 @@ func (f *Funder) OpenChannel(ctx context.Context, params *pchannel.Params, state
 
 	//env := f.integrEnv
 
-	contractAddress := f.stellarClient.GetContractIDAddress()
+	contractAddress := f.stellarClient.GetPerunAddress()
 	kp := f.kpFull
 	hz := f.stellarClient.GetHorizonAcc()
 
 	// generate tx to open the channel
 	openTxArgs := env.BuildOpenTxArgs(params, state)
 	fmt.Println("openTxArgs: ", openTxArgs)
-
-	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction(hz, "open", openTxArgs, contractAddress, kp)
+	auth := []xdr.SorobanAuthorizationEntry{}
+	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction(hz, "open", openTxArgs, contractAddress, kp, auth)
 	if err != nil {
 		return errors.New("error while invoking and processing host function: open")
 	}
 
-	_, err = DecodeEvents(txMeta)
+	_, err = DecodeEventsPerun(txMeta)
 	if err != nil {
 		return errors.New("error while decoding events")
 	}
@@ -152,7 +160,10 @@ func (f *Funder) OpenChannel(ctx context.Context, params *pchannel.Params, state
 
 func (f *Funder) FundChannel(ctx context.Context, params *pchannel.Params, state *pchannel.State, funderIdx bool) error {
 
-	contractAddress := f.stellarClient.GetContractIDAddress()
+	perunContractAddress := f.stellarClient.GetPerunAddress()
+	tokenContractAddress := f.stellarClient.GetTokenAddress()
+	fmt.Println("perunContractAddress: ", perunContractAddress, "tokenContractAddress: ", tokenContractAddress)
+
 	kp := f.kpFull
 	hzAcc := f.stellarClient.GetHorizonAcc()
 	chanId := state.ID
@@ -162,14 +173,114 @@ func (f *Funder) FundChannel(ctx context.Context, params *pchannel.Params, state
 	if err != nil {
 		return errors.New("error while building fund tx")
 	}
-	fmt.Println("funderchan args: ", contractAddress, kp, hzAcc, chanId, fundTxArgs, funderIdx)
+	// fmt.Println("funderchan args: ", perunContractAddress, kp, hzAcc, chanId, fundTxArgs, funderIdx)
 
-	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction(hzAcc, "fund", fundTxArgs, contractAddress, kp)
+	balsStellar, err := wire.MakeBalances(state.Allocation)
+	if err != nil {
+		return errors.New("error while making balances")
+	}
+	// tokenIDAsset := balsStellar.Token
+
+	// fmt.Println("tokenIDAsset, perunID: ", tokenIDAsset.ContractId, perunContractAddress.ContractId)
+
+	var amountInt128 xdr.Int128Parts
+
+	if funderIdx {
+
+		amountInt128 = balsStellar.BalB
+		if err != nil {
+			return errors.New("error while making int128 parts on index 1")
+		}
+
+	} else {
+		amountInt128 = balsStellar.BalA
+		if err != nil {
+			return errors.New("error while making int128 parts on index 0")
+		}
+	}
+
+	amountBalsScv, err := scval.WrapInt128Parts(amountInt128)
+	if err != nil {
+		return errors.New("error while wrapping int128 parts")
+	}
+
+	stellarAddr, err := types.MakeAccountAddress(kp)
+	if err != nil {
+		return errors.New("error while making account address")
+	}
+	scClientAddr := scval.MustWrapScAddress(stellarAddr)
+	scPerunAddr := scval.MustWrapScAddress(perunContractAddress)
+	transferArgs := xdr.ScVec{scClientAddr, scPerunAddr, amountBalsScv}
+
+	authTransfer := xdr.SorobanAuthorizedInvocation{
+		Function: xdr.SorobanAuthorizedFunction{
+			Type: xdr.SorobanAuthorizedFunctionTypeSorobanAuthorizedFunctionTypeContractFn,
+			ContractFn: &xdr.InvokeContractArgs{
+				ContractAddress: tokenContractAddress,
+				FunctionName:    "transfer",
+				Args:            transferArgs,
+			},
+		},
+		SubInvocations: nil,
+	}
+	fmt.Println("authTransfer: ", authTransfer)
+
+	fundRootInv := xdr.SorobanAuthorizedInvocation{
+		Function: xdr.SorobanAuthorizedFunction{
+			Type: xdr.SorobanAuthorizedFunctionTypeSorobanAuthorizedFunctionTypeContractFn,
+			ContractFn: &xdr.InvokeContractArgs{
+				ContractAddress: perunContractAddress,
+				FunctionName:    "fund",
+				Args:            fundTxArgs,
+			},
+		},
+		SubInvocations: []xdr.SorobanAuthorizedInvocation{}, //authTransfer
+	}
+	pphrase := f.stellarClient.GetPassPhrase()
+
+	preimg, err := makePreImgAuth(pphrase, fundRootInv)
+	if err != nil {
+		panic(err)
+	}
+
+	preimgMarshaled, err := preimg.MarshalBinary()
+	if err != nil {
+		panic(err)
+	}
+
+	hashSign, err := kp.Sign(preimgMarshaled)
+	if err != nil {
+		panic(err)
+	}
+
+	hashScVal, err := scval.WrapScBytes(hashSign)
+	if err != nil {
+		panic(err)
+	}
+
+	srbAddrCreds := xdr.SorobanAddressCredentials{
+		Address:                   stellarAddr,
+		Nonce:                     preimg.SorobanAuthorization.Nonce,
+		SignatureExpirationLedger: preimg.SorobanAuthorization.SignatureExpirationLedger,
+		Signature:                 hashScVal,
+	}
+
+	srbCreds := xdr.SorobanCredentials{Address: &srbAddrCreds,
+		Type: xdr.SorobanCredentialsTypeSorobanCredentialsAddress}
+
+	authFundClx := []xdr.SorobanAuthorizationEntry{
+		{
+			Credentials:    srbCreds,
+			RootInvocation: fundRootInv,
+		},
+	}
+
+	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction(hzAcc, "fund", fundTxArgs, perunContractAddress, kp, authFundClx) // []xdr.SorobanAuthorizationEntry{}) //authFundClx
 	if err != nil {
 		return errors.New("error while invoking and processing host function: fund")
 	}
 
-	_, err = DecodeEvents(txMeta)
+	_, err = DecodeEventsPerun(txMeta)
 	if err != nil {
 		return errors.New("error while decoding events")
 	}
@@ -177,9 +288,35 @@ func (f *Funder) FundChannel(ctx context.Context, params *pchannel.Params, state
 	return nil
 }
 
+func makePreImgAuth(passphrase string, rootInv xdr.SorobanAuthorizedInvocation) (xdr.HashIdPreimage, error) {
+	max := big.NewInt(0).SetInt64(int64(^uint64(0) >> 1))
+	randomPart, err := rand.Int(rand.Reader, max)
+	if err != nil {
+		panic(err)
+	}
+	networkId := xdr.Hash(sha256.Sum256([]byte(passphrase)))
+	ledgerEntry := uint32(100)
+	lEntryXdr := xdr.Uint32(ledgerEntry)
+	nonce := randomPart.Int64()
+	ncXdr := xdr.Int64(nonce)
+
+	srbPreImgAuth := xdr.HashIdPreimageSorobanAuthorization{
+		NetworkId:                 networkId,
+		Nonce:                     ncXdr,
+		SignatureExpirationLedger: lEntryXdr,
+		Invocation:                rootInv,
+	}
+
+	srbAuth := xdr.HashIdPreimage{
+		Type:                 xdr.EnvelopeTypeEnvelopeTypeSorobanAuthorization,
+		SorobanAuthorization: &srbPreImgAuth}
+
+	return srbAuth, nil
+}
+
 func (f *Funder) AbortChannel(ctx context.Context, params *pchannel.Params, state *pchannel.State) error {
 
-	contractAddress := f.stellarClient.GetContractIDAddress()
+	contractAddress := f.stellarClient.GetPerunAddress()
 	kp := f.kpFull
 	reqAlice := f.stellarClient.GetHorizonAcc()
 	chanId := state.ID
@@ -189,12 +326,13 @@ func (f *Funder) AbortChannel(ctx context.Context, params *pchannel.Params, stat
 	if err != nil {
 		return errors.New("error while building get_channel tx")
 	}
-	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction(reqAlice, "abort_funding", openTxArgs, contractAddress, kp)
+	auth := []xdr.SorobanAuthorizationEntry{}
+	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction(reqAlice, "abort_funding", openTxArgs, contractAddress, kp, auth)
 	if err != nil {
 		return errors.New("error while invoking and processing host function: abort_funding")
 	}
 
-	_, err = DecodeEvents(txMeta)
+	_, err = DecodeEventsPerun(txMeta)
 	if err != nil {
 		return errors.New("error while decoding events")
 	}
@@ -204,7 +342,7 @@ func (f *Funder) AbortChannel(ctx context.Context, params *pchannel.Params, stat
 
 func (f *Funder) GetChannelState(ctx context.Context, params *pchannel.Params, state *pchannel.State) (wire.Channel, error) {
 
-	contractAddress := f.stellarClient.GetContractIDAddress()
+	contractAddress := f.stellarClient.GetPerunAddress()
 	kp := f.kpFull
 	hz := f.stellarClient.GetHorizonAcc()
 	chanId := state.ID
@@ -214,8 +352,8 @@ func (f *Funder) GetChannelState(ctx context.Context, params *pchannel.Params, s
 	if err != nil {
 		return wire.Channel{}, errors.New("error while building get_channel tx")
 	}
-
-	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction(hz, "get_channel", getchTxArgs, contractAddress, kp)
+	auth := []xdr.SorobanAuthorizationEntry{}
+	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction(hz, "get_channel", getchTxArgs, contractAddress, kp, auth)
 	if err != nil {
 		return wire.Channel{}, errors.New("error while processing and submitting get_channel tx")
 	}

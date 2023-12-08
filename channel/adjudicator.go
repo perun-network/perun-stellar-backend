@@ -151,7 +151,7 @@ func (a *Adjudicator) BuildWithdrawTxArgs(req pchannel.AdjudicatorReq) (xdr.ScVe
 
 func (a *Adjudicator) withdraw(ctx context.Context, req pchannel.AdjudicatorReq) error {
 
-	contractAddress := a.stellarClient.GetContractIDAddress()
+	contractAddress := a.stellarClient.GetPerunAddress()
 	kp := a.kpFull
 	hzAcc := a.stellarClient.GetHorizonAcc()
 
@@ -160,12 +160,13 @@ func (a *Adjudicator) withdraw(ctx context.Context, req pchannel.AdjudicatorReq)
 	if err != nil {
 		return errors.New("error while building fund tx")
 	}
-	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction(hzAcc, "withdraw", withdrawTxArgs, contractAddress, kp)
+	auth := []xdr.SorobanAuthorizationEntry{}
+	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction(hzAcc, "withdraw", withdrawTxArgs, contractAddress, kp, auth)
 	if err != nil {
 		return errors.New("error while invoking and processing host function: withdraw")
 	}
 
-	_, err = DecodeEvents(txMeta)
+	_, err = DecodeEventsPerun(txMeta)
 	if err != nil {
 		return errors.New("error while decoding events")
 	}
@@ -175,18 +176,19 @@ func (a *Adjudicator) withdraw(ctx context.Context, req pchannel.AdjudicatorReq)
 
 func (a *Adjudicator) Close(ctx context.Context, id pchannel.ID, state *pchannel.State, sigs []pwallet.Sig, params *pchannel.Params) error {
 	fmt.Println("Close called")
-	contractAddress := a.stellarClient.GetContractIDAddress()
+	contractAddress := a.stellarClient.GetPerunAddress()
 	kp := a.kpFull
 	hzAcc := a.stellarClient.GetHorizonAcc()
 	closeTxArgs, err := BuildCloseTxArgs(*state, sigs)
 	if err != nil {
 		return errors.New("error while building fund tx")
 	}
-	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction(hzAcc, "close", closeTxArgs, contractAddress, kp)
+	auth := []xdr.SorobanAuthorizationEntry{}
+	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction(hzAcc, "close", closeTxArgs, contractAddress, kp, auth)
 	if err != nil {
 		return errors.New("error while invoking and processing host function: close")
 	}
-	_, err = DecodeEvents(txMeta)
+	_, err = DecodeEventsPerun(txMeta)
 	if err != nil {
 		return errors.New("error while decoding events")
 	}
@@ -200,18 +202,19 @@ func (a *Adjudicator) Register(ctx context.Context, req pchannel.AdjudicatorReq,
 
 func (a *Adjudicator) ForceClose(ctx context.Context, id pchannel.ID, state *pchannel.State, sigs []pwallet.Sig, params *pchannel.Params) error {
 	fmt.Println("ForceClose called")
-	contractAddress := a.stellarClient.GetContractIDAddress()
+	contractAddress := a.stellarClient.GetPerunAddress()
 	kp := a.kpFull
 	hzAcc := a.stellarClient.GetHorizonAcc()
 	forceCloseTxArgs, err := env.BuildForceCloseTxArgs(id)
 	if err != nil {
 		return errors.New("error while building fund tx")
 	}
-	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction(hzAcc, "force_close", forceCloseTxArgs, contractAddress, kp)
+	auth := []xdr.SorobanAuthorizationEntry{}
+	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction(hzAcc, "force_close", forceCloseTxArgs, contractAddress, kp, auth)
 	if err != nil {
 		return errors.New("error while invoking and processing host function")
 	}
-	_, err = DecodeEvents(txMeta)
+	_, err = DecodeEventsPerun(txMeta)
 	if err != nil {
 		return errors.New("error while decoding events")
 	}

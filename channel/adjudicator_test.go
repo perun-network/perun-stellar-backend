@@ -2,6 +2,7 @@ package channel_test
 
 import (
 	"context"
+	"github.com/stellar/go/xdr"
 	"github.com/stretchr/testify/require"
 	pchannel "perun.network/go-perun/channel"
 	pwallet "perun.network/go-perun/wallet"
@@ -29,7 +30,7 @@ func TestCloseChannel(t *testing.T) {
 	reqDeployer := itest.AccountDetails(kpDeployer)
 
 	contractAddr := util.Deploy(itest, kpDeployer, reqDeployer, PerunContractPath)
-	itest.SetContractIDAddress(contractAddr)
+	itest.SetPerunAddress(contractAddr)
 
 	_, accAlice, _ := util.MakeRandPerunWallet()
 	_, accBob, _ := util.MakeRandPerunWallet()
@@ -59,7 +60,8 @@ func TestCloseChannel(t *testing.T) {
 	getChannelArgs, err := env.BuildGetChannelTxArgs(chanID)
 	require.NoError(t, err)
 
-	txMetaGetChAfterFunding, err := aliceClient.InvokeAndProcessHostFunction(hzAliceGetCh, "get_channel", getChannelArgs, contractAddr, kpAlice)
+	auth := []xdr.SorobanAuthorizationEntry{}
+	txMetaGetChAfterFunding, err := aliceClient.InvokeAndProcessHostFunction(hzAliceGetCh, "get_channel", getChannelArgs, contractAddr, kpAlice, auth)
 	require.NoError(t, err)
 
 	retVal := txMetaGetChAfterFunding.V3.SorobanMeta.ReturnValue
@@ -91,7 +93,8 @@ func TestCloseChannel(t *testing.T) {
 	require.NoError(t, err)
 	hzAliceGClose := aliceClient.GetHorizonAcc()
 
-	invokeHostFunctionOpClose := env.BuildContractCallOp(hzAliceGClose, "close", closeArgs, contractAddr)
+	auth = []xdr.SorobanAuthorizationEntry{}
+	invokeHostFunctionOpClose := env.BuildContractCallOp(hzAliceGClose, "close", closeArgs, contractAddr, auth)
 
 	preFlightOpClose, minFeeClose := itest.PreflightHostFunctions(&hzAliceGClose, *invokeHostFunctionOpClose)
 
@@ -103,7 +106,7 @@ func TestCloseChannel(t *testing.T) {
 
 	require.NoError(t, err)
 
-	_, err = channel.DecodeEvents(txMetaClose)
+	_, err = channel.DecodeEventsPerun(txMetaClose)
 
 	require.NoError(t, err)
 
@@ -121,7 +124,7 @@ func TestWithdrawChannel(t *testing.T) {
 	reqDeployer := itest.AccountDetails(kpDeployer)
 
 	contractAddr := util.Deploy(itest, kpDeployer, reqDeployer, PerunContractPath)
-	itest.SetContractIDAddress(contractAddr)
+	itest.SetPerunAddress(contractAddr)
 
 	_, accAlice, _ := util.MakeRandPerunWallet()
 	_, accBob, _ := util.MakeRandPerunWallet()
@@ -153,7 +156,8 @@ func TestWithdrawChannel(t *testing.T) {
 	getChannelArgs, err := env.BuildGetChannelTxArgs(chanID)
 	require.NoError(t, err)
 
-	txMetaGetChAfterFunding, err := aliceClient.InvokeAndProcessHostFunction(hzAliceGetCh, "get_channel", getChannelArgs, contractAddr, kpAlice)
+	auth := []xdr.SorobanAuthorizationEntry{}
+	txMetaGetChAfterFunding, err := aliceClient.InvokeAndProcessHostFunction(hzAliceGetCh, "get_channel", getChannelArgs, contractAddr, kpAlice, auth)
 	require.NoError(t, err)
 
 	retVal := txMetaGetChAfterFunding.V3.SorobanMeta.ReturnValue
@@ -185,7 +189,8 @@ func TestWithdrawChannel(t *testing.T) {
 	require.NoError(t, err)
 	hzAliceGClose := aliceClient.GetHorizonAcc()
 
-	invokeHostFunctionOpClose := env.BuildContractCallOp(hzAliceGClose, "close", closeArgs, contractAddr)
+	auth = []xdr.SorobanAuthorizationEntry{}
+	invokeHostFunctionOpClose := env.BuildContractCallOp(hzAliceGClose, "close", closeArgs, contractAddr, auth)
 
 	preFlightOpClose, minFeeClose := itest.PreflightHostFunctions(&hzAliceGClose, *invokeHostFunctionOpClose)
 
@@ -197,13 +202,14 @@ func TestWithdrawChannel(t *testing.T) {
 
 	require.NoError(t, err)
 
-	_, err = channel.DecodeEvents(txMetaClose)
+	_, err = channel.DecodeEventsPerun(txMetaClose)
 	require.NoError(t, err)
 
 	hzAliceWithdraw := aliceClient.GetHorizonAcc()
 	waArgs, err := env.BuildFundTxArgs(chanID, false)
 	require.NoError(t, err)
-	invokeHostFunctionOpWA := env.BuildContractCallOp(hzAliceWithdraw, "withdraw", waArgs, contractAddr)
+	auth = []xdr.SorobanAuthorizationEntry{}
+	invokeHostFunctionOpWA := env.BuildContractCallOp(hzAliceWithdraw, "withdraw", waArgs, contractAddr, auth)
 	preFlightOpWA, minFeeWA := itest.PreflightHostFunctions(&hzAliceWithdraw, *invokeHostFunctionOpWA)
 	txWithdrawAlice, err := itest.SubmitOperationsWithFee(&hzAliceWithdraw, kpAlice, minFeeWA, &preFlightOpWA)
 	require.NoError(t, err)
@@ -211,13 +217,14 @@ func TestWithdrawChannel(t *testing.T) {
 	txMetaWA, err := env.DecodeTxMeta(txWithdrawAlice)
 
 	require.NoError(t, err)
-	_, err = channel.DecodeEvents(txMetaWA)
+	_, err = channel.DecodeEventsPerun(txMetaWA)
 	require.NoError(t, err)
 
 	hzBobWithdraw := bobClient.GetHorizonAcc()
 	wbArgs, err := env.BuildFundTxArgs(chanID, true)
 	require.NoError(t, err)
-	invokeHostFunctionOpWB := env.BuildContractCallOp(hzBobWithdraw, "withdraw", wbArgs, contractAddr)
+	auth = []xdr.SorobanAuthorizationEntry{}
+	invokeHostFunctionOpWB := env.BuildContractCallOp(hzBobWithdraw, "withdraw", wbArgs, contractAddr, auth)
 	preFlightOpWB, minFeeWB := itest.PreflightHostFunctions(&hzBobWithdraw, *invokeHostFunctionOpWB)
 	txWithdrawBob, err := itest.SubmitOperationsWithFee(&hzBobWithdraw, kpBob, minFeeWB, &preFlightOpWB)
 	require.NoError(t, err)
@@ -225,7 +232,7 @@ func TestWithdrawChannel(t *testing.T) {
 	txMetaWB, err := env.DecodeTxMeta(txWithdrawBob)
 
 	require.NoError(t, err)
-	_, err = channel.DecodeEvents(txMetaWB)
+	_, err = channel.DecodeEventsPerun(txMetaWB)
 	require.NoError(t, err)
 
 }

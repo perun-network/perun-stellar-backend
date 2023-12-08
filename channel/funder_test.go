@@ -2,6 +2,7 @@ package channel_test
 
 import (
 	"context"
+	"fmt"
 	"github.com/stellar/go/xdr"
 	"github.com/stretchr/testify/require"
 	pchannel "perun.network/go-perun/channel"
@@ -32,6 +33,8 @@ func TestOpenChannel(t *testing.T) {
 
 	// Create the contract
 
+	fmt.Println("itest.GetPassPhrase(): ", itest.GetPassPhrase())
+
 	createContractOp := channel.AssembleCreateContractOp(kpAlice.Address(), channel.PerunContractPath, "a1", itest.GetPassPhrase())
 	preFlightOp, minFee = itest.PreflightHostFunctions(&reqAlice, *createContractOp)
 	_, err := itest.SubmitOperationsWithFee(&reqAlice, kpAlice, minFee, &preFlightOp)
@@ -49,8 +52,8 @@ func TestOpenChannel(t *testing.T) {
 	perunFirstParams, perunFirstState := chtest.NewParamsState(t)
 
 	openArgs := env.BuildOpenTxArgs(perunFirstParams, perunFirstState)
-
-	invokeHostFunctionOp := env.BuildContractCallOp(reqAlice, "open", openArgs, contractIDAddress)
+	auth := []xdr.SorobanAuthorizationEntry{}
+	invokeHostFunctionOp := env.BuildContractCallOp(reqAlice, "open", openArgs, contractIDAddress, auth)
 
 	preFlightOp, minFee = itest.PreflightHostFunctions(&reqAlice, *invokeHostFunctionOp)
 
@@ -60,7 +63,7 @@ func TestOpenChannel(t *testing.T) {
 	txMeta, err := env.DecodeTxMeta(tx)
 	require.NoError(t, err)
 
-	_, err = channel.DecodeEvents(txMeta)
+	_, err = channel.DecodeEventsPerun(txMeta)
 	require.NoError(t, err)
 
 }
@@ -79,7 +82,7 @@ func TestFundChannel(t *testing.T) {
 	reqDeployer := itest.AccountDetails(kpDeployer)
 
 	contractAddr := util.Deploy(itest, kpDeployer, reqDeployer, PerunContractPath)
-	itest.SetContractIDAddress(contractAddr)
+	itest.SetPerunAddress(contractAddr)
 
 	perunFirstParams, perunFirstState := chtest.NewParamsState(t)
 
