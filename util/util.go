@@ -14,7 +14,7 @@ import (
 	mathrand "math/rand"
 )
 
-func Deploy(stellarEnv *env.IntegrationTestEnv, kp *keypair.Full, hz horizon.Account, contractPath string) xdr.ScAddress {
+func Deploy(stellarEnv *env.IntegrationTestEnv, kp *keypair.Full, hz horizon.Account, contractPath string) (xdr.ScAddress, xdr.Hash) {
 	// Install contract
 	installContractOp := channel.AssembleInstallContractCodeOp(kp.Address(), contractPath)
 	preFlightOp, minFee := stellarEnv.PreflightHostFunctions(&hz, *installContractOp)
@@ -28,11 +28,12 @@ func Deploy(stellarEnv *env.IntegrationTestEnv, kp *keypair.Full, hz horizon.Acc
 		panic(err)
 	}
 	contractID := preFlightOp.Ext.SorobanData.Resources.Footprint.ReadWrite[0].MustContractData().Contract.ContractId
+	contractHash := preFlightOp.Ext.SorobanData.Resources.Footprint.ReadOnly[0].MustContractCode().Hash
 	contractIDAddress := xdr.ScAddress{
 		Type:       xdr.ScAddressTypeScAddressTypeContract,
 		ContractId: contractID,
 	}
-	return contractIDAddress
+	return contractIDAddress, contractHash
 
 }
 

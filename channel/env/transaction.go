@@ -112,3 +112,33 @@ func DecodeTxMeta(tx horizon.Transaction) (xdr.TransactionMeta, error) {
 
 	return transactionMeta, nil
 }
+
+func stellarAssetContractID(stellarEnv *IntegrationTestEnv, asset xdr.Asset) xdr.Hash {
+	contractID, err := asset.ContractID(stellarEnv.GetPassPhrase())
+	if err != nil {
+		panic(err)
+	}
+	return contractID
+}
+
+func i128Param(hi int64, lo uint64) xdr.ScVal {
+	i128 := &xdr.Int128Parts{
+		Hi: xdr.Int64(hi),
+		Lo: xdr.Uint64(lo),
+	}
+	return xdr.ScVal{
+		Type: xdr.ScValTypeScvI128,
+		I128: i128,
+	}
+}
+
+func AccountAddressParam(accountID string) xdr.ScVal {
+	address := xdr.ScAddress{
+		Type:      xdr.ScAddressTypeScAddressTypeAccount,
+		AccountId: xdr.MustAddressPtr(accountID),
+	}
+	return xdr.ScVal{
+		Type:    xdr.ScValTypeScvAddress,
+		Address: &address,
+	}
+}

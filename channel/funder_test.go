@@ -81,7 +81,7 @@ func TestFundChannel(t *testing.T) {
 	_ = itest.AccountDetails(kpBob)
 	reqDeployer := itest.AccountDetails(kpDeployer)
 
-	contractAddr := util.Deploy(itest, kpDeployer, reqDeployer, PerunContractPath)
+	contractAddr, _ := util.Deploy(itest, kpDeployer, reqDeployer, PerunContractPath)
 	itest.SetPerunAddress(contractAddr)
 
 	perunFirstParams, perunFirstState := chtest.NewParamsState(t)

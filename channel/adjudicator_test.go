@@ -29,7 +29,7 @@ func TestCloseChannel(t *testing.T) {
 	kpDeployer := kps[2]
 	reqDeployer := itest.AccountDetails(kpDeployer)
 
-	contractAddr := util.Deploy(itest, kpDeployer, reqDeployer, PerunContractPath)
+	contractAddr, _ := util.Deploy(itest, kpDeployer, reqDeployer, PerunContractPath)
 	itest.SetPerunAddress(contractAddr)
 
 	_, accAlice, _ := util.MakeRandPerunWallet()
@@ -123,7 +123,7 @@ func TestWithdrawChannel(t *testing.T) {
 
 	reqDeployer := itest.AccountDetails(kpDeployer)
 
-	contractAddr := util.Deploy(itest, kpDeployer, reqDeployer, PerunContractPath)
+	contractAddr, _ := util.Deploy(itest, kpDeployer, reqDeployer, PerunContractPath)
 	itest.SetPerunAddress(contractAddr)
 
 	_, accAlice, _ := util.MakeRandPerunWallet()

@@ -80,6 +80,32 @@ func BuildGetTokenBalanceArgs(balanceOf xdr.ScAddress) (xdr.ScVec, error) {
 	return GetTokenBalanceArgs, nil
 }
 
+func BuildTransferTokenArgs(from xdr.ScAddress, to xdr.ScAddress, amount xdr.Int128Parts) (xdr.ScVec, error) {
+
+	fromScAddr, err := scval.WrapScAddress(from)
+	if err != nil {
+		panic(err)
+	}
+
+	toScAddr, err := scval.WrapScAddress(to)
+	if err != nil {
+		panic(err)
+	}
+
+	amountSc, err := scval.WrapInt128Parts(amount)
+	if err != nil {
+		panic(err)
+	}
+
+	GetTokenBalanceArgs := xdr.ScVec{
+		fromScAddr,
+		toScAddr,
+		amountSc,
+	}
+
+	return GetTokenBalanceArgs, nil
+}
+
 func InitTokenContract(ctx context.Context, stellarClient *env.StellarClient, adminAddr xdr.ScAddress, decimals uint32, tokenName, tokenSymbol string, contractAddress xdr.ScAddress) error {
 
 	hzAcc := stellarClient.GetHorizonAcc()
@@ -145,6 +171,27 @@ func GetTokenBalance(ctx context.Context, stellarClient *env.StellarClient, bala
 	}
 	auth := []xdr.SorobanAuthorizationEntry{}
 	txMeta, err := stellarClient.InvokeAndProcessHostFunction(hzAcc, "balance", getBalanceArgs, contractAddress, kp, auth)
+	if err != nil {
+		return errors.New("error while invoking and processing host function for GetTokenName")
+	}
+
+	_ = txMeta.V3.SorobanMeta.ReturnValue
+
+	// rVal := reVal.MustI128()
+
+	return nil
+}
+
+func TransferToken(ctx context.Context, stellarClient *env.StellarClient, from xdr.ScAddress, to xdr.ScAddress, amount128 xdr.Int128Parts, contractAddress xdr.ScAddress) error {
+
+	hzAcc := stellarClient.GetHorizonAcc()
+	kp := stellarClient.GetAccount()
+	transferArgs, err := BuildTransferTokenArgs(from, to, amount128)
+	if err != nil {
+		return errors.New("error while building fund tx")
+	}
+	auth := []xdr.SorobanAuthorizationEntry{}
+	txMeta, err := stellarClient.InvokeAndProcessHostFunction(hzAcc, "transfer", transferArgs, contractAddress, kp, auth)
 	if err != nil {
 		return errors.New("error while invoking and processing host function for GetTokenName")
 	}

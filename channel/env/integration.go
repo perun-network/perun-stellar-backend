@@ -2,12 +2,14 @@ package env
 
 import (
 	"errors"
+	"github.com/stellar/go/amount"
 	"github.com/stellar/go/clients/horizonclient"
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/protocols/horizon"
 	testenv "github.com/stellar/go/services/horizon/pkg/test/integration"
 	"github.com/stellar/go/txnbuild"
 	"github.com/stellar/go/xdr"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -26,8 +28,9 @@ func NewBackendEnv() *IntegrationTestEnv {
 	t := &testing.T{}
 
 	cfg := testenv.Config{
-		ProtocolVersion:  PtotocolVersion,
-		EnableSorobanRPC: EnableSorobanRPC,
+		ProtocolVersion:    PtotocolVersion,
+		EnableSorobanRPC:   EnableSorobanRPC,
+		HorizonEnvironment: map[string]string{"INGEST_DISABLE_STATE_VERIFICATION": "true", "CONNECTION_TIMEOUT": "360000"},
 	}
 	itest := IntegrationTestEnv{testEnv: testenv.NewTest(t, cfg)}
 	return &itest
@@ -53,6 +56,19 @@ func (it *IntegrationTestEnv) CreateAccounts(numAccounts int, initBalance string
 	kps, accs := it.testEnv.CreateAccounts(numAccounts, initBalance)
 
 	return kps, accs
+}
+
+func (it *IntegrationTestEnv) CreateAccount(initialBalance string) (*keypair.Full, txnbuild.Account) {
+	kps, accts := it.CreateAccounts(1, initialBalance)
+	return kps[0], accts[0]
+}
+
+func (it *IntegrationTestEnv) CurrentTest() *testing.T {
+	return it.testEnv.CurrentTest()
+}
+
+func (it *IntegrationTestEnv) Master() *keypair.Full {
+	return it.testEnv.Master()
 }
 
 func (it *IntegrationTestEnv) AccountDetails(acc *keypair.Full) horizon.Account {
@@ -98,6 +114,21 @@ func (it *IntegrationTestEnv) GetPerunAddress() xdr.ScAddress {
 	return it.perunAddress
 }
 
+func AssertContainsBalance(it *IntegrationTestEnv, acct *keypair.Full, issuer, code string, amt xdr.Int64) {
+	accountResponse := it.testEnv.MustGetAccount(acct)
+	if issuer == "" && code == "" {
+		xlmBalance, err := accountResponse.GetNativeBalance()
+		if err != nil {
+			panic(err)
+		}
+		assert.NoError(it.testEnv.CurrentTest(), err)
+		assert.Equal(it.testEnv.CurrentTest(), amt, amount.MustParse(xlmBalance))
+	} else {
+		assetBalance := accountResponse.GetCreditBalance(code, issuer)
+		assert.Equal(it.testEnv.CurrentTest(), amt, amount.MustParse(assetBalance))
+	}
+}
+
 func (it *IntegrationTestEnv) InvokeAndProcessHostFunction(horizonAcc horizon.Account, fname string, callTxArgs xdr.ScVec, contractAddr xdr.ScAddress, kp *keypair.Full) (xdr.TransactionMeta, error) {
 	// Build contract call operation
 	fnameXdr := xdr.ScSymbol(fname)
@@ -124,4 +155,23 @@ func (it *IntegrationTestEnv) InvokeAndProcessHostFunction(horizonAcc horizon.Ac
 
 func (it *IntegrationTestEnv) SubmitOperations(source txnbuild.Account, signer *keypair.Full, ops ...txnbuild.Operation) (horizon.Transaction, error) {
 	return it.testEnv.SubmitOperations(source, signer, ops...)
+}
+
+func (it *IntegrationTestEnv) MustGetAccount(source *keypair.Full) horizon.Account {
+	client := it.Client()
+	account, err := client.AccountDetail(horizonclient.AccountRequest{AccountID: source.Address()})
+	if err != nil {
+		panic(err)
+	}
+	return account
+}
+
+func (it *IntegrationTestEnv) MustEstablishTrustline(
+	truster *keypair.Full, account txnbuild.Account, asset txnbuild.Asset,
+) (resp horizon.Transaction) {
+	txResp, err := it.testEnv.EstablishTrustline(truster, account, asset)
+	if err != nil {
+		panic(err)
+	}
+	return txResp
 }

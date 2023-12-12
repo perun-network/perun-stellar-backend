@@ -2,9 +2,9 @@ package env
 
 import (
 	"errors"
-	"fmt"
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/protocols/horizon"
+	"github.com/stellar/go/txnbuild"
 	"github.com/stellar/go/xdr"
 	"perun.network/perun-stellar-backend/wire"
 )
@@ -57,12 +57,12 @@ func (s *StellarClient) InvokeAndProcessHostFunction(horizonAcc horizon.Account,
 
 	preFlightOp, minFee := s.stellarEnv.PreflightHostFunctions(&horizonAcc, *invokeHostFunctionOp)
 
-	tx, err := s.stellarEnv.SubmitOperationsWithFee(&horizonAcc, kp, minFee, &preFlightOp)
+	tx, err := s.stellarEnv.SubmitOperationsWithFee(&horizonAcc, kp, minFee+txnbuild.MinBaseFee, &preFlightOp)
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Println("tx from ", fname, ": ", tx)
+	// fmt.Println("tx from ", fname, ": ", tx)
 
 	// Decode transaction metadata
 	txMeta, err := DecodeTxMeta(tx)

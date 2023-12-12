@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	// "github.com/stellar/go/gxdr"
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/xdr"
 	"log"
@@ -14,7 +13,6 @@ import (
 
 	pchannel "perun.network/go-perun/channel"
 	"perun.network/perun-stellar-backend/channel/env"
-	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/wallet"
 	"perun.network/perun-stellar-backend/wire"
 	"perun.network/perun-stellar-backend/wire/scval"
@@ -162,7 +160,11 @@ func (f *Funder) FundChannel(ctx context.Context, params *pchannel.Params, state
 
 	perunContractAddress := f.stellarClient.GetPerunAddress()
 	tokenContractAddress := f.stellarClient.GetTokenAddress()
-	fmt.Println("perunContractAddress: ", perunContractAddress, "tokenContractAddress: ", tokenContractAddress)
+
+	// tokenAddrString, err := tokenContractAddress.String()
+	// if err != nil {
+	// 	return errors.New("error while converting token address to string")
+	// }
 
 	kp := f.kpFull
 	hzAcc := f.stellarClient.GetHorizonAcc()
@@ -173,109 +175,123 @@ func (f *Funder) FundChannel(ctx context.Context, params *pchannel.Params, state
 	if err != nil {
 		return errors.New("error while building fund tx")
 	}
-	// fmt.Println("funderchan args: ", perunContractAddress, kp, hzAcc, chanId, fundTxArgs, funderIdx)
-
 	balsStellar, err := wire.MakeBalances(state.Allocation)
 	if err != nil {
 		return errors.New("error while making balances")
 	}
-	// tokenIDAsset := balsStellar.Token
 
-	// fmt.Println("tokenIDAsset, perunID: ", tokenIDAsset.ContractId, perunContractAddress.ContractId)
+	tokenIDAddrFromBals := balsStellar.Token
 
-	var amountInt128 xdr.Int128Parts
-
-	if funderIdx {
-
-		amountInt128 = balsStellar.BalB
-		if err != nil {
-			return errors.New("error while making int128 parts on index 1")
-		}
-
-	} else {
-		amountInt128 = balsStellar.BalA
-		if err != nil {
-			return errors.New("error while making int128 parts on index 0")
-		}
+	same := tokenIDAddrFromBals.Equals(tokenContractAddress)
+	if !same {
+		panic("tokenIDAddrFromBals not equal to tokenContractAddress")
 	}
 
-	amountBalsScv, err := scval.WrapInt128Parts(amountInt128)
+	// var amountInt128 xdr.Int128Parts
+
+	// if funderIdx {
+
+	// 	amountInt128 = balsStellar.BalB
+	// 	if err != nil {
+	// 		return errors.New("error while making int128 parts on index 1")
+	// 	}
+
+	// } else {
+	// 	amountInt128 = balsStellar.BalA
+	// 	if err != nil {
+	// 		return errors.New("error while making int128 parts on index 0")
+	// 	}
+	// }
+
+	// amountBalsScv, err := scval.WrapInt128Parts(amountInt128)
+	// if err != nil {
+	// 	return errors.New("error while wrapping int128 parts")
+	// }
+
+	// stellarAddr, err := types.MakeAccountAddress(kp)
+	// if err != nil {
+	// 	return errors.New("error while making account address")
+	// }
+	// scClientAddr := scval.MustWrapScAddress(stellarAddr)
+	// scPerunAddr := scval.MustWrapScAddress(perunContractAddress)
+	// transferArgs := xdr.ScVec{scClientAddr, scPerunAddr, amountBalsScv}
+
+	// transfer here to perun, try if it works
+
+	tokenAddr := tokenContractAddress //balsStellar.Token
+
+	// authTransfer := xdr.SorobanAuthorizedInvocation{
+	// 	Function: xdr.SorobanAuthorizedFunction{
+	// 		Type: xdr.SorobanAuthorizedFunctionTypeSorobanAuthorizedFunctionTypeContractFn,
+	// 		ContractFn: &xdr.InvokeContractArgs{
+	// 			ContractAddress: tokenContractAddress,
+	// 			FunctionName:    "transfer",
+	// 			Args:            transferArgs,
+	// 		},
+	// 	},
+	// 	SubInvocations: nil,
+	// }
+
+	// fundRootInv := xdr.SorobanAuthorizedInvocation{
+	// 	Function: xdr.SorobanAuthorizedFunction{
+	// 		Type: xdr.SorobanAuthorizedFunctionTypeSorobanAuthorizedFunctionTypeContractFn,
+	// 		ContractFn: &xdr.InvokeContractArgs{
+	// 			ContractAddress: perunContractAddress,
+	// 			FunctionName:    "fund",
+	// 			Args:            fundTxArgs,
+	// 		},
+	// 	},
+	// 	SubInvocations: []xdr.SorobanAuthorizedInvocation{}, //authTransfer
+	// }
+	// pphrase := f.stellarClient.GetPassPhrase()
+
+	// preimg, err := makePreImgAuth(pphrase, fundRootInv)
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	// preimgMarshaled, err := preimg.MarshalBinary()
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	// hashSign, err := kp.Sign(preimgMarshaled)
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	// hashScVal, err := scval.WrapScBytes(hashSign)
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	// srbAddrCreds := xdr.SorobanAddressCredentials{
+	// 	Address:                   stellarAddr,
+	// 	Nonce:                     preimg.SorobanAuthorization.Nonce,
+	// 	SignatureExpirationLedger: preimg.SorobanAuthorization.SignatureExpirationLedger,
+	// 	Signature:                 hashScVal,
+	// }
+
+	// srbCreds := xdr.SorobanCredentials{Address: &srbAddrCreds,
+	// 	Type: xdr.SorobanCredentialsTypeSorobanCredentialsAddress}
+
+	// authFundClx := []xdr.SorobanAuthorizationEntry{
+	// 	{
+	// 		Credentials:    srbCreds,
+	// 		RootInvocation: fundRootInv,
+	// 	},
+	// }
+
+	tokenAddrXdr := scval.MustWrapScAddress(tokenAddr)
+
+	testArgs := xdr.ScVec{tokenAddrXdr}
+	hzAcctInt0 := f.stellarClient.GetHorizonAcc()
+	_, err = f.stellarClient.InvokeAndProcessHostFunction(hzAcctInt0, "testinteract", testArgs, perunContractAddress, kp, []xdr.SorobanAuthorizationEntry{}) // authFundClx) // []xdr.SorobanAuthorizationEntry{}) //authFundClx
 	if err != nil {
-		return errors.New("error while wrapping int128 parts")
+		return errors.New("error while invoking and processing host function: testinteract")
 	}
 
-	stellarAddr, err := types.MakeAccountAddress(kp)
-	if err != nil {
-		return errors.New("error while making account address")
-	}
-	scClientAddr := scval.MustWrapScAddress(stellarAddr)
-	scPerunAddr := scval.MustWrapScAddress(perunContractAddress)
-	transferArgs := xdr.ScVec{scClientAddr, scPerunAddr, amountBalsScv}
-
-	authTransfer := xdr.SorobanAuthorizedInvocation{
-		Function: xdr.SorobanAuthorizedFunction{
-			Type: xdr.SorobanAuthorizedFunctionTypeSorobanAuthorizedFunctionTypeContractFn,
-			ContractFn: &xdr.InvokeContractArgs{
-				ContractAddress: tokenContractAddress,
-				FunctionName:    "transfer",
-				Args:            transferArgs,
-			},
-		},
-		SubInvocations: nil,
-	}
-	fmt.Println("authTransfer: ", authTransfer)
-
-	fundRootInv := xdr.SorobanAuthorizedInvocation{
-		Function: xdr.SorobanAuthorizedFunction{
-			Type: xdr.SorobanAuthorizedFunctionTypeSorobanAuthorizedFunctionTypeContractFn,
-			ContractFn: &xdr.InvokeContractArgs{
-				ContractAddress: perunContractAddress,
-				FunctionName:    "fund",
-				Args:            fundTxArgs,
-			},
-		},
-		SubInvocations: []xdr.SorobanAuthorizedInvocation{}, //authTransfer
-	}
-	pphrase := f.stellarClient.GetPassPhrase()
-
-	preimg, err := makePreImgAuth(pphrase, fundRootInv)
-	if err != nil {
-		panic(err)
-	}
-
-	preimgMarshaled, err := preimg.MarshalBinary()
-	if err != nil {
-		panic(err)
-	}
-
-	hashSign, err := kp.Sign(preimgMarshaled)
-	if err != nil {
-		panic(err)
-	}
-
-	hashScVal, err := scval.WrapScBytes(hashSign)
-	if err != nil {
-		panic(err)
-	}
-
-	srbAddrCreds := xdr.SorobanAddressCredentials{
-		Address:                   stellarAddr,
-		Nonce:                     preimg.SorobanAuthorization.Nonce,
-		SignatureExpirationLedger: preimg.SorobanAuthorization.SignatureExpirationLedger,
-		Signature:                 hashScVal,
-	}
-
-	srbCreds := xdr.SorobanCredentials{Address: &srbAddrCreds,
-		Type: xdr.SorobanCredentialsTypeSorobanCredentialsAddress}
-
-	authFundClx := []xdr.SorobanAuthorizationEntry{
-		{
-			Credentials:    srbCreds,
-			RootInvocation: fundRootInv,
-		},
-	}
-
-	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction(hzAcc, "fund", fundTxArgs, perunContractAddress, kp, authFundClx) // []xdr.SorobanAuthorizationEntry{}) //authFundClx
+	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction(hzAcc, "fund", fundTxArgs, perunContractAddress, kp, []xdr.SorobanAuthorizationEntry{}) // authFundClx) // []xdr.SorobanAuthorizationEntry{}) //authFundClx
 	if err != nil {
 		return errors.New("error while invoking and processing host function: fund")
 	}
