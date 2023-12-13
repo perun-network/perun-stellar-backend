@@ -34,9 +34,8 @@ func SetupPaymentClient(
 	w *wallet.EphemeralWallet, // w is the wallet used to resolve addresses to accounts for channels.
 	acc *wallet.Account,
 	stellarKp *keypair.Full,
-	stellarTokenID types.StellarAsset,
+	stellarTokenID *types.StellarAsset,
 	bus *wire.LocalBus,
-	//hzAcc *horizon.Account,
 
 ) (*PaymentClient, error) {
 
@@ -63,7 +62,7 @@ func SetupPaymentClient(
 	c := &PaymentClient{
 		perunClient: perunClient,
 		account:     acc,
-		currency:    &stellarTokenID,
+		currency:    stellarTokenID,
 		channels:    make(chan *PaymentChannel, 1),
 		wAddr:       wireAddr,
 		balance:     big.NewInt(0),

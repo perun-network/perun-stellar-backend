@@ -8,6 +8,32 @@ import (
 	"perun.network/perun-stellar-backend/wire/scval"
 )
 
+type TokenParams struct {
+	decims uint32
+	name   string
+	symbol string
+}
+
+func NewTokenParams(decims uint32, name string, symbol string) *TokenParams {
+	return &TokenParams{
+		decims: decims,
+		name:   name,
+		symbol: symbol,
+	}
+}
+
+func (t *TokenParams) GetDecimals() uint32 {
+	return t.decims
+}
+
+func (t *TokenParams) GetName() string {
+	return t.name
+}
+
+func (t *TokenParams) GetSymbol() string {
+	return t.symbol
+}
+
 func BuildInitTokenArgs(adminAddr xdr.ScAddress, decimals uint32, tokenName string, tokenSymbol string) (xdr.ScVec, error) {
 
 	adminScAddr, err := scval.WrapScAddress(adminAddr)
@@ -106,10 +132,13 @@ func BuildTransferTokenArgs(from xdr.ScAddress, to xdr.ScAddress, amount xdr.Int
 	return GetTokenBalanceArgs, nil
 }
 
-func InitTokenContract(ctx context.Context, stellarClient *env.StellarClient, adminAddr xdr.ScAddress, decimals uint32, tokenName, tokenSymbol string, contractAddress xdr.ScAddress) error {
+func InitTokenContract(ctx context.Context, stellarClient *env.StellarClient, adminAddr xdr.ScAddress, tokenParams TokenParams, contractAddress xdr.ScAddress) error {
 
 	hzAcc := stellarClient.GetHorizonAcc()
 	kp := stellarClient.GetAccount()
+	decimals := tokenParams.GetDecimals()
+	tokenName := tokenParams.GetName()
+	tokenSymbol := tokenParams.GetSymbol()
 
 	initTokenArgs, err := BuildInitTokenArgs(adminAddr, decimals, tokenName, tokenSymbol)
 	if err != nil {

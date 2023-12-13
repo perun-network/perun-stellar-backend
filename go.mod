@@ -13,8 +13,6 @@ require (
 
 replace github.com/stellar/go v0.0.0-20231003185205-facabfc2f4c4 => github.com/perun-network/go v0.0.0-20231212081247-248b5be6c4ba
 
-// replace github.com/stellar/go v0.0.0-20231003185205-facabfc2f4c4 => ../stellarfork/go
-
 require (
 	github.com/2opremio/pretty v0.2.2-0.20230601220618-e1d5758b2a95 // indirect
 	github.com/BurntSushi/toml v0.3.1 // indirect

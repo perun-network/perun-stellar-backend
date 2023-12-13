@@ -68,9 +68,6 @@ func (f *Funder) fundPartyA(ctx context.Context, req pchannel.FundingReq) error 
 		return errors.New("error while polling for opened channel A")
 	}
 	fmt.Println("polled chanState for PartyA: ", chanState.Control.FundedA, chanState.Control.FundedB)
-	// fund the channel:
-
-	fmt.Println("funding channel in party A: ", req.Params, "state: ", req.State)
 
 	err = f.FundChannel(ctx, req.Params, req.State, false)
 	if err != nil {
@@ -133,15 +130,12 @@ polling:
 
 func (f *Funder) OpenChannel(ctx context.Context, params *pchannel.Params, state *pchannel.State) error {
 
-	//env := f.integrEnv
-
 	contractAddress := f.stellarClient.GetPerunAddress()
 	kp := f.kpFull
 	hz := f.stellarClient.GetHorizonAcc()
 
 	// generate tx to open the channel
 	openTxArgs := env.BuildOpenTxArgs(params, state)
-	fmt.Println("openTxArgs: ", openTxArgs)
 	auth := []xdr.SorobanAuthorizationEntry{}
 	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction(hz, "open", openTxArgs, contractAddress, kp, auth)
 	if err != nil {
