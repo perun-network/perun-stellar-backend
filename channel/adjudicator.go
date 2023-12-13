@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/xdr"
 	"perun.network/go-perun/log"
@@ -13,12 +14,13 @@ import (
 	"perun.network/perun-stellar-backend/channel/env"
 	"perun.network/perun-stellar-backend/wallet"
 
+	"time"
+
 	"perun.network/perun-stellar-backend/wire"
 	"perun.network/perun-stellar-backend/wire/scval"
-	"time"
 )
 
-var ErrChannelAlreadyClosed = errors.New("nonce values was out of range")
+var ErrChannelAlreadyClosed = errors.New("Channel is already closed")
 
 type Adjudicator struct {
 	log             log.Embedding
@@ -52,7 +54,7 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 	if req.Tx.State.IsFinal {
 		log.Println("Withdraw called")
 
-		err := a.Close(ctx, req.Tx.ID, req.Tx.State, req.Tx.Sigs, req.Params)
+		err := a.Close(ctx, req.Tx.ID, req.Tx.State, req.Tx.Sigs)
 		if err != nil {
 			getChanArgs, err := env.BuildGetChannelTxArgs(req.Tx.ID)
 			if err != nil {
@@ -71,12 +73,11 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 		if err != nil {
 			return err
 		}
-		//... after the event has arrived, we conclude
 		return a.withdraw(ctx, req)
 
 	} else {
 		err := a.ForceClose(ctx, req.Tx.ID, req.Tx.State, req.Tx.Sigs, req.Params)
-		fmt.Println("ForceClose called")
+		log.Println("ForceClose called")
 		if err != nil {
 			if err == ErrChannelAlreadyClosed {
 				return a.withdraw(ctx, req)
@@ -174,8 +175,8 @@ func (a *Adjudicator) withdraw(ctx context.Context, req pchannel.AdjudicatorReq)
 	return nil
 }
 
-func (a *Adjudicator) Close(ctx context.Context, id pchannel.ID, state *pchannel.State, sigs []pwallet.Sig, params *pchannel.Params) error {
-	fmt.Println("Close called")
+func (a *Adjudicator) Close(ctx context.Context, id pchannel.ID, state *pchannel.State, sigs []pwallet.Sig) error {
+	log.Println("Close called")
 	contractAddress := a.stellarClient.GetPerunAddress()
 	kp := a.kpFull
 	hzAcc := a.stellarClient.GetHorizonAcc()
@@ -197,11 +198,38 @@ func (a *Adjudicator) Close(ctx context.Context, id pchannel.ID, state *pchannel
 
 // Register registers and disputes a channel.
 func (a *Adjudicator) Register(ctx context.Context, req pchannel.AdjudicatorReq, states []pchannel.SignedState) error {
-	panic("implement me")
+	log.Println("Register called")
+	sigs := req.Tx.Sigs
+	state := req.Tx.State
+	err := a.Dispute(ctx, state, sigs)
+	if err != nil {
+		return fmt.Errorf("error while disputing channel: %w", err)
+	}
+	return nil
+}
+
+func (a *Adjudicator) Dispute(ctx context.Context, state *pchannel.State, sigs []pwallet.Sig) error {
+	contractAddress := a.stellarClient.GetPerunAddress()
+	kp := a.kpFull
+	hzAcc := a.stellarClient.GetHorizonAcc()
+	closeTxArgs, err := BuildDisputeTxArgs(*state, sigs)
+	if err != nil {
+		return errors.New("error while building fund tx")
+	}
+	auth := []xdr.SorobanAuthorizationEntry{}
+	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction(hzAcc, "dispute", closeTxArgs, contractAddress, kp, auth)
+	if err != nil {
+		return errors.New("error while invoking and processing host function: dispute")
+	}
+	_, err = DecodeEventsPerun(txMeta)
+	if err != nil {
+		return errors.New("error while decoding events")
+	}
+	return nil
 }
 
 func (a *Adjudicator) ForceClose(ctx context.Context, id pchannel.ID, state *pchannel.State, sigs []pwallet.Sig, params *pchannel.Params) error {
-	fmt.Println("ForceClose called")
+	log.Println("ForceClose called")
 	contractAddress := a.stellarClient.GetPerunAddress()
 	kp := a.kpFull
 	hzAcc := a.stellarClient.GetHorizonAcc()
@@ -222,6 +250,34 @@ func (a *Adjudicator) ForceClose(ctx context.Context, id pchannel.ID, state *pch
 }
 
 func BuildCloseTxArgs(state pchannel.State, sigs []pwallet.Sig) (xdr.ScVec, error) {
+
+	wireState, err := wire.MakeState(state)
+	if err != nil {
+		return xdr.ScVec{}, err
+	}
+
+	sigAXdr, err := scval.WrapScBytes(sigs[0])
+	if err != nil {
+		return xdr.ScVec{}, err
+	}
+	sigBXdr, err := scval.WrapScBytes(sigs[1])
+	if err != nil {
+		return xdr.ScVec{}, err
+	}
+	xdrState, err := wireState.ToScVal()
+	if err != nil {
+		return xdr.ScVec{}, err
+	}
+
+	fundArgs := xdr.ScVec{
+		xdrState,
+		sigAXdr,
+		sigBXdr,
+	}
+	return fundArgs, nil
+}
+
+func BuildDisputeTxArgs(state pchannel.State, sigs []pwallet.Sig) (xdr.ScVec, error) {
 
 	wireState, err := wire.MakeState(state)
 	if err != nil {

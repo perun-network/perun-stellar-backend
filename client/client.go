@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/stellar/go/keypair"
-	//"github.com/stellar/go/protocols/horizon"
 	"math/big"
 	pchannel "perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
@@ -68,7 +67,6 @@ func SetupPaymentClient(
 		balance:     big.NewInt(0),
 	}
 
-	//go c.PollBalances()
 	go perunClient.Handle(c, c)
 	return c, nil
 }
