@@ -50,6 +50,18 @@ func MustWrapScSymbol(symbol xdr.ScSymbol) xdr.ScVal {
 	return v
 }
 
+func WrapScString(str xdr.ScString) (xdr.ScVal, error) {
+	return xdr.NewScVal(xdr.ScValTypeScvString, str)
+}
+
+func MustWrapScString(str xdr.ScString) xdr.ScVal {
+	v, err := WrapScString(str)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
 func WrapScBytes(b xdr.ScBytes) (xdr.ScVal, error) {
 	return xdr.NewScVal(xdr.ScValTypeScvBytes, b)
 }

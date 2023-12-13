@@ -204,14 +204,20 @@ func ToParams(params Params) (channel.Params, error) {
 	if err != nil {
 		return channel.Params{}, err
 	}
-	return channel.Params{
-		LedgerChannel:     true,
-		VirtualChannel:    false,
-		App:               channel.NoApp(),
-		Parts:             []wallet.Address{&participantA, &participantB},
-		Nonce:             ToNonce(params.Nonce),
-		ChallengeDuration: uint64(params.ChallengeDuration),
-	}, nil
+
+	challengeDuration := uint64(params.ChallengeDuration)
+	parts := []wallet.Address{&participantA, &participantB}
+	app := channel.NoApp()
+	nonce := ToNonce(params.Nonce)
+	ledgerChannel := true
+	virtualChannel := false
+
+	perunParams, err := channel.NewParams(challengeDuration, parts, app, nonce, ledgerChannel, virtualChannel)
+	if err != nil {
+		return channel.Params{}, err
+	}
+
+	return *perunParams, nil
 }
 
 func MakeNonce(nonce channel.Nonce) xdr.ScBytes {
