@@ -1,10 +1,9 @@
 package channel
 
 import (
-	"fmt"
-	"reflect"
-
+	"log"
 	pchannel "perun.network/go-perun/channel"
+	"reflect"
 )
 
 func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
@@ -19,7 +18,6 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 	select {
 	case event := <-s.Events():
 		if event == nil {
-			fmt.Println("Event nil received: ", event)
 			return nil
 		}
 
@@ -27,7 +25,7 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 
 		switch e := event.(type) {
 		case *DisputedEvent:
-			fmt.Println("DisputedEvent received")
+			log.Println("DisputedEvent received")
 			dispEvent := pchannel.AdjudicatorEventBase{
 				VersionV: e.Version(),
 				IDV:      e.ID(),
@@ -39,7 +37,7 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 
 		case *CloseEvent:
 
-			fmt.Println("CloseEvent received")
+			log.Println("CloseEvent received")
 			conclEvent := pchannel.AdjudicatorEventBase{
 				VersionV: e.Version(),
 				IDV:      e.ID(),
@@ -50,7 +48,7 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 			return ccn
 
 		default:
-			fmt.Printf("Received an unknown event type: %v\n", reflect.TypeOf(e))
+			log.Printf("Received an unknown event type: %v\n", reflect.TypeOf(e))
 			return nil
 		}
 

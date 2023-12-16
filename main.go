@@ -2,12 +2,10 @@ package main
 
 import (
 	"context"
-	"github.com/stellar/go/xdr"
+	"fmt"
 	"log"
 	"perun.network/go-perun/wire"
-	"perun.network/perun-stellar-backend/channel"
 	"perun.network/perun-stellar-backend/channel/env"
-	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/util"
 )
@@ -17,123 +15,60 @@ const StellarAssetContractPath = "./testdata/perun_soroban_token.wasm"
 
 func main() {
 
-	stellarEnv := env.NewBackendEnv()
-	kps, _ := stellarEnv.CreateAccounts(5, "1000000000")
+	kps, _ := util.CreateFundNewRandomStellarKP(4, "1000000")
 	kpAlice := kps[0]
 	kpBob := kps[1]
-	kpDeployerPerun := kps[2]
-	kpDeployerToken := kps[3]
-	tokenContractIDAddress, _ := util.Deploy(stellarEnv, kpDeployerToken, stellarEnv.AccountDetails(kpDeployerToken), StellarAssetContractPath)
+	kpDeployerToken := kps[2]
+	kpDeployerPerun := kps[3]
 
-	adminScAddr, err := types.MakeAccountAddress(kpDeployerToken)
-	if err != nil {
-		panic(err)
-	}
-	decims := uint32(7)
-	tokenName := "PerunToken"
-	tokenSymbol := "PRN"
+	tokenAddr, assetHash := util.Deploy(kpDeployerToken, StellarAssetContractPath)
+	// util.MintAsset(kpDeployerToken, tokenAddr, kpAlice.Address(), 1000000)
+	// util.MintAsset(kpDeployerToken, tokenAddr, kpBob.Address(), 1000000)
 
-	deployerStellarClient := env.NewStellarClient(stellarEnv, kpDeployerToken)
-	aliceStellarClient := env.NewStellarClient(stellarEnv, kpAlice)
-
-	err = channel.InitTokenContract(context.TODO(), deployerStellarClient, adminScAddr, decims, tokenName, tokenSymbol, tokenContractIDAddress)
+	err := util.InitTokenContract(kpDeployerToken, tokenAddr)
 	if err != nil {
 		panic(err)
 	}
 
-	err = channel.GetTokenName(context.TODO(), deployerStellarClient, tokenContractIDAddress)
+	aliceAddr, err := util.MakeAccountAddress(kpAlice)
 	if err != nil {
 		panic(err)
 	}
 
-	aliceAddrXdr, err := types.MakeAccountAddress(kpAlice)
-	if err != nil {
-		panic(err)
-	}
-	bobAddrXdr, err := types.MakeAccountAddress(kpBob)
+	bobAddr, err := util.MakeAccountAddress(kpBob)
 	if err != nil {
 		panic(err)
 	}
 
-	mintAmount := int64(100000000)
-
-	err = channel.MintToken(context.TODO(), deployerStellarClient, aliceAddrXdr, mintAmount, tokenContractIDAddress)
-	if err != nil {
-		panic(err)
-	}
-	err = channel.MintToken(context.TODO(), deployerStellarClient, bobAddrXdr, mintAmount, tokenContractIDAddress)
+	err = util.MintToken(kpDeployerToken, tokenAddr, int64(10000000000), aliceAddr)
 	if err != nil {
 		panic(err)
 	}
 
-	err = channel.GetTokenBalance(context.TODO(), deployerStellarClient, aliceAddrXdr, tokenContractIDAddress)
-	if err != nil {
-		panic(err)
-	}
-	err = channel.GetTokenBalance(context.TODO(), deployerStellarClient, bobAddrXdr, tokenContractIDAddress)
-	if err != nil {
-		panic(err)
-	}
-	txAmountBob128 := xdr.Int128Parts{Hi: 0, Lo: xdr.Uint64(mintAmount / 10.)}
-
-	err = channel.TransferToken(context.TODO(), aliceStellarClient, aliceAddrXdr, bobAddrXdr, txAmountBob128, tokenContractIDAddress)
+	err = util.MintToken(kpDeployerToken, tokenAddr, int64(10000000000), bobAddr)
 	if err != nil {
 		panic(err)
 	}
 
-	err = channel.GetTokenBalance(context.TODO(), deployerStellarClient, aliceAddrXdr, tokenContractIDAddress)
-	if err != nil {
-		panic(err)
-	}
-	err = channel.GetTokenBalance(context.TODO(), deployerStellarClient, bobAddrXdr, tokenContractIDAddress)
-	if err != nil {
-		panic(err)
-	}
-
-	perunContractIDAddress, _ := util.Deploy(stellarEnv, kpDeployerPerun, stellarEnv.AccountDetails(kpDeployerPerun), PerunContractPath)
-	stellarEnv.SetPerunAddress(perunContractIDAddress)
-	stellarEnv.SetTokenAddress(tokenContractIDAddress)
-
-	err = channel.MintToken(context.TODO(), deployerStellarClient, perunContractIDAddress, mintAmount, tokenContractIDAddress)
-	if err != nil {
-		panic(err)
-	}
-
-	txAmountPerun128 := xdr.Int128Parts{Hi: 0, Lo: xdr.Uint64(mintAmount / 20.)}
-
-	err = channel.TransferToken(context.TODO(), aliceStellarClient, aliceAddrXdr, perunContractIDAddress, txAmountPerun128, tokenContractIDAddress)
-	if err != nil {
-		panic(err)
-	}
-
-	err = channel.GetTokenBalance(context.TODO(), deployerStellarClient, perunContractIDAddress, tokenContractIDAddress)
-	if err != nil {
-		panic(err)
-	}
+	perunAddr, perunHash := util.Deploy(kpDeployerPerun, PerunContractPath)
+	fmt.Println("assetID, assetHash, perunID, perunHas: ", perunAddr, assetHash, perunHash)
 
 	// // Generate L2 accounts for the payment channel
 	wAlice, accAlice, _ := util.MakeRandPerunWallet()
 	wBob, accBob, _ := util.MakeRandPerunWallet()
 
-	assetCID, err := types.NewStellarAssetFromScAddress(tokenContractIDAddress)
-	if err != nil {
-		panic(err)
-	}
-	assetContractID := *assetCID
-
 	bus := wire.NewLocalBus()
-	alicePerun, err := client.SetupPaymentClient(stellarEnv, wAlice, accAlice, kpAlice, assetContractID, bus)
+	alicePerun, err := client.SetupPaymentClient(wAlice, accAlice, kpAlice, tokenAddr, perunAddr, bus)
 	if err != nil {
 		panic(err)
 	}
 
-	bobPerun, err := client.SetupPaymentClient(stellarEnv, wBob, accBob, kpBob, assetContractID, bus)
+	bobPerun, err := client.SetupPaymentClient(wBob, accBob, kpBob, tokenAddr, perunAddr, bus)
 
 	if err != nil {
 		panic(err)
 	}
-
-	alicePerun.OpenChannel(bobPerun.WireAddress(), 1000)
+	alicePerun.OpenChannel(bobPerun.WireAddress(), 10)
 	aliceChannel := alicePerun.Channel
 	bobChannel := bobPerun.AcceptedChannel()
 
@@ -144,5 +79,14 @@ func main() {
 	bobPerun.Shutdown()
 
 	log.Println("Done")
+	// // initialize the contract
 
+	cl := env.NewStellarClient(kpAlice)
+
+	err = cl.TestInteractContract(context.TODO(), kpAlice, tokenAddr, perunAddr)
+	if err != nil {
+		panic(err)
+	}
+
+	log.Println("DONE")
 }

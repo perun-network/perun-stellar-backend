@@ -5,7 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/stellar/go/keypair"
-	//"github.com/stellar/go/protocols/horizon"
+	"github.com/stellar/go/xdr"
+
 	"math/big"
 	pchannel "perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
@@ -30,21 +31,20 @@ type PaymentClient struct {
 }
 
 func SetupPaymentClient(
-	stellarEnv *env.IntegrationTestEnv,
 	w *wallet.EphemeralWallet, // w is the wallet used to resolve addresses to accounts for channels.
 	acc *wallet.Account,
-	stellarKp *keypair.Full,
-	stellarTokenID types.StellarAsset,
+	kp *keypair.Full,
+	tokenAddr xdr.ScAddress,
+	perunAddr xdr.ScAddress,
 	bus *wire.LocalBus,
-	//hzAcc *horizon.Account,
 
 ) (*PaymentClient, error) {
 
 	// Connect to Perun pallet and get funder + adjudicator from it.
 
-	perunConn := env.NewStellarClient(stellarEnv, stellarKp)
-	funder := channel.NewFunder(acc, stellarKp, perunConn)
-	adj := channel.NewAdjudicator(acc, stellarKp, perunConn)
+	perunConn := env.NewStellarClient(kp)
+	funder := channel.NewFunder(acc, kp, perunConn, perunAddr, tokenAddr)
+	adj := channel.NewAdjudicator(acc, kp, perunConn, perunAddr, tokenAddr)
 
 	// Setup dispute watcher.
 	watcher, err := local.NewWatcher(adj)
@@ -59,17 +59,21 @@ func SetupPaymentClient(
 		return nil, errors.New("creating client")
 	}
 
+	assetContractID, err := types.NewStellarAssetFromScAddress(tokenAddr)
+	if err != nil {
+		panic(err)
+	}
+
 	// Create client and start request handler.
 	c := &PaymentClient{
 		perunClient: perunClient,
 		account:     acc,
-		currency:    &stellarTokenID,
+		currency:    assetContractID,
 		channels:    make(chan *PaymentChannel, 1),
 		wAddr:       wireAddr,
 		balance:     big.NewInt(0),
 	}
 
-	//go c.PollBalances()
 	go perunClient.Handle(c, c)
 	return c, nil
 }

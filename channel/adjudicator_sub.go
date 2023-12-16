@@ -33,6 +33,8 @@ type AdjEventSub struct {
 	stellarClient *env.StellarClient
 	chanControl   wire.Control
 	cid           pchannel.ID
+	perunID       xdr.ScAddress
+	assetID       xdr.ScAddress
 	events        chan AdjEvent
 	Ev            []AdjEvent
 	err           error
@@ -43,7 +45,7 @@ type AdjEventSub struct {
 	log           log.Embedding
 }
 
-func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *env.StellarClient) *AdjEventSub {
+func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *env.StellarClient, perunID xdr.ScAddress, assetID xdr.ScAddress) *AdjEventSub {
 	getChanArgs, err := env.BuildGetChannelTxArgs(cid)
 	if err != nil {
 		panic(err)
@@ -54,6 +56,8 @@ func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *env.
 		stellarClient: stellarClient,
 		chanControl:   wire.Control{},
 		cid:           cid,
+		perunID:       perunID,
+		assetID:       assetID,
 		events:        make(chan AdjEvent, DefaultBufferSize),
 		Ev:            make([]AdjEvent, 0),
 		panicErr:      make(chan error, 1),
@@ -118,6 +122,27 @@ polling:
 	}
 }
 
+func (s *AdjEventSub) GetChannelState(chanArgs xdr.ScVec) (wire.Channel, error) {
+	contractAddress := s.perunID
+	kp := s.stellarClient.GetKeyPair()
+	// hz := s.GetHorizonAcc()
+	auth := []xdr.SorobanAuthorizationEntry{}
+	txMeta, err := s.stellarClient.InvokeAndProcessHostFunction("get_channel", chanArgs, contractAddress, kp, auth)
+	if err != nil {
+		return wire.Channel{}, errors.New("error while processing and submitting get_channel tx")
+	}
+
+	retVal := txMeta.V3.SorobanMeta.ReturnValue
+	var getChan wire.Channel
+
+	err = getChan.FromScVal(retVal)
+	if err != nil {
+		return wire.Channel{}, errors.New("error while decoding return value")
+	}
+	return getChan, nil
+
+}
+
 func (s *AdjEventSub) getChanControl() (wire.Control, error) {
 	// query channel state
 
@@ -126,7 +151,7 @@ func (s *AdjEventSub) getChanControl() (wire.Control, error) {
 		return wire.Control{}, err
 	}
 
-	chanParams, err := s.stellarClient.GetChannelState(getChanArgs)
+	chanParams, err := s.GetChannelState(getChanArgs)
 	if err != nil {
 		return wire.Control{}, err
 	}

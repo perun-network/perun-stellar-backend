@@ -88,16 +88,6 @@ type (
 		VersionV  Version
 		Timestamp uint64
 	}
-
-	// ConcludedEvent struct {
-	// 	Finalized bool
-	// 	Alloc     [2]uint64
-	// 	Tout      uint64
-	// 	Timestamp uint64
-	// 	concluded bool
-	// 	VersionV  Version
-	// 	IDV       pchannel.ID
-	// }
 )
 
 type StellarEvent struct {
