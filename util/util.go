@@ -150,10 +150,76 @@ func CreateFundNewRandomStellarKP(count int, initialBalance string) ([]*keypair.
 	return pairs, accounts
 }
 
+func CreateFundStellarAccounts(pairs []*keypair.Full, count int, initialBalance string) error {
+
+	masterClient := env.NewHorizonMasterClient()
+	masterHzClient := masterClient.GetMaster()
+	sourceKey := masterClient.GetSourceKey()
+
+	hzClient := env.NewHorizonClient()
+
+	// pairs := make([]*keypair.Full, count)
+	ops := make([]txnbuild.Operation, count)
+
+	// kp := keypair.MustRandom()
+	accReq := horizonclient.AccountRequest{AccountID: sourceKey.Address()}
+	sourceAccount, err := masterHzClient.AccountDetail(accReq)
+	if err != nil {
+		panic(err)
+	}
+
+	masterAccount := txnbuild.SimpleAccount{
+		AccountID: sourceKey.Address(),
+		Sequence:  sourceAccount.Sequence,
+	}
+
+	// use masteraccount to generate new accounts
+	for i := 0; i < count; i++ {
+		// pair, _ := keypair.Random()
+		pair := pairs[i]
+		// pairs[i] = pair
+
+		ops[i] = &txnbuild.CreateAccount{
+			SourceAccount: masterAccount.AccountID,
+			Destination:   pair.Address(),
+			Amount:        initialBalance,
+		}
+	}
+
+	txParams := env.GetBaseTransactionParamsWithFee(&masterAccount, txnbuild.MinBaseFee, ops...)
+
+	txSigned, err := env.CreateSignedTransactionWithParams([]*keypair.Full{sourceKey}, txParams)
+
+	if err != nil {
+		panic(err)
+	}
+	_, err = hzClient.SubmitTransaction(txSigned)
+	if err != nil {
+		panic(err)
+	}
+
+	accounts := make([]txnbuild.Account, count)
+	for i, kp := range pairs {
+		request := horizonclient.AccountRequest{AccountID: kp.Address()}
+		account, err := hzClient.AccountDetail(request)
+		if err != nil {
+			panic(err)
+		}
+
+		accounts[i] = &account
+	}
+
+	for _, keys := range pairs {
+		log.Printf("Funded %s (%s) with %s XLM.\n",
+			keys.Seed(), keys.Address(), initialBalance)
+	}
+
+	return nil
+}
+
 func InitTokenContract(kp *keypair.Full, contractIDAddress xdr.ScAddress) error {
 
 	stellarClient := env.NewStellarClient(kp)
-	// cl := stellarClient.GetHorizonClient()
 	adminScAddr, err := types.MakeAccountAddress(kp)
 	if err != nil {
 		panic(err)
@@ -218,9 +284,6 @@ func i128Param(hi int64, lo uint64) xdr.ScVal {
 
 func MintToken(kp *keypair.Full, contractAddr xdr.ScAddress, amount int64, recipientAddr xdr.ScAddress) error { //stellarCl *env.StellarClient,
 	stellarClient := env.NewStellarClient(kp)
-	// cl := stellarClient.GetHorizonClient()
-
-	// amount128 := i128Param(0, amount)
 
 	amountSc, err := xdr.NewScVal(xdr.ScValTypeScvI64, xdr.Int64(amount))
 	if err != nil {
@@ -232,6 +295,20 @@ func MintToken(kp *keypair.Full, contractAddr xdr.ScAddress, amount int64, recip
 	}
 	// contractAsset := NewAssetFromScAddress(contractAddr)
 	_, err = stellarClient.InvokeAndProcessHostFunction("mint", mintTokenArgs, contractAddr, kp, []xdr.SorobanAuthorizationEntry{})
+	if err != nil {
+		panic(err)
+	}
+	return nil
+}
+
+func GetTokenBalance(kp *keypair.Full, contractAddr xdr.ScAddress, balanceOf xdr.ScAddress) error { //stellarCl *env.StellarClient,
+	stellarClient := env.NewStellarClient(kp)
+
+	GetTokenBalanceArgs, err := env.BuildGetTokenBalanceArgs(balanceOf)
+	if err != nil {
+		panic(err)
+	}
+	_, err = stellarClient.InvokeAndProcessHostFunction("balance", GetTokenBalanceArgs, contractAddr, kp, []xdr.SorobanAuthorizationEntry{})
 	if err != nil {
 		panic(err)
 	}
