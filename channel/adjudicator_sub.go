@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	DefaultBufferSize                  = 3
-	DefaultSubscriptionPollingInterval = time.Duration(10) * time.Second
+	DefaultBufferSize                  = 1024
+	DefaultSubscriptionPollingInterval = time.Duration(5) * time.Second
 )
 
 type AdjEvent interface {

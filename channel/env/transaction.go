@@ -62,7 +62,7 @@ func PreflightHostFunctions(hzClient *horizonclient.Client,
 		if err != nil {
 			panic(err)
 		}
-		fmt.Printf("Result:\n\n%# +v\n\n", pretty.Formatter(decodedRes))
+		// fmt.Printf("Result:\n\n%# +v\n\n", pretty.Formatter(decodedRes))
 		for _, authBase64 := range res.Auth {
 			var authEntry xdr.SorobanAuthorizationEntry
 			err = xdr.SafeUnmarshalBase64(authBase64, &authEntry)
@@ -115,6 +115,7 @@ func simulateTransaction(hzClient *horizonclient.Client,
 		panic(err)
 	}
 	fmt.Printf("Transaction Data:\n\n%# +v\n\n", pretty.Formatter(transactionData))
+	// fmt.Printf("Result:\n\n%# +v\n\n", pretty.Formatter(result))
 	return result, transactionData
 }
 func syncWithSorobanRPC(ledgerToWaitFor uint32) {
@@ -168,7 +169,7 @@ func (h *StellarClient) TestInteractContract(ctx context.Context, kp *keypair.Fu
 
 	tokenAddr := tokenAddress
 	tokenAddrXdr := scval.MustWrapScAddress(tokenAddr)
-	testArgs := xdr.ScVec{tokenAddrXdr}
+	testArgs := xdr.ScVec{tokenAddrXdr, tokenAddrXdr}
 
 	auth := []xdr.SorobanAuthorizationEntry{}
 
@@ -217,6 +218,20 @@ func BuildMintTokenArgs(mintTo xdr.ScAddress, amount xdr.ScVal) (xdr.ScVec, erro
 	}
 
 	return MintTokenArgs, nil
+}
+
+func BuildGetTokenBalanceArgs(balanceOf xdr.ScAddress) (xdr.ScVec, error) {
+
+	balanceOfSc, err := scval.WrapScAddress(balanceOf)
+	if err != nil {
+		panic(err)
+	}
+
+	GetTokenBalanceArgs := xdr.ScVec{
+		balanceOfSc,
+	}
+
+	return GetTokenBalanceArgs, nil
 }
 
 func BuildFundTxArgs(chanID pchannel.ID, funderIdx bool) (xdr.ScVec, error) {
@@ -314,9 +329,9 @@ func (s *StellarClient) InvokeAndProcessHostFunction(fname string, callTxArgs xd
 	if err != nil {
 		return xdr.TransactionMeta{}, errors.New("error while decoding tx meta")
 	}
-	fmt.Println("txMeta: ", txMeta)
+	fmt.Println("txMetaof calling: ", fname, ": ", txMeta)
 	retval := txMeta.V3.SorobanMeta.ReturnValue
-	fmt.Println("retval: ", retval)
+	fmt.Println("retval of calling: ", fname, ": ", retval)
 
 	return txMeta, nil
 }

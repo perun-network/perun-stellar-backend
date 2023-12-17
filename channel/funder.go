@@ -2,24 +2,21 @@ package channel
 
 import (
 	"context"
-	// 	"crypto/rand"
-	// 	"crypto/sha256"
+	"crypto/rand"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/xdr"
 
-	// 	"github.com/stellar/go/xdr"
 	"log"
-	// 	"math/big"
+	"math/big"
 
 	pchannel "perun.network/go-perun/channel"
 	"perun.network/perun-stellar-backend/channel/env"
 	"perun.network/perun-stellar-backend/wallet"
 	"perun.network/perun-stellar-backend/wire"
-
-	"perun.network/perun-stellar-backend/wire/scval"
 
 	"time"
 )
@@ -171,7 +168,6 @@ func (f *Funder) FundChannel(ctx context.Context, params *pchannel.Params, state
 	tokenAddress := f.GetAssetID()
 
 	kp := f.kpFull
-	// hzAcc := f.stellarClient.GetHorizonAcc()
 	chanId := state.ID
 
 	// generate tx to open the channel
@@ -191,16 +187,6 @@ func (f *Funder) FundChannel(ctx context.Context, params *pchannel.Params, state
 		panic("tokenIDAddrFromBals not equal to tokenContractAddress")
 	}
 
-	// tokenAddr := tokenContractAddress
-	tokenAddrXdr := scval.MustWrapScAddress(tokenAddress)
-
-	testArgs := xdr.ScVec{tokenAddrXdr}
-	// hzAcctInt0 := f.stellarClient.GetHorizonAcc()
-	_, err = f.stellarClient.InvokeAndProcessHostFunction("testinteract", testArgs, perunAddress, kp, []xdr.SorobanAuthorizationEntry{}) // authFundClx) // []xdr.SorobanAuthorizationEntry{}) //authFundClx
-	if err != nil {
-		return errors.New("error while invoking and processing host function: testinteract")
-	}
-
 	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction("fund", fundTxArgs, perunAddress, kp, []xdr.SorobanAuthorizationEntry{}) // authFundClx) // []xdr.SorobanAuthorizationEntry{}) //authFundClx
 	if err != nil {
 		return errors.New("error while invoking and processing host function: fund")
@@ -214,31 +200,31 @@ func (f *Funder) FundChannel(ctx context.Context, params *pchannel.Params, state
 	return nil
 }
 
-// func makePreImgAuth(passphrase string, rootInv xdr.SorobanAuthorizedInvocation) (xdr.HashIdPreimage, error) {
-// 	max := big.NewInt(0).SetInt64(int64(^uint64(0) >> 1))
-// 	randomPart, err := rand.Int(rand.Reader, max)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	networkId := xdr.Hash(sha256.Sum256([]byte(passphrase)))
-// 	ledgerEntry := uint32(100)
-// 	lEntryXdr := xdr.Uint32(ledgerEntry)
-// 	nonce := randomPart.Int64()
-// 	ncXdr := xdr.Int64(nonce)
+func makePreImgAuth(passphrase string, rootInv xdr.SorobanAuthorizedInvocation) (xdr.HashIdPreimage, error) {
+	max := big.NewInt(0).SetInt64(int64(^uint64(0) >> 1))
+	randomPart, err := rand.Int(rand.Reader, max)
+	if err != nil {
+		panic(err)
+	}
+	networkId := xdr.Hash(sha256.Sum256([]byte(passphrase)))
+	ledgerEntry := uint32(100)
+	lEntryXdr := xdr.Uint32(ledgerEntry)
+	nonce := randomPart.Int64()
+	ncXdr := xdr.Int64(nonce)
 
-// 	srbPreImgAuth := xdr.HashIdPreimageSorobanAuthorization{
-// 		NetworkId:                 networkId,
-// 		Nonce:                     ncXdr,
-// 		SignatureExpirationLedger: lEntryXdr,
-// 		Invocation:                rootInv,
-// 	}
+	srbPreImgAuth := xdr.HashIdPreimageSorobanAuthorization{
+		NetworkId:                 networkId,
+		Nonce:                     ncXdr,
+		SignatureExpirationLedger: lEntryXdr,
+		Invocation:                rootInv,
+	}
 
-// 	srbAuth := xdr.HashIdPreimage{
-// 		Type:                 xdr.EnvelopeTypeEnvelopeTypeSorobanAuthorization,
-// 		SorobanAuthorization: &srbPreImgAuth}
+	srbAuth := xdr.HashIdPreimage{
+		Type:                 xdr.EnvelopeTypeEnvelopeTypeSorobanAuthorization,
+		SorobanAuthorization: &srbPreImgAuth}
 
-// 	return srbAuth, nil
-// }
+	return srbAuth, nil
+}
 
 func (f *Funder) AbortChannel(ctx context.Context, params *pchannel.Params, state *pchannel.State) error {
 

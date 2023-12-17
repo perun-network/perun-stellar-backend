@@ -14,10 +14,9 @@ import (
 	"perun.network/perun-stellar-backend/channel/env"
 	"perun.network/perun-stellar-backend/wallet"
 
-	"time"
-
 	"perun.network/perun-stellar-backend/wire"
 	"perun.network/perun-stellar-backend/wire/scval"
+	"time"
 )
 
 var ErrChannelAlreadyClosed = errors.New("Channel is already closed")
@@ -72,10 +71,10 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 
 		err := a.Close(ctx, req.Tx.ID, req.Tx.State, req.Tx.Sigs)
 		if err != nil {
-			// getChanArgs, err := env.BuildGetChannelTxArgs(req.Tx.ID)
-			if err != nil {
-				panic(err)
-			}
+			panic(err)
+		}
+		if err != nil {
+
 			chanControl, err := a.GetChannelState(ctx, req.Tx.State)
 			if err != nil {
 				return err
@@ -197,9 +196,7 @@ func (a *Adjudicator) withdraw(ctx context.Context, req pchannel.AdjudicatorReq)
 
 	perunAddress := a.GetPerunID()
 	kp := a.kpFull
-	// hzAcc := a.stellarClient.GetHorizonAcc()
 
-	// generate tx to open the channel
 	withdrawTxArgs, err := a.BuildWithdrawTxArgs(req)
 	if err != nil {
 		return errors.New("error while building fund tx")
@@ -219,10 +216,10 @@ func (a *Adjudicator) withdraw(ctx context.Context, req pchannel.AdjudicatorReq)
 }
 
 func (a *Adjudicator) Close(ctx context.Context, id pchannel.ID, state *pchannel.State, sigs []pwallet.Sig) error {
+
 	log.Println("Close called")
 	contractAddress := a.GetPerunID()
 	kp := a.kpFull
-	// hzAcc := a.stellarClient.GetHorizonAcc()
 	closeTxArgs, err := BuildCloseTxArgs(*state, sigs)
 	if err != nil {
 		return errors.New("error while building fund tx")
@@ -232,10 +229,12 @@ func (a *Adjudicator) Close(ctx context.Context, id pchannel.ID, state *pchannel
 	if err != nil {
 		return errors.New("error while invoking and processing host function: close")
 	}
+
 	_, err = DecodeEventsPerun(txMeta)
 	if err != nil {
 		return errors.New("error while decoding events")
 	}
+
 	return nil
 }
 

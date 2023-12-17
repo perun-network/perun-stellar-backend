@@ -206,6 +206,12 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 			panic(ErrNotStellarPerunContract)
 		}
 		perunString, ok := topics[0].GetSym()
+
+		if perunString == "transfer" {
+			// TODO: Improve this fix
+			continue
+		}
+
 		if perunString != AssertPerunSymbol {
 			panic(ErrNotStellarPerunContract)
 		}
@@ -244,7 +250,6 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 			}
 
 			evs = append(evs, &openEvent)
-			log.Println("OpenEvent: ", openEvent)
 			log.Println("OpenEvent-Params: ", openEvent.Channel.Params)
 			log.Println("OpenEvent-State: ", openEvent.Channel.State)
 			log.Println("OpenEvent-Control: ", openEvent.Channel.Control)
@@ -259,7 +264,7 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 				Channel: fundEventchanStellar,
 			}
 			evs = append(evs, &fundEvent)
-
+			log.Println("FundEvent: ", fundEvent)
 		case EventTypeClosed:
 			closedEventchanStellar, err := GetChannelFromEvents(ev.Body.V0.Data)
 			if err != nil {
@@ -270,6 +275,7 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 				Channel: closedEventchanStellar,
 			}
 			evs = append(evs, &closeEvent)
+			log.Println("CloseEvent: ", closeEvent)
 		case EventTypeWithdrawn:
 			withdrawnEventchanStellar, err := GetChannelFromEvents(ev.Body.V0.Data)
 			if err != nil {
