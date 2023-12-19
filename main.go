@@ -40,7 +40,7 @@ func main() {
 	bobPerun, err := client.SetupPaymentClient(wBob, accBob, kpBob, tokenAddr, perunAddr, bus)
 	checkErr(err)
 
-	alicePerun.OpenChannel(bobPerun.WireAddress(), 100)
+	alicePerun.OpenChannel(bobPerun.WireAddress(), 1000)
 	aliceChannel, bobChannel := alicePerun.Channel, bobPerun.AcceptedChannel()
 
 	aliceChannel.SendPayment(150)
@@ -52,10 +52,13 @@ func main() {
 	alicePerun.Shutdown()
 	bobPerun.Shutdown()
 
-	fmt.Println("Get Balances: ")
-	checkErr(util.GetTokenBalance(kpAlice, tokenAddr, aliceAddr))
-	checkErr(util.GetTokenBalance(kpBob, tokenAddr, bobAddr))
+	tokenBalAlice, err := util.GetTokenBalance(kpAlice, tokenAddr, aliceAddr)
+	fmt.Println("New Token Balance (Alice): ", tokenBalAlice)
 
+	checkErr(err)
+	tokenBalBob, err := util.GetTokenBalance(kpBob, tokenAddr, bobAddr)
+	fmt.Println("New Token Balance (Bob): ", tokenBalBob)
+	checkErr(err)
 	log.Println("DONE")
 }
 

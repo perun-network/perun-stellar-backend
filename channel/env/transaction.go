@@ -293,9 +293,7 @@ func (s *StellarClient) InvokeAndProcessHostFunction(fname string, callTxArgs xd
 	if err != nil {
 		return xdr.TransactionMeta{}, errors.New("error while decoding tx meta")
 	}
-	fmt.Println("txMetaof calling: ", fname, ": ", txMeta)
-	retval := txMeta.V3.SorobanMeta.ReturnValue
-	fmt.Println("retval of calling: ", fname, ": ", retval)
+	_ = txMeta.V3.SorobanMeta.ReturnValue
 
 	return txMeta, nil
 }
