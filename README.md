@@ -5,13 +5,13 @@
 
 # [Perun](https://perun.network/) Stellar backend
 
-This repository contains the [Stellar](https://dfinity.org/) backend for the [go-perun](https://github.com/perun-network/go-perun) channel library. It provides the necessary components to run our secure peer-to-peer Perun Payment Channels on the Stellar blockchain, using a [Soroban](https://soroban.stellar.org/) smart contract implementation. The payment channel implementation connects our Perun state machine with the [Perun contract](https://github.com/perun-network/perun-soroban-contract), which implements the Perun Payment Channel logic on the Stellar blockchain. This project is financed through the Stellar Community Fund grants program.
+This repository contains the [Stellar](https://stellar.org/) backend for the [go-perun](https://github.com/perun-network/go-perun) channel library. It provides the necessary components to run our secure peer-to-peer Perun Payment Channels on the Stellar blockchain, using a [Soroban](https://soroban.stellar.org/) smart contract implementation. The payment channel implementation connects our Perun state machine with the [Perun contract](https://github.com/perun-network/perun-soroban-contract), which implements the Perun Payment Channel logic on the Stellar blockchain. This project is financed through the Stellar Community Fund grants program.
 
 In the following sections, we will describe how to run our Payment Channels on a local instance of the Stellar blockchain.
 
 ## [Setup](#setup)
 
-1. We use a fork of the Stellar Go SDK, which is located [here](https://github.com/perun-network/go). Our payment channels use the integration test environment of the Stellar Go SDK, which supports Soroban functionality. You can find more information on the test environment [here](https://github.com/perun-network/go/tree/master/services/horizon/internal/docs).
+1. We the Stellar Go SDK, which is located [here](https://github.com/stellar/go). Our payment channels use the integration test environment of the Stellar Go SDK, which supports Soroban functionality. You can find more information on the test environment [here](https://github.com/perun-network/go/tree/master/services/horizon/internal/docs).
 
 However, we will summarize the necessary steps to run the Stellar Go client with Soroban support here:
 
