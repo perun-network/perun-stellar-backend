@@ -15,12 +15,12 @@ import (
 	pchannel "perun.network/go-perun/channel"
 	"perun.network/perun-stellar-backend/wire"
 	"perun.network/perun-stellar-backend/wire/scval"
-
-	// "perun.network/perun-stellar-backend/util"
-
 	"strconv"
+	"sync"
 	"time"
 )
+
+var sharedMtx sync.Mutex
 
 const sorobanRPCPort = 8000
 
@@ -62,7 +62,6 @@ func PreflightHostFunctions(hzClient *horizonclient.Client,
 		if err != nil {
 			panic(err)
 		}
-		// fmt.Printf("Result:\n\n%# +v\n\n", pretty.Formatter(decodedRes))
 		for _, authBase64 := range res.Auth {
 			var authEntry xdr.SorobanAuthorizationEntry
 			err = xdr.SafeUnmarshalBase64(authBase64, &authEntry)
@@ -161,24 +160,6 @@ func CreateSignedTransactionWithParams(signers []*keypair.Full, txParams txnbuil
 		}
 	}
 	return tx, nil
-}
-
-func (h *StellarClient) TestInteractContract(ctx context.Context, kp *keypair.Full, tokenAddress xdr.ScAddress, contractAddress xdr.ScAddress) error {
-
-	// hzAcc := h.GetKeyPair()
-
-	tokenAddr := tokenAddress
-	tokenAddrXdr := scval.MustWrapScAddress(tokenAddr)
-	testArgs := xdr.ScVec{tokenAddrXdr, tokenAddrXdr}
-
-	auth := []xdr.SorobanAuthorizationEntry{}
-
-	_, err := h.InvokeAndProcessHostFunction("testinteract", testArgs, contractAddress, kp, auth)
-	if err != nil {
-		return errors.New("error while invoking and processing host function for InitTokenContract")
-	}
-
-	return nil
 }
 
 func BuildOpenTxArgs(params *pchannel.Params, state *pchannel.State) xdr.ScVec {
@@ -288,31 +269,14 @@ func BuildForceCloseTxArgs(chanID pchannel.ID) (xdr.ScVec, error) {
 	return getChannelArgs, nil
 }
 
-// func (h *StellarClient) MintToken(ctx context.Context, kp *keypair.Full, to xdr.ScAddress, tokenAddress xdr.ScAddress, contractAddress xdr.ScAddress) error {
-
-// 	hzAcc := h.GetAccount(kp)
-
-// 	tokenAddr := tokenAddress
-// 	tokenAddrXdr := scval.MustWrapScAddress(tokenAddr)
-// 	testArgs := xdr.ScVec{tokenAddrXdr}
-
-// 	auth := []xdr.SorobanAuthorizationEntry{}
-// 	_, err := h.InvokeAndProcessHostFunction(hzAcc, "mint", testArgs, contractAddress, kp, auth)
-// 	if err != nil {
-// 		return errors.New("error while invoking and processing host function for InitTokenContract")
-// 	}
-
-// 	return nil
-// }
-
-func (s *StellarClient) InvokeAndProcessHostFunction(fname string, callTxArgs xdr.ScVec, contractAddr xdr.ScAddress, kp *keypair.Full, auth []xdr.SorobanAuthorizationEntry) (xdr.TransactionMeta, error) {
-
-	// Build contract call operation
+func (s *StellarClient) InvokeAndProcessHostFunction(fname string, callTxArgs xdr.ScVec, contractAddr xdr.ScAddress, kp *keypair.Full) (xdr.TransactionMeta, error) {
+	sharedMtx.Lock()
+	defer sharedMtx.Unlock()
 	fnameXdr := xdr.ScSymbol(fname)
 	hzAcc := s.GetHorizonAccount(kp)
 	hzClient := s.GetHorizonClient()
 
-	invokeHostFunctionOp := BuildContractCallOp(hzAcc, fnameXdr, callTxArgs, contractAddr, auth)
+	invokeHostFunctionOp := BuildContractCallOp(hzAcc, fnameXdr, callTxArgs, contractAddr)
 	preFlightOp, minFee := PreflightHostFunctions(hzClient, &hzAcc, *invokeHostFunctionOp)
 
 	txParams := GetBaseTransactionParamsWithFee(&hzAcc, minFee, &preFlightOp)
@@ -336,7 +300,7 @@ func (s *StellarClient) InvokeAndProcessHostFunction(fname string, callTxArgs xd
 	return txMeta, nil
 }
 
-func BuildContractCallOp(caller horizon.Account, fName xdr.ScSymbol, callArgs xdr.ScVec, contractIdAddress xdr.ScAddress, auth []xdr.SorobanAuthorizationEntry) *txnbuild.InvokeHostFunction {
+func BuildContractCallOp(caller horizon.Account, fName xdr.ScSymbol, callArgs xdr.ScVec, contractIdAddress xdr.ScAddress) *txnbuild.InvokeHostFunction {
 
 	return &txnbuild.InvokeHostFunction{
 		HostFunction: xdr.HostFunction{
@@ -347,7 +311,6 @@ func BuildContractCallOp(caller horizon.Account, fName xdr.ScSymbol, callArgs xd
 				Args:            callArgs,
 			},
 		},
-		Auth:          auth,
 		SourceAccount: caller.AccountID,
 	}
 }

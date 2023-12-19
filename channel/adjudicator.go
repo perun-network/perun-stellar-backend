@@ -13,7 +13,6 @@ import (
 	pwallet "perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/channel/env"
 	"perun.network/perun-stellar-backend/wallet"
-
 	"perun.network/perun-stellar-backend/wire"
 	"perun.network/perun-stellar-backend/wire/scval"
 	"time"
@@ -64,15 +63,10 @@ func (a *Adjudicator) Subscribe(ctx context.Context, cid pchannel.ID) (pchannel.
 
 func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq, smap pchannel.StateMap) error {
 
-	// cid := req.Tx.State.ID
-
 	if req.Tx.State.IsFinal {
 		log.Println("Withdraw called")
 
 		err := a.Close(ctx, req.Tx.ID, req.Tx.State, req.Tx.Sigs)
-		if err != nil {
-			panic(err)
-		}
 		if err != nil {
 
 			chanControl, err := a.GetChannelState(ctx, req.Tx.State)
@@ -148,8 +142,7 @@ func (a *Adjudicator) GetChannelState(ctx context.Context, state *pchannel.State
 	if err != nil {
 		return wire.Channel{}, errors.New("error while building get_channel tx")
 	}
-	auth := []xdr.SorobanAuthorizationEntry{}
-	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction("get_channel", getchTxArgs, contractAddress, kp, auth)
+	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction("get_channel", getchTxArgs, contractAddress, kp)
 	if err != nil {
 		return wire.Channel{}, errors.New("error while processing and submitting get_channel tx")
 	}
@@ -201,8 +194,7 @@ func (a *Adjudicator) withdraw(ctx context.Context, req pchannel.AdjudicatorReq)
 	if err != nil {
 		return errors.New("error while building fund tx")
 	}
-	auth := []xdr.SorobanAuthorizationEntry{}
-	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction("withdraw", withdrawTxArgs, perunAddress, kp, auth)
+	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction("withdraw", withdrawTxArgs, perunAddress, kp)
 	if err != nil {
 		return errors.New("error while invoking and processing host function: withdraw")
 	}
@@ -224,8 +216,7 @@ func (a *Adjudicator) Close(ctx context.Context, id pchannel.ID, state *pchannel
 	if err != nil {
 		return errors.New("error while building fund tx")
 	}
-	auth := []xdr.SorobanAuthorizationEntry{}
-	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction("close", closeTxArgs, contractAddress, kp, auth)
+	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction("close", closeTxArgs, contractAddress, kp)
 	if err != nil {
 		return errors.New("error while invoking and processing host function: close")
 	}
@@ -258,8 +249,7 @@ func (a *Adjudicator) Dispute(ctx context.Context, state *pchannel.State, sigs [
 	if err != nil {
 		return errors.New("error while building fund tx")
 	}
-	auth := []xdr.SorobanAuthorizationEntry{}
-	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction("dispute", closeTxArgs, contractAddress, kp, auth)
+	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction("dispute", closeTxArgs, contractAddress, kp)
 	if err != nil {
 		return errors.New("error while invoking and processing host function: dispute")
 	}
@@ -278,8 +268,7 @@ func (a *Adjudicator) ForceClose(ctx context.Context, id pchannel.ID, state *pch
 	if err != nil {
 		return errors.New("error while building fund tx")
 	}
-	auth := []xdr.SorobanAuthorizationEntry{}
-	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction("force_close", forceCloseTxArgs, contractAddress, kp, auth)
+	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction("force_close", forceCloseTxArgs, contractAddress, kp)
 	if err != nil {
 		return errors.New("error while invoking and processing host function")
 	}

@@ -1,90 +1,50 @@
 package main
 
 import (
-	// "context"
 	"fmt"
-
 	"github.com/stellar/go/keypair"
-	// "github.com/stellar/go/txnbuild"
-	// "github.com/stellar/go/xdr"
-
 	"log"
-
 	"perun.network/go-perun/wire"
-	// "perun.network/perun-stellar-backend/channel/env"
 	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/util"
-	// "perun.network/perun-stellar-backend/wallet"
 )
 
 const PerunContractPath = "./testdata/perun_soroban_contract.wasm"
 const StellarAssetContractPath = "./testdata/perun_soroban_token.wasm"
 
 func main() {
-
 	wAlice, accAlice, kpAlice := util.MakeRandPerunWallet()
 	wBob, accBob, kpBob := util.MakeRandPerunWallet()
 	_, _, kpDepToken := util.MakeRandPerunWallet()
 	_, _, kpDepPerun := util.MakeRandPerunWallet()
 	kps := []*keypair.Full{kpAlice, kpBob, kpDepToken, kpDepPerun}
 
-	err := util.CreateFundStellarAccounts(kps, len(kps), "1000000")
-	if err != nil {
-		panic(err)
-	}
+	checkErr(util.CreateFundStellarAccounts(kps, len(kps), "1000000"))
 
-	tokenAddr, assetHash := util.Deploy(kpDepToken, StellarAssetContractPath)
-
-	err = util.InitTokenContract(kpDepToken, tokenAddr)
-	if err != nil {
-		panic(err)
-	}
+	tokenAddr, _ := util.Deploy(kpDepToken, StellarAssetContractPath)
+	checkErr(util.InitTokenContract(kpDepToken, tokenAddr))
 
 	aliceAddr, err := util.MakeAccountAddress(kpAlice)
-	if err != nil {
-		panic(err)
-	}
-
+	checkErr(err)
 	bobAddr, err := util.MakeAccountAddress(kpBob)
-	if err != nil {
-		panic(err)
-	}
+	checkErr(err)
 
-	err = util.MintToken(kpDepToken, tokenAddr, int64(10000000000), aliceAddr)
-	if err != nil {
-		panic(err)
-	}
+	checkErr(util.MintToken(kpDepToken, tokenAddr, 1000000, aliceAddr))
+	checkErr(util.MintToken(kpDepToken, tokenAddr, 1000000, bobAddr))
 
-	err = util.MintToken(kpDepToken, tokenAddr, int64(10000000000), bobAddr)
-	if err != nil {
-		panic(err)
-	}
-
-	perunAddr, perunHash := util.Deploy(kpDepPerun, PerunContractPath)
-	fmt.Println("assetID, assetHash, perunID, perunHas: ", perunAddr, assetHash, perunHash)
-
-	err = util.MintToken(kpDepToken, tokenAddr, int64(10000000000), perunAddr)
-	if err != nil {
-		panic(err)
-	}
+	perunAddr, _ := util.Deploy(kpDepPerun, PerunContractPath)
 
 	bus := wire.NewLocalBus()
 	alicePerun, err := client.SetupPaymentClient(wAlice, accAlice, kpAlice, tokenAddr, perunAddr, bus)
-	if err != nil {
-		panic(err)
-	}
-
+	checkErr(err)
 	bobPerun, err := client.SetupPaymentClient(wBob, accBob, kpBob, tokenAddr, perunAddr, bus)
+	checkErr(err)
 
-	if err != nil {
-		panic(err)
-	}
 	alicePerun.OpenChannel(bobPerun.WireAddress(), 100)
-	aliceChannel := alicePerun.Channel
-	bobChannel := bobPerun.AcceptedChannel()
+	aliceChannel, bobChannel := alicePerun.Channel, bobPerun.AcceptedChannel()
 
-	aliceChannel.SendPayment(10)
-	bobChannel.SendPayment(2)
+	aliceChannel.SendPayment(150)
+	bobChannel.SendPayment(220)
 
 	aliceChannel.Settle()
 	bobChannel.Settle()
@@ -93,16 +53,14 @@ func main() {
 	bobPerun.Shutdown()
 
 	fmt.Println("Get Balances: ")
-
-	err = util.GetTokenBalance(kpAlice, tokenAddr, aliceAddr)
-	if err != nil {
-		panic(err)
-	}
-
-	err = util.GetTokenBalance(kpBob, tokenAddr, bobAddr)
-	if err != nil {
-		panic(err)
-	}
+	checkErr(util.GetTokenBalance(kpAlice, tokenAddr, aliceAddr))
+	checkErr(util.GetTokenBalance(kpBob, tokenAddr, bobAddr))
 
 	log.Println("DONE")
+}
+
+func checkErr(err error) {
+	if err != nil {
+		panic(err)
+	}
 }
