@@ -51,7 +51,7 @@ func (p *Participant) UnmarshalBinary(data []byte) error {
 
 // String returns the string representation of the participant as [ParticipantAddress string]:[public key hex].
 func (p Participant) String() string {
-	return p.AddressString() + ":" + p.PublicKeyString()
+	return p.AddressString() // + ":" + p.PublicKeyString()
 }
 
 func (p Participant) Equal(other wallet.Address) bool {
