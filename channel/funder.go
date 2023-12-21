@@ -70,8 +70,6 @@ func (f *Funder) fundPartyA(ctx context.Context, req pchannel.FundingReq) error 
 		return err
 	}
 
-	// await response from party B
-
 polling:
 	for i := 0; i < f.maxIters; i++ {
 		select {
@@ -101,13 +99,11 @@ polling:
 		case <-time.After(f.pollingInterval):
 			log.Println("Party B: Polling for opened channel...")
 			chanState, err := f.GetChannelState(ctx, req.Params, req.State)
-			// fmt.Println("polled chanState for PartyB: ", chanState.Control.FundedA, chanState.Control.FundedB)
 			if err != nil {
 				log.Println("Party B: Error while polling for opened channel:", err)
 				continue polling
 			}
 			log.Println("Party B: Found opened channel!")
-			// Optional: make some channel checks here
 			if chanState.Control.FundedA && chanState.Control.FundedB {
 				return nil
 			}
@@ -121,7 +117,6 @@ func (f *Funder) OpenChannel(ctx context.Context, params *pchannel.Params, state
 	perunAddress := f.GetPerunID()
 	kp := f.kpFull
 
-	// generate tx to open the channel
 	openTxArgs := env.BuildOpenTxArgs(params, state)
 	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction("open", openTxArgs, perunAddress, kp)
 	if err != nil {
@@ -144,7 +139,6 @@ func (f *Funder) FundChannel(ctx context.Context, params *pchannel.Params, state
 	kp := f.kpFull
 	chanId := state.ID
 
-	// generate tx to open the channel
 	fundTxArgs, err := env.BuildFundTxArgs(chanId, funderIdx)
 	if err != nil {
 		return errors.New("error while building fund tx")
@@ -180,7 +174,6 @@ func (f *Funder) AbortChannel(ctx context.Context, params *pchannel.Params, stat
 	kp := f.kpFull
 	chanId := state.ID
 
-	// generate tx to open the channel
 	openTxArgs, err := env.BuildGetChannelTxArgs(chanId)
 	if err != nil {
 		return errors.New("error while building get_channel tx")
@@ -204,7 +197,6 @@ func (f *Funder) GetChannelState(ctx context.Context, params *pchannel.Params, s
 	kp := f.kpFull
 	chanId := state.ID
 
-	// generate tx to open the channel
 	getchTxArgs, err := env.BuildGetChannelTxArgs(chanId)
 	if err != nil {
 		return wire.Channel{}, errors.New("error while building get_channel tx")
