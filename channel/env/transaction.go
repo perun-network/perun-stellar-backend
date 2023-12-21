@@ -3,8 +3,6 @@ package env
 import (
 	"context"
 	"errors"
-	"fmt"
-	"github.com/2opremio/pretty"
 	"github.com/creachadair/jrpc2"
 	"github.com/creachadair/jrpc2/jhttp"
 	"github.com/stellar/go/clients/horizonclient"
@@ -39,16 +37,7 @@ type RPCSimulateHostFunctionResult struct {
 func PreflightHostFunctions(hzClient *horizonclient.Client,
 	sourceAccount txnbuild.Account, function txnbuild.InvokeHostFunction,
 ) (txnbuild.InvokeHostFunction, int64) {
-	fmt.Println("Preflighting function call of type:", function.HostFunction.Type)
-	if function.HostFunction.Type == xdr.HostFunctionTypeHostFunctionTypeInvokeContract {
-		fmt.Printf("Preflighting function call to: %s\n", string(function.HostFunction.InvokeContract.FunctionName))
-	}
 	result, transactionData := simulateTransaction(hzClient, sourceAccount, &function)
-
-	if function.HostFunction.Type == xdr.HostFunctionTypeHostFunctionTypeInvokeContract {
-		fmt.Println("Preflight result in function: ", string(function.HostFunction.InvokeContract.FunctionName), ": ", result)
-
-	}
 
 	function.Ext = xdr.TransactionExt{
 		V:           1,
@@ -56,7 +45,6 @@ func PreflightHostFunctions(hzClient *horizonclient.Client,
 	}
 	var funAuth []xdr.SorobanAuthorizationEntry
 	for _, res := range result.Results {
-		fmt.Println("Enter range loop")
 		var decodedRes xdr.ScVal
 		err := xdr.SafeUnmarshalBase64(res.XDR, &decodedRes)
 		if err != nil {
@@ -68,7 +56,6 @@ func PreflightHostFunctions(hzClient *horizonclient.Client,
 			if err != nil {
 				panic(err)
 			}
-			fmt.Printf("Auth:\n\n%# +v\n\n", pretty.Formatter(authEntry))
 			funAuth = append(funAuth, authEntry)
 		}
 	}
@@ -87,7 +74,6 @@ func simulateTransaction(hzClient *horizonclient.Client,
 	}
 	syncWithSorobanRPC(uint32(root.HorizonSequence))
 
-	// TODO: soroban-tools should be exporting a proper Go client
 	ch := jhttp.NewChannel("http://localhost:"+strconv.Itoa(sorobanRPCPort)+"/soroban/rpc", nil)
 	sorobanRPCClient := jrpc2.NewClient(ch, nil)
 	txParams := GetBaseTransactionParamsWithFee(sourceAccount, txnbuild.MinBaseFee, op)
@@ -101,7 +87,6 @@ func simulateTransaction(hzClient *horizonclient.Client,
 		panic(err)
 	}
 	result := RPCSimulateTxResponse{}
-	fmt.Printf("Preflight TX:\n\n%v \n\n", base64)
 	err = sorobanRPCClient.CallResult(context.Background(), "simulateTransaction", struct {
 		Transaction string `json:"transaction"`
 	}{base64}, &result)
@@ -113,8 +98,6 @@ func simulateTransaction(hzClient *horizonclient.Client,
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Transaction Data:\n\n%# +v\n\n", pretty.Formatter(transactionData))
-	// fmt.Printf("Result:\n\n%# +v\n\n", pretty.Formatter(result))
 	return result, transactionData
 }
 func syncWithSorobanRPC(ledgerToWaitFor uint32) {

@@ -196,8 +196,6 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 
 	txEvents := txMeta.V3.SorobanMeta.Events
 
-	fmt.Println("txEvents: ", txEvents)
-
 	for _, ev := range txEvents {
 		sev := StellarEvent{}
 		topics := ev.Body.V0.Topics
@@ -208,7 +206,6 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 		perunString, ok := topics[0].GetSym()
 
 		if perunString == "transfer" {
-			// TODO: Improve this fix
 			continue
 		}
 
@@ -250,9 +247,7 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 			}
 
 			evs = append(evs, &openEvent)
-			log.Println("OpenEvent-Params: ", openEvent.Channel.Params)
-			log.Println("OpenEvent-State: ", openEvent.Channel.State)
-			log.Println("OpenEvent-Control: ", openEvent.Channel.Control)
+			log.Println("OpenEvent: ", openEvent)
 
 		case EventTypeFundChannel:
 			fundEventchanStellar, _, err := GetChannelBoolFromEvents(ev.Body.V0.Data)

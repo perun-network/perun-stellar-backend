@@ -3,7 +3,6 @@ package channel
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/stellar/go/xdr"
 	pchannel "perun.network/go-perun/channel"
 	log "perun.network/go-perun/log"
@@ -183,8 +182,6 @@ func DifferencesInControls(controlCurr, controlNext wire.Control) (AdjEvent, err
 			return nil, errors.New("channel cannot be reopened after closing")
 		}
 		if !controlCurr.Closed && controlNext.Closed {
-			fmt.Println("controlCurr.Closed need to insert data: ", controlCurr.Closed)
-
 			return &CloseEvent{}, nil
 		}
 		return &CloseEvent{}, nil

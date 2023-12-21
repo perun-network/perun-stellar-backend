@@ -3,7 +3,6 @@ package channel
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/xdr"
 	"log"
@@ -60,21 +59,12 @@ func (f *Funder) Fund(ctx context.Context, req pchannel.FundingReq) error {
 }
 
 func (f *Funder) fundPartyA(ctx context.Context, req pchannel.FundingReq) error {
-	fmt.Println("req: polling for party A: ", req)
 
 	err := f.OpenChannel(ctx, req.Params, req.State)
 	if err != nil {
 
 		return errors.New("error while opening channel in party A")
 	}
-	fmt.Println("opened channel in party A, checking state")
-	chanState, err := f.GetChannelState(ctx, req.Params, req.State)
-	fmt.Println("chanState after opening channel: ", chanState)
-	if err != nil {
-		return errors.New("error while polling for opened channel A")
-	}
-	fmt.Println("polled chanState for PartyA: ", chanState.Control.FundedA, chanState.Control.FundedB)
-
 	err = f.FundChannel(ctx, req.Params, req.State, false)
 	if err != nil {
 		return err
@@ -88,13 +78,10 @@ polling:
 		case <-ctx.Done():
 			return f.AbortChannel(ctx, req.Params, req.State)
 		case <-time.After(f.pollingInterval):
-			fmt.Println("Party A: Polling for opened channel...")
 			chanState, err := f.GetChannelState(ctx, req.Params, req.State)
 			if err != nil {
 				continue polling
 			}
-			fmt.Println("Party A: chanState.Control.FundedA && chanState.Control.FundedB: ", chanState.Control.FundedA, chanState.Control.FundedB)
-
 			if chanState.Control.FundedA && chanState.Control.FundedB {
 				return nil
 			}
@@ -105,11 +92,6 @@ polling:
 }
 
 func (f *Funder) fundPartyB(ctx context.Context, req pchannel.FundingReq) error {
-	fmt.Println("req: polling for party B: ", req)
-	// err := f.OpenChannel(ctx, req.Params, req.State)
-	// if err != nil {
-	// 	return errors.New("error while opening channel in party A")
-	// }
 
 polling:
 	for {
@@ -119,7 +101,7 @@ polling:
 		case <-time.After(f.pollingInterval):
 			log.Println("Party B: Polling for opened channel...")
 			chanState, err := f.GetChannelState(ctx, req.Params, req.State)
-			fmt.Println("polled chanState for PartyB: ", chanState.Control.FundedA, chanState.Control.FundedB)
+			// fmt.Println("polled chanState for PartyB: ", chanState.Control.FundedA, chanState.Control.FundedB)
 			if err != nil {
 				log.Println("Party B: Error while polling for opened channel:", err)
 				continue polling
