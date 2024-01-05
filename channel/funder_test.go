@@ -12,13 +12,4 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package test
-
-import (
-	"perun.network/go-perun/wallet/test"
-	_ "perun.network/perun-stellar-backend/channel/test"
-)
-
-func init() {
-	test.SetRandomizer(&Randomizer{})
-}
+package channel_test
