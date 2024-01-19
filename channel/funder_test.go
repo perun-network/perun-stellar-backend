@@ -13,3 +13,31 @@
 // limitations under the License.
 
 package channel_test
+
+import (
+	"github.com/stretchr/testify/require"
+	pchannel "perun.network/go-perun/channel"
+	pwallet "perun.network/go-perun/wallet"
+	chtest "perun.network/perun-stellar-backend/channel/test"
+	"testing"
+)
+
+func TestFunding(t *testing.T) {
+	setup := chtest.NewTestSetup(t)
+	stellarAsset := setup.GetTokenAsset()
+	accs := setup.GetAccounts()
+	addrAlice := accs[0].Address()
+	addrBob := accs[1].Address()
+	addrList := []pwallet.Address{addrAlice, addrBob}
+	perunParams, perunState := chtest.NewParamsWithAddressStateWithAsset(t, addrList, stellarAsset)
+
+	freqAlice := pchannel.NewFundingReq(perunParams, perunState, 0, perunState.Balances)
+	freqBob := pchannel.NewFundingReq(perunParams, perunState, 1, perunState.Balances)
+
+	freqs := []*pchannel.FundingReq{freqAlice, freqBob}
+
+	funders := setup.GetFunders()
+	ctx := setup.NewCtx()
+	err := chtest.FundAll(ctx, funders, freqs)
+	require.NoError(t, err)
+}
