@@ -14,8 +14,14 @@
 
 package test
 
-import "perun.network/go-perun/channel/test"
+import (
+	pchtest "perun.network/go-perun/channel/test"
+	pwtest "perun.network/go-perun/wallet/test"
+	wtest "perun.network/perun-stellar-backend/wallet/test"
+)
 
 func init() {
-	test.SetRandomizer(&Randomizer{})
+	pchtest.SetRandomizer(&Randomizer{})
+	walletRdz := wtest.Randomizer{}
+	pwtest.SetRandomizer(&walletRdz)
 }
