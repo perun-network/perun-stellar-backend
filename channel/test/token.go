@@ -1,0 +1,223 @@
+// Copyright 2023 PolyCrypt GmbH
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package test
+
+import (
+	"github.com/stellar/go/clients/horizonclient"
+	"github.com/stellar/go/keypair"
+	"github.com/stellar/go/xdr"
+	"github.com/stretchr/testify/require"
+	"perun.network/perun-stellar-backend/channel"
+	"perun.network/perun-stellar-backend/channel/env"
+	"perun.network/perun-stellar-backend/channel/types"
+	"perun.network/perun-stellar-backend/wire/scval"
+	"testing"
+)
+
+const tokenDecimals = uint32(7)
+const tokenName = "PerunToken"
+const tokenSymbol = "PRN"
+
+type TokenParams struct {
+	decimals uint32
+	name     string
+	symbol   string
+}
+
+func NewTokenParams() *TokenParams {
+	return &TokenParams{
+		decimals: tokenDecimals,
+		name:     tokenName,
+		symbol:   tokenSymbol,
+	}
+}
+
+func (t *TokenParams) GetDecimals() uint32 {
+	return t.decimals
+}
+
+func (t *TokenParams) GetName() string {
+	return t.name
+}
+
+func (t *TokenParams) GetSymbol() string {
+	return t.symbol
+}
+
+func BuildInitTokenArgs(adminAddr xdr.ScAddress, decimals uint32, tokenName string, tokenSymbol string) (xdr.ScVec, error) {
+
+	adminScAddr, err := scval.WrapScAddress(adminAddr)
+	if err != nil {
+		panic(err)
+	}
+
+	decim := xdr.Uint32(decimals)
+	scvaltype := xdr.ScValTypeScvU32
+	decimSc, err := xdr.NewScVal(scvaltype, decim)
+	if err != nil {
+		panic(err)
+	}
+
+	tokenNameScString := xdr.ScString(tokenName)
+	tokenNameXdr := scval.MustWrapScString(tokenNameScString)
+
+	tokenSymbolString := xdr.ScString(tokenSymbol)
+	tokenSymbolXdr := scval.MustWrapScString(tokenSymbolString)
+
+	initTokenArgs := xdr.ScVec{
+		adminScAddr,
+		decimSc,
+		tokenNameXdr,
+		tokenSymbolXdr,
+	}
+
+	return initTokenArgs, nil
+}
+
+func InitTokenContract(kp *keypair.Full, contractIDAddress xdr.ScAddress) error {
+
+	stellarClient := env.NewStellarClient(kp)
+	adminScAddr, err := types.MakeAccountAddress(kp)
+	if err != nil {
+		panic(err)
+	}
+
+	tokenParams := NewTokenParams()
+	decimals := tokenParams.GetDecimals()
+	name := tokenParams.GetName()
+	symbol := tokenParams.GetSymbol()
+
+	initArgs, err := BuildInitTokenArgs(adminScAddr, decimals, name, symbol)
+	if err != nil {
+		panic(err)
+	}
+	_, err = stellarClient.InvokeAndProcessHostFunction("initialize", initArgs, contractIDAddress, kp)
+	if err != nil {
+		panic(err)
+	}
+
+	return nil
+}
+
+func GetTokenName(kp *keypair.Full, contractAddress xdr.ScAddress) error {
+
+	stellarClient := env.NewStellarClient(kp)
+	TokenNameArgs := xdr.ScVec{}
+
+	_, err := stellarClient.InvokeAndProcessHostFunction("name", TokenNameArgs, contractAddress, kp)
+	if err != nil {
+		panic(err)
+	}
+
+	return nil
+}
+
+func BuildGetTokenBalanceArgs(balanceOf xdr.ScAddress) (xdr.ScVec, error) {
+
+	recScAddr, err := scval.WrapScAddress(balanceOf)
+	if err != nil {
+		panic(err)
+	}
+
+	GetTokenBalanceArgs := xdr.ScVec{
+		recScAddr,
+	}
+
+	return GetTokenBalanceArgs, nil
+}
+
+func BuildTransferTokenArgs(from xdr.ScAddress, to xdr.ScAddress, amount xdr.Int128Parts) (xdr.ScVec, error) {
+
+	fromScAddr, err := scval.WrapScAddress(from)
+	if err != nil {
+		panic(err)
+	}
+
+	toScAddr, err := scval.WrapScAddress(to)
+	if err != nil {
+		panic(err)
+	}
+
+	amountSc, err := scval.WrapInt128Parts(amount)
+	if err != nil {
+		panic(err)
+	}
+
+	GetTokenBalanceArgs := xdr.ScVec{
+		fromScAddr,
+		toScAddr,
+		amountSc,
+	}
+
+	return GetTokenBalanceArgs, nil
+}
+
+func Deploy(t *testing.T, kp *keypair.Full, contractPath string) (xdr.ScAddress, xdr.Hash) {
+	deployerClient := env.NewStellarClient(kp)
+	hzClient := deployerClient.GetHorizonClient()
+	deployerAccReq := horizonclient.AccountRequest{AccountID: kp.Address()}
+	deployerAcc, err := hzClient.AccountDetail(deployerAccReq)
+
+	require.NoError(t, err)
+
+	installContractOpInstall := channel.AssembleInstallContractCodeOp(kp.Address(), contractPath)
+	preFlightOp, minFeeInstall := env.PreflightHostFunctions(hzClient, &deployerAcc, *installContractOpInstall)
+	txParamsInstall := env.GetBaseTransactionParamsWithFee(&deployerAcc, int64(minFeeInstall), &preFlightOp)
+	txSignedInstall, err := env.CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParamsInstall)
+	require.NoError(t, err)
+
+	_, err = hzClient.SubmitTransaction(txSignedInstall)
+
+	require.NoError(t, err)
+
+	createContractOp := channel.AssembleCreateContractOp(kp.Address(), contractPath, "a1", env.NETWORK_PASSPHRASE)
+	preFlightOpCreate, minFeeCreate := env.PreflightHostFunctions(hzClient, &deployerAcc, *createContractOp)
+	txParamsCreate := env.GetBaseTransactionParamsWithFee(&deployerAcc, int64(minFeeCreate), &preFlightOpCreate)
+	txSignedCreate, err := env.CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParamsCreate)
+
+	require.NoError(t, err)
+
+	_, err = hzClient.SubmitTransaction(txSignedCreate)
+	require.NoError(t, err)
+
+	contractID := preFlightOpCreate.Ext.SorobanData.Resources.Footprint.ReadWrite[0].MustContractData().Contract.ContractId
+	contractHash := preFlightOpCreate.Ext.SorobanData.Resources.Footprint.ReadOnly[0].MustContractCode().Hash
+	contractIDAddress := xdr.ScAddress{
+		Type:       xdr.ScAddressTypeScAddressTypeContract,
+		ContractId: contractID,
+	}
+
+	return contractIDAddress, contractHash
+}
+
+func MintToken(kp *keypair.Full, contractAddr xdr.ScAddress, amount uint64, recipientAddr xdr.ScAddress) error {
+	stellarClient := env.NewStellarClient(kp)
+
+	amountTo128Xdr := xdr.Int128Parts{Hi: 0, Lo: xdr.Uint64(amount)}
+
+	amountSc, err := xdr.NewScVal(xdr.ScValTypeScvI128, amountTo128Xdr)
+	if err != nil {
+		panic(err)
+	}
+	mintTokenArgs, err := env.BuildMintTokenArgs(recipientAddr, amountSc)
+	if err != nil {
+		panic(err)
+	}
+	_, err = stellarClient.InvokeAndProcessHostFunction("mint", mintTokenArgs, contractAddr, kp)
+	if err != nil {
+		panic(err)
+	}
+	return nil
+}
