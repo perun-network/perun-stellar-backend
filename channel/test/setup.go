@@ -64,6 +64,10 @@ func (s *Setup) GetFunders() []*channel.Funder {
 	return s.funders
 }
 
+func (s *Setup) GetAdjudicators() []*channel.Adjudicator {
+	return s.adjs
+}
+
 func (s *Setup) GetTokenAsset() pchannel.Asset {
 	return s.assetID
 }
