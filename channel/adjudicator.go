@@ -81,7 +81,10 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 		log.Println("Withdraw called")
 
 		err := a.Close(ctx, req.Tx.ID, req.Tx.State, req.Tx.Sigs)
+		fmt.Println("Close called: err := a.Close(ctx, req.Tx.ID, req.Tx.State, req.Tx.Sigs)")
+
 		if err != nil {
+			fmt.Println("chanControl, err := a.GetChannelState(ctx, req.Tx.State)")
 
 			chanControl, err := a.GetChannelState(ctx, req.Tx.State)
 			if err != nil {
@@ -89,6 +92,7 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 			}
 
 			if chanControl.Control.Closed {
+				fmt.Println("chanControl.Control.Closed in withdraw")
 				return a.withdraw(ctx, req)
 			}
 
@@ -96,6 +100,8 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 		if err != nil {
 			return err
 		}
+		fmt.Println("before a.withdraw(ctx, req)")
+
 		return a.withdraw(ctx, req)
 
 	} else {
@@ -115,34 +121,6 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 		}
 	}
 	return nil
-}
-
-func (a *Adjudicator) waitForClosed(ctx context.Context, evsub *AdjEventSub, cid pchannel.ID) error {
-	a.log.Log().Tracef("Waiting for the channel closing event")
-
-loop:
-	for {
-
-		select {
-		case event := <-evsub.Events():
-			_, ok := event.(*CloseEvent)
-
-			if !ok {
-				continue loop
-			}
-
-			evsub.Close()
-			return nil
-
-		case <-ctx.Done():
-			return ctx.Err()
-		case err := <-evsub.PanicErr():
-			return err
-		default:
-			continue loop
-		}
-
-	}
 }
 
 func (a *Adjudicator) GetChannelState(ctx context.Context, state *pchannel.State) (wire.Channel, error) {
@@ -258,7 +236,6 @@ func (a *Adjudicator) Register(ctx context.Context, req pchannel.AdjudicatorReq,
 func (a *Adjudicator) Dispute(ctx context.Context, state *pchannel.State, sigs []pwallet.Sig) error {
 	contractAddress := a.GetPerunID()
 	kp := a.kpFull
-	// hzAcc := a.stellarClient.GetHorizonAcc()
 	closeTxArgs, err := BuildDisputeTxArgs(*state, sigs)
 	if err != nil {
 		return errors.New("error while building fund tx")

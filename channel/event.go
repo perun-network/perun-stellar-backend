@@ -18,7 +18,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/stellar/go/xdr"
-	"log"
 	pchannel "perun.network/go-perun/channel"
 	"perun.network/perun-stellar-backend/wire"
 	"time"
@@ -61,8 +60,6 @@ var (
 type controlsState map[string]bool
 
 type (
-
-	// PerunEvent is a Perun event.
 	PerunEvent interface {
 		ID() pchannel.ID
 		Timeout() pchannel.Timeout
@@ -261,7 +258,6 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 			}
 
 			evs = append(evs, &openEvent)
-			log.Println("OpenEvent: ", openEvent)
 
 		case EventTypeFundChannel:
 			fundEventchanStellar, _, err := GetChannelBoolFromEvents(ev.Body.V0.Data)
@@ -273,7 +269,6 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 				Channel: fundEventchanStellar,
 			}
 			evs = append(evs, &fundEvent)
-			log.Println("FundEvent: ", fundEvent)
 		case EventTypeClosed:
 			closedEventchanStellar, err := GetChannelFromEvents(ev.Body.V0.Data)
 			if err != nil {
@@ -284,7 +279,6 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 				Channel: closedEventchanStellar,
 			}
 			evs = append(evs, &closeEvent)
-			log.Println("CloseEvent: ", closeEvent)
 		case EventTypeWithdrawn:
 			withdrawnEventchanStellar, err := GetChannelFromEvents(ev.Body.V0.Data)
 			if err != nil {
@@ -367,7 +361,6 @@ func (e *CloseEvent) EventDataFromChannel(chanState wire.Channel, timestamp uint
 	copy(cid[:], chanID[:])
 
 	e.IDV = cid
-	//e.VersionV = version
 	e.Timestamp = timestamp
 	e.Channel = chanState
 	return nil
@@ -380,7 +373,6 @@ func (e *FundEvent) EventDataFromChannel(chanState wire.Channel, timestamp uint6
 	copy(cid[:], chanID[:])
 
 	e.IDV = cid
-	//e.VersionV = version
 	e.Timestamp = timestamp
 	e.Channel = chanState
 	return nil
@@ -393,7 +385,6 @@ func (e *WithdrawnEvent) EventDataFromChannel(chanState wire.Channel, timestamp 
 	copy(cid[:], chanID[:])
 
 	e.IDV = cid
-	//e.VersionV = version
 	e.Timestamp = timestamp
 	e.Channel = chanState
 	return nil
@@ -406,7 +397,6 @@ func (e *DisputedEvent) EventDataFromChannel(chanState wire.Channel, timestamp u
 	copy(cid[:], chanID[:])
 
 	e.IDV = cid
-	//e.VersionV = version
 	e.Timestamp = timestamp
 	e.Channel = chanState
 	return nil
