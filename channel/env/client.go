@@ -31,7 +31,6 @@ type HorizonMasterClient struct {
 type StellarClient struct {
 	hzClient *horizonclient.Client
 	kp       *keypair.Full
-	// clientKey *keypair.Full
 }
 
 func NewHorizonClient() *horizonclient.Client {

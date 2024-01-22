@@ -145,7 +145,6 @@ func (b *Balances) UnmarshalBinary(data []byte) error {
 }
 
 func MakeBalances(alloc channel.Allocation) (Balances, error) {
-	// TODO: Move all these checks into a compatibility layer
 	if err := alloc.Valid(); err != nil {
 		return Balances{}, err
 	}
