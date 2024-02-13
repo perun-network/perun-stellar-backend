@@ -20,25 +20,33 @@ git clone https://github.com/perun-network/perun-stellar-backend
 cd perun-stellar-backend
 ```
 
+2. Running the payment channel unit tests:
 
-2.  To run a local Stellar blockchain with Soroban smart contract support, you initialize the docker images defined in the ```quickstart.sh``` script. Docker needs to be installed to perform this step:
+To run the unit tests only, you can use the following command:
 
-```sh
-
-./quickstart.sh standalone
-```
-
-Note that this backend is customized to run on a local Stellar blockchain (standalone), but can be easily adapted to run on a public testnet.
-
-
-3. Running the payment channel tests:
-
-To make sure that your setup is correct, you can run the payment channel tests after cloning this repository:
-  
 ```sh
 
 go test ./...
 ```
+
+3. Running the payment channel tests, including the integration tests:
+
+The integration tests require running a local Stellar blockchain, a Horizon client and a Soroban RPC server. The binaries are packages in a docker image, which are initialized using the ```quickstart.sh``` script. Docker needs to be installed to perform this step:
+
+```sh
+./quickstart.sh standalone
+
+```
+
+The initialization takes a few seconds. Afterwards, you can run the tests using the following command:
+  
+```sh
+
+go test -tags=integration ./...
+```
+
+Note that this backend is customized to run on a local Stellar blockchain (standalone), but can be easily adapted to run on a public blockchain.
+
 
 # Payment Channel Demo
 
