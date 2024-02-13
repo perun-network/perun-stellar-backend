@@ -31,7 +31,15 @@ go test ./...
 
 3. Running the payment channel tests, including the integration tests:
 
-The integration tests require running a local Stellar blockchain, a Horizon client and a Soroban RPC server. The binaries are packages in a docker image, which are initialized using the ```quickstart.sh``` script. Docker needs to be installed to perform this step:
+The integration tests require running a local Stellar blockchain, a Horizon client and a Soroban RPC server. The binaries are packaged in a docker image.
+
+To install the docker image, you need to download and build it first, using the build.sh script in testdata/docker:
+
+```sh
+./testdata/docker/build.sh
+```
+
+Now you can run the docker image with
 
 ```sh
 ./quickstart.sh standalone
