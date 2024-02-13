@@ -81,10 +81,8 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 		log.Println("Withdraw called")
 
 		err := a.Close(ctx, req.Tx.ID, req.Tx.State, req.Tx.Sigs)
-		fmt.Println("Close called: err := a.Close(ctx, req.Tx.ID, req.Tx.State, req.Tx.Sigs)")
 
 		if err != nil {
-			fmt.Println("chanControl, err := a.GetChannelState(ctx, req.Tx.State)")
 
 			chanControl, err := a.GetChannelState(ctx, req.Tx.State)
 			if err != nil {
@@ -92,7 +90,6 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 			}
 
 			if chanControl.Control.Closed {
-				fmt.Println("chanControl.Control.Closed in withdraw")
 				return a.withdraw(ctx, req)
 			}
 
@@ -100,7 +97,6 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 		if err != nil {
 			return err
 		}
-		fmt.Println("before a.withdraw(ctx, req)")
 
 		return a.withdraw(ctx, req)
 

@@ -16,10 +16,8 @@ package channel
 
 import (
 	"crypto/sha256"
-	"encoding/hex"
 	"github.com/stellar/go/txnbuild"
 	"github.com/stellar/go/xdr"
-	"log"
 	"os"
 )
 
@@ -53,7 +51,6 @@ func AssembleCreateContractOp(sourceAccount string, wasmFileName string, contrac
 	}
 
 	salt := sha256.Sum256([]byte(contractSalt))
-	log.Printf("Salt hash: %v", hex.EncodeToString(salt[:]))
 	saltParameter := xdr.Uint256(salt)
 
 	accountId := xdr.MustAddress(sourceAccount)
