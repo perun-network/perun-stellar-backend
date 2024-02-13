@@ -21,7 +21,7 @@ import (
 	ptest "perun.network/go-perun/channel/test"
 	schannel "perun.network/perun-stellar-backend/channel"
 
-	_ "perun.network/perun-stellar-backend/wallet/test"
+	_ "perun.network/perun-stellar-backend/channel/test"
 	"perun.network/perun-stellar-backend/wire"
 
 	pkgtest "polycry.pt/poly-go/test"

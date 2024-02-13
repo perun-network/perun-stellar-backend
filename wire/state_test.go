@@ -20,6 +20,7 @@ import (
 	"math/big"
 	"perun.network/go-perun/channel"
 	ptest "perun.network/go-perun/channel/test"
+	_ "perun.network/perun-stellar-backend/channel/test"
 	"perun.network/perun-stellar-backend/wire"
 	polytest "polycry.pt/poly-go/test"
 	"testing"
