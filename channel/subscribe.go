@@ -25,12 +25,12 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 		return nil
 	}
 
-	if s.Events() == nil {
+	if s.getEvents() == nil {
 		return nil
 	}
 
 	select {
-	case event := <-s.Events():
+	case event := <-s.getEvents():
 		if event == nil {
 			return nil
 		}
@@ -76,7 +76,7 @@ func (s *AdjEventSub) Close() error {
 	return nil
 }
 
-func (s *AdjEventSub) Events() <-chan AdjEvent {
+func (s *AdjEventSub) getEvents() <-chan AdjEvent {
 	return s.events
 }
 
