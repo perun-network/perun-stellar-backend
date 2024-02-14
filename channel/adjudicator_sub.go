@@ -49,7 +49,6 @@ type AdjEventSub struct {
 	perunID       xdr.ScAddress
 	assetID       xdr.ScAddress
 	events        chan AdjEvent
-	Ev            []AdjEvent
 	err           error
 	panicErr      chan error
 	cancel        context.CancelFunc
@@ -72,7 +71,6 @@ func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *env.
 		perunID:       perunID,
 		assetID:       assetID,
 		events:        make(chan AdjEvent, DefaultBufferSize),
-		Ev:            make([]AdjEvent, 0),
 		panicErr:      make(chan error, 1),
 		pollInterval:  DefaultSubscriptionPollingInterval,
 		closer:        new(pkgsync.Closer),
