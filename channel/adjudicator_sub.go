@@ -49,8 +49,8 @@ type AdjEventSub struct {
 	perunID       xdr.ScAddress
 	assetID       xdr.ScAddress
 	events        chan AdjEvent
+	subErrors     chan error
 	err           error
-	panicErr      chan error
 	cancel        context.CancelFunc
 	closer        *pkgsync.Closer
 	pollInterval  time.Duration
@@ -71,7 +71,7 @@ func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *env.
 		perunID:       perunID,
 		assetID:       assetID,
 		events:        make(chan AdjEvent, DefaultBufferSize),
-		panicErr:      make(chan error, 1),
+		subErrors:     make(chan error, 1),
 		pollInterval:  DefaultSubscriptionPollingInterval,
 		closer:        new(pkgsync.Closer),
 		log:           log.MakeEmbedding(log.Default()),
@@ -87,7 +87,7 @@ func (s *AdjEventSub) run(ctx context.Context) {
 	s.log.Log().Info("Listening for channel state changes")
 	chanControl, err := s.getChanControl()
 	if err != nil {
-		s.panicErr <- err
+		s.subErrors <- err
 	}
 	s.chanControl = chanControl
 	finish := func(err error) {
@@ -98,6 +98,9 @@ polling:
 	for {
 		s.log.Log().Debug("AdjudicatorSub is listening for Adjudicator Events")
 		select {
+		case err := <-s.subErrors:
+			finish(err)
+			return
 		case <-ctx.Done():
 			finish(nil)
 			return
@@ -107,12 +110,11 @@ polling:
 
 			if err != nil {
 
-				s.panicErr <- err
+				s.subErrors <- err
 			}
-			// decode channel state difference to events
 			adjEvent, err := DifferencesInControls(s.chanControl, newChanControl)
 			if err != nil {
-				s.panicErr <- err
+				s.subErrors <- err
 			}
 
 			if adjEvent == nil {
@@ -122,9 +124,6 @@ polling:
 
 			} else {
 				s.log.Log().Debug("Event detected, evaluating events...")
-
-				// Store the event
-
 				s.log.Log().Debugf("Found event: %v", adjEvent)
 				s.events <- adjEvent
 				return

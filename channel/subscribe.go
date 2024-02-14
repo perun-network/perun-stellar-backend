@@ -83,7 +83,3 @@ func (s *AdjEventSub) getEvents() <-chan AdjEvent {
 func (s *AdjEventSub) Err() error {
 	return s.err
 }
-
-func (s *AdjEventSub) PanicErr() <-chan error {
-	return s.panicErr
-}
