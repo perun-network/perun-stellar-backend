@@ -80,21 +80,15 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 	if req.Tx.State.IsFinal {
 		log.Println("Withdraw called")
 
-		err := a.Close(ctx, req.Tx.ID, req.Tx.State, req.Tx.Sigs)
-
-		if err != nil {
-
-			chanControl, err := a.GetChannelState(ctx, req.Tx.State)
-			if err != nil {
-				return err
+		if err := a.Close(ctx, req.Tx.ID, req.Tx.State, req.Tx.Sigs); err != nil {
+			chanControl, errChanState := a.GetChannelState(ctx, req.Tx.State)
+			if errChanState != nil {
+				return errChanState
 			}
 
 			if chanControl.Control.Closed {
 				return a.withdraw(ctx, req)
 			}
-
-		}
-		if err != nil {
 			return err
 		}
 
@@ -103,12 +97,11 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 	} else {
 		err := a.ForceClose(ctx, req.Tx.ID, req.Tx.State, req.Tx.Sigs, req.Params)
 		log.Println("ForceClose called")
+		if errors.Is(err, ErrChannelAlreadyClosed) {
+			return a.withdraw(ctx, req)
+		}
 		if err != nil {
-			if err == ErrChannelAlreadyClosed {
-				return a.withdraw(ctx, req)
-			} else {
-				return err
-			}
+			return err
 		}
 
 		err = a.withdraw(ctx, req)
