@@ -159,35 +159,35 @@ func CreateSignedTransactionWithParams(signers []*keypair.Full, txParams txnbuil
 	return tx, nil
 }
 
-func BuildOpenTxArgs(params *pchannel.Params, state *pchannel.State) xdr.ScVec {
+func BuildOpenTxArgs(params *pchannel.Params, state *pchannel.State) (xdr.ScVec, error) {
 	paramsStellar, err := wire.MakeParams(*params)
 	if err != nil {
-		panic(err)
+		return xdr.ScVec{}, err
 	}
 	stateStellar, err := wire.MakeState(*state)
 	if err != nil {
-		panic(err)
+		return xdr.ScVec{}, err
 	}
 	paramsXdr, err := paramsStellar.ToScVal()
 	if err != nil {
-		panic(err)
+		return xdr.ScVec{}, err
 	}
 	stateXdr, err := stateStellar.ToScVal()
 	if err != nil {
-		panic(err)
+		return xdr.ScVec{}, err
 	}
 	openArgs := xdr.ScVec{
 		paramsXdr,
 		stateXdr,
 	}
-	return openArgs
+	return openArgs, nil
 }
 
 func BuildMintTokenArgs(mintTo xdr.ScAddress, amount xdr.ScVal) (xdr.ScVec, error) {
 
 	mintToSc, err := scval.WrapScAddress(mintTo)
 	if err != nil {
-		panic(err)
+		return xdr.ScVec{}, err
 	}
 
 	MintTokenArgs := xdr.ScVec{
@@ -202,7 +202,7 @@ func BuildGetTokenBalanceArgs(balanceOf xdr.ScAddress) (xdr.ScVec, error) {
 
 	balanceOfSc, err := scval.WrapScAddress(balanceOf)
 	if err != nil {
-		panic(err)
+		return xdr.ScVec{}, err
 	}
 
 	GetTokenBalanceArgs := xdr.ScVec{
@@ -241,7 +241,7 @@ func BuildGetChannelTxArgs(chanID pchannel.ID) (xdr.ScVec, error) {
 	copy(chanid[:], chanIDStellar)
 	channelID, err := scval.WrapScBytes(chanIDStellar)
 	if err != nil {
-		panic(err)
+		return xdr.ScVec{}, err
 	}
 
 	getChannelArgs := xdr.ScVec{
@@ -270,7 +270,10 @@ func (s *StellarClient) InvokeAndProcessHostFunction(fname string, callTxArgs xd
 	sharedMtx.Lock()
 	defer sharedMtx.Unlock()
 	fnameXdr := xdr.ScSymbol(fname)
-	hzAcc := s.GetHorizonAccount(kp)
+	hzAcc, err := s.GetHorizonAccount(kp)
+	if err != nil {
+		return xdr.TransactionMeta{}, err
+	}
 	hzClient := s.GetHorizonClient()
 
 	invokeHostFunctionOp := BuildContractCallOp(hzAcc, fnameXdr, callTxArgs, contractAddr)
@@ -279,11 +282,11 @@ func (s *StellarClient) InvokeAndProcessHostFunction(fname string, callTxArgs xd
 	txParams := GetBaseTransactionParamsWithFee(&hzAcc, minFee, &preFlightOp)
 	txSigned, err := CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParams)
 	if err != nil {
-		panic(err)
+		return xdr.TransactionMeta{}, err
 	}
 	tx, err := hzClient.SubmitTransaction(txSigned)
 	if err != nil {
-		panic(err)
+		return xdr.TransactionMeta{}, err
 	}
 	// Decode transaction metadata
 	txMeta, err := DecodeTxMeta(tx)

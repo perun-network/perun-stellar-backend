@@ -212,7 +212,7 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 		topics := ev.Body.V0.Topics
 
 		if len(topics) < 2 {
-			panic(ErrNotStellarPerunContract)
+			return []PerunEvent{}, ErrNotStellarPerunContract
 		}
 		perunString, ok := topics[0].GetSym()
 
@@ -221,7 +221,7 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 		}
 
 		if perunString != AssertPerunSymbol {
-			panic(ErrNotStellarPerunContract)
+			return []PerunEvent{}, ErrNotStellarPerunContract
 		}
 		if !ok {
 			return []PerunEvent{}, ErrNotStellarPerunContract

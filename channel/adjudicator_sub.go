@@ -57,10 +57,10 @@ type AdjEventSub struct {
 	log           log.Embedding
 }
 
-func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *env.StellarClient, perunID xdr.ScAddress, assetID xdr.ScAddress) *AdjEventSub {
+func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *env.StellarClient, perunID xdr.ScAddress, assetID xdr.ScAddress) (*AdjEventSub, error) {
 	getChanArgs, err := env.BuildGetChannelTxArgs(cid)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	sub := &AdjEventSub{
@@ -79,7 +79,7 @@ func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *env.
 
 	ctx, sub.cancel = context.WithCancel(ctx)
 	go sub.run(ctx)
-	return sub
+	return sub, nil
 
 }
 

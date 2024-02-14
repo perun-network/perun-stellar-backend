@@ -68,20 +68,20 @@ func (c *StellarClient) GetHorizonClient() *horizonclient.Client {
 	return c.hzClient
 }
 
-func (h *HorizonMasterClient) GetAccount(kp *keypair.Full) horizon.Account {
+func (h *HorizonMasterClient) GetAccount(kp *keypair.Full) (horizon.Account, error) {
 	accountReq := horizonclient.AccountRequest{AccountID: kp.Address()}
 	hzAccount, err := h.master.AccountDetail(accountReq)
 	if err != nil {
-		panic(err)
+		return hzAccount, err
 	}
-	return hzAccount
+	return hzAccount, nil
 }
 
-func (s *StellarClient) GetHorizonAccount(kp *keypair.Full) horizon.Account {
+func (s *StellarClient) GetHorizonAccount(kp *keypair.Full) (horizon.Account, error) {
 	accountReq := horizonclient.AccountRequest{AccountID: kp.Address()}
 	hzAccount, err := s.hzClient.AccountDetail(accountReq)
 	if err != nil {
-		panic(err)
+		return hzAccount, err
 	}
-	return hzAccount
+	return hzAccount, nil
 }

@@ -131,7 +131,10 @@ func (f *Funder) OpenChannel(ctx context.Context, params *pchannel.Params, state
 	perunAddress := f.GetPerunID()
 	kp := f.kpFull
 
-	openTxArgs := env.BuildOpenTxArgs(params, state)
+	openTxArgs, err := env.BuildOpenTxArgs(params, state)
+	if err != nil {
+		return errors.New("error while building open tx")
+	}
 	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction("open", openTxArgs, perunAddress, kp)
 	if err != nil {
 		return errors.New("error while invoking and processing host function: open")
@@ -166,7 +169,7 @@ func (f *Funder) FundChannel(ctx context.Context, params *pchannel.Params, state
 
 	sameContractTokenID := tokenIDAddrFromBals.Equals(tokenAddress)
 	if !sameContractTokenID {
-		panic("tokenIDAddrFromBals not equal to tokenContractAddress")
+		return errors.New("tokenIDAddrFromBals not equal to tokenContractAddress")
 	}
 
 	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction("fund", fundTxArgs, perunAddress, kp)

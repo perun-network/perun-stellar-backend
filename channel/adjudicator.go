@@ -72,7 +72,7 @@ func (a *Adjudicator) Subscribe(ctx context.Context, cid pchannel.ID) (pchannel.
 	c := a.stellarClient
 	perunID := a.GetPerunID()
 	assetID := a.GetAssetID()
-	return NewAdjudicatorSub(ctx, cid, c, perunID, assetID), nil
+	return NewAdjudicatorSub(ctx, cid, c, perunID, assetID)
 }
 
 func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq, smap pchannel.StateMap) error {
@@ -156,7 +156,7 @@ func (a *Adjudicator) BuildWithdrawTxArgs(req pchannel.AdjudicatorReq) (xdr.ScVe
 	} else if partyIdx == 1 {
 		withdrawIdx = scval.MustWrapBool(true)
 	} else {
-		panic("partyIdx must be 0 or 1")
+		return xdr.ScVec{}, errors.New("invalid party index")
 	}
 	var chanid xdr.ScBytes
 	copy(chanid, chanIDStellar)
