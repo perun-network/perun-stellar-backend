@@ -62,68 +62,69 @@ func (f *Funder) GetAssetID() xdr.ScAddress {
 
 func (f *Funder) Fund(ctx context.Context, req pchannel.FundingReq) error {
 	log.Println("Fund called")
-	switch req.Idx {
-	case 0:
-		return f.fundPartyA(ctx, req)
-	case 1:
-		return f.fundPartyB(ctx, req)
-	default:
-		return errors.New("invalid index")
+
+	if req.Idx != 0 && req.Idx != 1 {
+		return errors.New("req.Idx must be 0 or 1")
 	}
+
+	if req.Idx == pchannel.Index(0) {
+		err := f.openChannel(ctx, req)
+		if err != nil {
+			return err
+		}
+	}
+
+	return f.fundParty(ctx, req)
 }
+func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 
-func (f *Funder) fundPartyA(ctx context.Context, req pchannel.FundingReq) error {
+	party := getPartyByIndex(req.Idx)
 
-	err := f.OpenChannel(ctx, req.Params, req.State)
-	if err != nil {
+	log.Printf("%s: Funding channel...\n", party)
 
-		return errors.New("error while opening channel in party A")
-	}
-	err = f.FundChannel(ctx, req.Params, req.State, false)
-	if err != nil {
-		return err
-	}
-
-polling:
 	for i := 0; i < f.maxIters; i++ {
 		select {
 		case <-ctx.Done():
 			return f.AbortChannel(ctx, req.Params, req.State)
 		case <-time.After(f.pollingInterval):
+
+			log.Printf("%s: Polling for opened channel...\n", party)
 			chanState, err := f.GetChannelState(ctx, req.Params, req.State)
 			if err != nil {
-				continue polling
+				log.Printf("%s: Error while polling for opened channel: %v\n", party, err)
+				continue
 			}
+
+			log.Printf("%s: Found opened channel!\n", party)
 			if chanState.Control.FundedA && chanState.Control.FundedB {
 				return nil
 			}
 
+			if req.Idx == pchannel.Index(0) && !chanState.Control.FundedA {
+				err := f.FundChannel(ctx, req.Params, req.State, false)
+				if err != nil {
+					return err
+				}
+				continue
+			}
+			if req.Idx == pchannel.Index(1) && !chanState.Control.FundedB {
+				err := f.FundChannel(ctx, req.Params, req.State, true)
+				if err != nil {
+					return err
+				}
+				continue
+			}
 		}
 	}
 	return f.AbortChannel(ctx, req.Params, req.State)
 }
 
-func (f *Funder) fundPartyB(ctx context.Context, req pchannel.FundingReq) error {
-
-polling:
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(f.pollingInterval):
-			log.Println("Party B: Polling for opened channel...")
-			chanState, err := f.GetChannelState(ctx, req.Params, req.State)
-			if err != nil {
-				log.Println("Party B: Error while polling for opened channel:", err)
-				continue polling
-			}
-			log.Println("Party B: Found opened channel!")
-			if chanState.Control.FundedA && chanState.Control.FundedB {
-				return nil
-			}
-			return f.FundChannel(ctx, req.Params, req.State, true)
-		}
+func (f *Funder) openChannel(ctx context.Context, req pchannel.FundingReq) error {
+	err := f.OpenChannel(ctx, req.Params, req.State)
+	if err != nil {
+		return errors.New("error while opening channel in party A")
 	}
+	return nil
 }
 
 func (f *Funder) OpenChannel(ctx context.Context, params *pchannel.Params, state *pchannel.State) error {
@@ -231,4 +232,11 @@ func (f *Funder) GetChannelState(ctx context.Context, params *pchannel.Params, s
 		return wire.Channel{}, errors.New("error while decoding return value")
 	}
 	return getChan, nil
+}
+
+func getPartyByIndex(funderIdx pchannel.Index) string {
+	if funderIdx == 1 {
+		return "Party B"
+	}
+	return "Party A"
 }
