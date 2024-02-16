@@ -49,7 +49,7 @@ func (b backend) DecodeSig(reader io.Reader) (wallet.Sig, error) {
 func (b backend) VerifySignature(msg []byte, sig wallet.Sig, a wallet.Address) (bool, error) {
 	p, ok := a.(*types.Participant)
 	if !ok {
-		return false, errors.New("Participant has invalid type")
+		return false, errors.New("participant has invalid type")
 	}
 	if len(sig) != ed25519.SignatureSize {
 		return false, errors.New("invalid signature size")

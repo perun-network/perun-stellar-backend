@@ -31,7 +31,7 @@ import (
 	"time"
 )
 
-var ErrChannelAlreadyClosed = errors.New("Channel is already closed")
+var ErrChannelAlreadyClosed = errors.New("channel is already closed")
 
 type Adjudicator struct {
 	log             log.Embedding
@@ -135,7 +135,6 @@ func (a *Adjudicator) GetChannelState(ctx context.Context, state *pchannel.State
 
 func (a *Adjudicator) BuildWithdrawTxArgs(req pchannel.AdjudicatorReq) (xdr.ScVec, error) {
 
-	// build withdrawalargs
 	chanIDStellar := req.Tx.ID[:]
 	partyIdx := req.Idx
 	var withdrawIdx xdr.ScVal
