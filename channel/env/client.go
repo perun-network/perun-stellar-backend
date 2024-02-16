@@ -18,53 +18,50 @@ import (
 	"github.com/stellar/go/clients/horizonclient"
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/protocols/horizon"
+	"github.com/stellar/go/txnbuild"
 )
 
 const HorizonURL = "http://localhost:8000"
 const NETWORK_PASSPHRASE = "Standalone Network ; February 2017"
 
 type StellarClient struct {
-	hzClient *horizonclient.Client
-	kp       *keypair.Full
+	hzClient  *horizonclient.Client
+	keyHolder keyHolder
+}
+
+type keyHolder struct {
+	kp *keypair.Full
 }
 
 func NewHorizonClient() *horizonclient.Client {
 	return &horizonclient.Client{HorizonURL: HorizonURL}
 }
 
-func NewStellarClient(kp *keypair.Full) *StellarClient {
-	return &StellarClient{
-		hzClient: NewHorizonClient(),
-		kp:       kp,
-	}
+func newKeyHolder(kp *keypair.Full) keyHolder {
+	return keyHolder{kp}
 }
 
-func (s *StellarClient) GetKeyPair() *keypair.Full {
-	return s.kp
+func NewStellarClient(kp *keypair.Full) *StellarClient {
+	return &StellarClient{
+		hzClient:  NewHorizonClient(),
+		keyHolder: newKeyHolder(kp),
+	}
 }
 
 func NewHorizonMasterClient() *StellarClient {
 	sourceKey := keypair.Root(NETWORK_PASSPHRASE)
 	return &StellarClient{
-		hzClient: &horizonclient.Client{HorizonURL: HorizonURL},
-		kp:       sourceKey,
+		hzClient:  &horizonclient.Client{HorizonURL: HorizonURL},
+		keyHolder: newKeyHolder(sourceKey),
 	}
 }
-
-// func (m *StellarClient) GetMaster() *horizonclient.Client {
-// 	return m.hzClient
-// }
-
-// func (m *StellarClient) GetSourceKey() *keypair.Full {
-// 	return m.kp
-// }
 
 func (c *StellarClient) GetHorizonClient() *horizonclient.Client {
 	return c.hzClient
 }
 
-func (h *StellarClient) GetAccount(kp *keypair.Full) (horizon.Account, error) {
-	accountReq := horizonclient.AccountRequest{AccountID: kp.Address()}
+func (h *StellarClient) GetAccount() (horizon.Account, error) {
+	accountReq := horizonclient.AccountRequest{AccountID: h.GetAddress()}
 	hzAccount, err := h.hzClient.AccountDetail(accountReq)
 	if err != nil {
 		return hzAccount, err
@@ -72,11 +69,30 @@ func (h *StellarClient) GetAccount(kp *keypair.Full) (horizon.Account, error) {
 	return hzAccount, nil
 }
 
-func (s *StellarClient) GetHorizonAccount(kp *keypair.Full) (horizon.Account, error) {
-	accountReq := horizonclient.AccountRequest{AccountID: kp.Address()}
+func (s *StellarClient) GetAddress() string {
+	return s.keyHolder.kp.Address()
+}
+
+func (s *StellarClient) GetHorizonAccount() (horizon.Account, error) {
+	accountReq := horizonclient.AccountRequest{AccountID: s.GetAddress()}
 	hzAccount, err := s.hzClient.AccountDetail(accountReq)
 	if err != nil {
 		return hzAccount, err
 	}
 	return hzAccount, nil
+}
+
+func (s *StellarClient) CreateSignedTxFromParams(txParams txnbuild.TransactionParams) (*txnbuild.Transaction, error) {
+
+	txUnsigned, err := txnbuild.NewTransaction(txParams)
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := txUnsigned.Sign(NETWORK_PASSPHRASE, s.keyHolder.kp)
+	if err != nil {
+		return nil, err
+	}
+
+	return tx, nil
 }

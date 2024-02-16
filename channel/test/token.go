@@ -103,7 +103,7 @@ func InitTokenContract(kp *keypair.Full, contractIDAddress xdr.ScAddress) error 
 	if err != nil {
 		panic(err)
 	}
-	_, err = stellarClient.InvokeAndProcessHostFunction("initialize", initArgs, contractIDAddress, kp)
+	_, err = stellarClient.InvokeAndProcessHostFunction("initialize", initArgs, contractIDAddress)
 	if err != nil {
 		panic(err)
 	}
@@ -116,7 +116,7 @@ func GetTokenName(kp *keypair.Full, contractAddress xdr.ScAddress) error {
 	stellarClient := env.NewStellarClient(kp)
 	TokenNameArgs := xdr.ScVec{}
 
-	_, err := stellarClient.InvokeAndProcessHostFunction("name", TokenNameArgs, contractAddress, kp)
+	_, err := stellarClient.InvokeAndProcessHostFunction("name", TokenNameArgs, contractAddress)
 	if err != nil {
 		panic(err)
 	}
@@ -215,7 +215,7 @@ func MintToken(kp *keypair.Full, contractAddr xdr.ScAddress, amount uint64, reci
 	if err != nil {
 		panic(err)
 	}
-	_, err = stellarClient.InvokeAndProcessHostFunction("mint", mintTokenArgs, contractAddr, kp)
+	_, err = stellarClient.InvokeAndProcessHostFunction("mint", mintTokenArgs, contractAddr)
 	if err != nil {
 		panic(err)
 	}

@@ -101,7 +101,7 @@ func NewTestSetup(t *testing.T) *Setup {
 	channelAccs := []*wallet.Account{accs[0], accs[1]}
 	channelClients := []*env.StellarClient{aliceClient, bobClient}
 
-	funders, adjs := createFundersAndAdjudicators(channelAccs, kpsToFund, stellarClients, perunAddress, tokenAddress)
+	funders, adjs := createFundersAndAdjudicators(channelAccs, stellarClients, perunAddress, tokenAddress)
 
 	setup := Setup{
 		t:              t,
@@ -123,12 +123,12 @@ func setupAccountsAndContracts(t *testing.T, deployerKp *keypair.Full, kps []*ke
 	}
 }
 
-func createFundersAndAdjudicators(accs []*wallet.Account, kps []*keypair.Full, clients []*env.StellarClient, perunAddress, tokenAddress xdr.ScAddress) ([]*channel.Funder, []*channel.Adjudicator) {
+func createFundersAndAdjudicators(accs []*wallet.Account, clients []*env.StellarClient, perunAddress, tokenAddress xdr.ScAddress) ([]*channel.Funder, []*channel.Adjudicator) {
 	funders := make([]*channel.Funder, len(accs))
 	adjs := make([]*channel.Adjudicator, len(accs))
 	for i, acc := range accs {
-		funders[i] = channel.NewFunder(acc, kps[i], clients[i], perunAddress, tokenAddress)
-		adjs[i] = channel.NewAdjudicator(acc, kps[i], clients[i], perunAddress, tokenAddress)
+		funders[i] = channel.NewFunder(acc, clients[i], perunAddress, tokenAddress)
+		adjs[i] = channel.NewAdjudicator(acc, clients[i], perunAddress, tokenAddress)
 	}
 	return funders, adjs
 }
@@ -179,20 +179,20 @@ func CreateFundStellarAccounts(pairs []*keypair.Full, initialBalance string) err
 
 	masterClient := env.NewHorizonMasterClient()
 	masterHzClient := masterClient.GetHorizonClient()
-	sourceKey := masterClient.GetKeyPair()
+	sourceKey := keypair.Root(env.NETWORK_PASSPHRASE)
 
 	hzClient := env.NewHorizonClient()
 
 	ops := make([]txnbuild.Operation, numKps)
 
-	accReq := horizonclient.AccountRequest{AccountID: sourceKey.Address()}
+	accReq := horizonclient.AccountRequest{AccountID: masterClient.GetAddress()}
 	sourceAccount, err := masterHzClient.AccountDetail(accReq)
 	if err != nil {
 		panic(err)
 	}
 
 	masterAccount := txnbuild.SimpleAccount{
-		AccountID: sourceKey.Address(),
+		AccountID: masterClient.GetAddress(),
 		Sequence:  sourceAccount.Sequence,
 	}
 

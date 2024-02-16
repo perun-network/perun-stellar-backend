@@ -17,7 +17,6 @@ package channel
 import (
 	"context"
 	"errors"
-	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/xdr"
 	"log"
 	pchannel "perun.network/go-perun/channel"
@@ -33,18 +32,16 @@ const DefaultPollingInterval = time.Duration(6) * time.Second
 type Funder struct {
 	stellarClient   *env.StellarClient
 	acc             *wallet.Account
-	kpFull          *keypair.Full
 	perunID         xdr.ScAddress
 	assetID         xdr.ScAddress
 	maxIters        int
 	pollingInterval time.Duration
 }
 
-func NewFunder(acc *wallet.Account, kp *keypair.Full, stellarClient *env.StellarClient, perunID xdr.ScAddress, assetID xdr.ScAddress) *Funder {
+func NewFunder(acc *wallet.Account, stellarClient *env.StellarClient, perunID xdr.ScAddress, assetID xdr.ScAddress) *Funder {
 	return &Funder{
 		stellarClient:   stellarClient,
 		acc:             acc,
-		kpFull:          kp,
 		perunID:         perunID,
 		assetID:         assetID,
 		maxIters:        MaxIterationsUntilAbort,
@@ -130,13 +127,11 @@ func (f *Funder) openChannel(ctx context.Context, req pchannel.FundingReq) error
 func (f *Funder) OpenChannel(ctx context.Context, params *pchannel.Params, state *pchannel.State) error {
 
 	perunAddress := f.GetPerunID()
-	kp := f.kpFull
-
 	openTxArgs, err := env.BuildOpenTxArgs(params, state)
 	if err != nil {
 		return errors.New("error while building open tx")
 	}
-	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction("open", openTxArgs, perunAddress, kp)
+	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction("open", openTxArgs, perunAddress)
 	if err != nil {
 		return errors.New("error while invoking and processing host function: open")
 	}
@@ -154,7 +149,6 @@ func (f *Funder) FundChannel(ctx context.Context, params *pchannel.Params, state
 	perunAddress := f.GetPerunID()
 	tokenAddress := f.GetAssetID()
 
-	kp := f.kpFull
 	chanId := state.ID
 
 	fundTxArgs, err := env.BuildFundTxArgs(chanId, funderIdx)
@@ -173,7 +167,7 @@ func (f *Funder) FundChannel(ctx context.Context, params *pchannel.Params, state
 		return errors.New("tokenIDAddrFromBals not equal to tokenContractAddress")
 	}
 
-	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction("fund", fundTxArgs, perunAddress, kp)
+	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction("fund", fundTxArgs, perunAddress)
 	if err != nil {
 		return errors.New("error while invoking and processing host function: fund")
 	}
@@ -189,14 +183,13 @@ func (f *Funder) FundChannel(ctx context.Context, params *pchannel.Params, state
 func (f *Funder) AbortChannel(ctx context.Context, params *pchannel.Params, state *pchannel.State) error {
 
 	contractAddress := f.GetPerunID()
-	kp := f.kpFull
 	chanId := state.ID
 
 	openTxArgs, err := env.BuildGetChannelTxArgs(chanId)
 	if err != nil {
 		return errors.New("error while building get_channel tx")
 	}
-	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction("abort_funding", openTxArgs, contractAddress, kp)
+	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction("abort_funding", openTxArgs, contractAddress)
 	if err != nil {
 		return errors.New("error while invoking and processing host function: abort_funding")
 	}
@@ -212,14 +205,13 @@ func (f *Funder) AbortChannel(ctx context.Context, params *pchannel.Params, stat
 func (f *Funder) GetChannelState(ctx context.Context, params *pchannel.Params, state *pchannel.State) (wire.Channel, error) {
 
 	contractAddress := f.GetPerunID()
-	kp := f.kpFull
 	chanId := state.ID
 
 	getchTxArgs, err := env.BuildGetChannelTxArgs(chanId)
 	if err != nil {
 		return wire.Channel{}, errors.New("error while building get_channel tx")
 	}
-	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction("get_channel", getchTxArgs, contractAddress, kp)
+	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction("get_channel", getchTxArgs, contractAddress)
 	if err != nil {
 		return wire.Channel{}, errors.New("error while processing and submitting get_channel tx")
 	}

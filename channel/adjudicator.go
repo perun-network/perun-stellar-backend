@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/xdr"
 	"perun.network/go-perun/log"
 
@@ -38,7 +37,6 @@ type Adjudicator struct {
 	log             log.Embedding
 	stellarClient   *env.StellarClient
 	acc             *wallet.Account
-	kpFull          *keypair.Full
 	assetID         xdr.ScAddress
 	perunID         xdr.ScAddress
 	maxIters        int
@@ -47,11 +45,10 @@ type Adjudicator struct {
 
 // NewAdjudicator returns a new Adjudicator.
 
-func NewAdjudicator(acc *wallet.Account, kp *keypair.Full, stellarClient *env.StellarClient, perunID xdr.ScAddress, assetID xdr.ScAddress) *Adjudicator {
+func NewAdjudicator(acc *wallet.Account, stellarClient *env.StellarClient, perunID xdr.ScAddress, assetID xdr.ScAddress) *Adjudicator {
 	return &Adjudicator{
 		stellarClient:   stellarClient,
 		acc:             acc,
-		kpFull:          kp,
 		perunID:         perunID,
 		assetID:         assetID,
 		maxIters:        MaxIterationsUntilAbort,
@@ -115,15 +112,13 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 func (a *Adjudicator) GetChannelState(ctx context.Context, state *pchannel.State) (wire.Channel, error) {
 
 	contractAddress := a.GetPerunID()
-	kp := a.kpFull
 	chanId := state.ID
 
-	// generate tx to open the channel
 	getchTxArgs, err := env.BuildGetChannelTxArgs(chanId)
 	if err != nil {
 		return wire.Channel{}, errors.New("error while building get_channel tx")
 	}
-	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction("get_channel", getchTxArgs, contractAddress, kp)
+	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction("get_channel", getchTxArgs, contractAddress)
 	if err != nil {
 		return wire.Channel{}, errors.New("error while processing and submitting get_channel tx")
 	}
@@ -169,13 +164,11 @@ func (a *Adjudicator) BuildWithdrawTxArgs(req pchannel.AdjudicatorReq) (xdr.ScVe
 func (a *Adjudicator) withdraw(ctx context.Context, req pchannel.AdjudicatorReq) error {
 
 	perunAddress := a.GetPerunID()
-	kp := a.kpFull
-
 	withdrawTxArgs, err := a.BuildWithdrawTxArgs(req)
 	if err != nil {
 		return errors.New("error while building fund tx")
 	}
-	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction("withdraw", withdrawTxArgs, perunAddress, kp)
+	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction("withdraw", withdrawTxArgs, perunAddress)
 	if err != nil {
 		return errors.New("error while invoking and processing host function: withdraw")
 	}
@@ -192,12 +185,11 @@ func (a *Adjudicator) Close(ctx context.Context, id pchannel.ID, state *pchannel
 
 	log.Println("Close called")
 	contractAddress := a.GetPerunID()
-	kp := a.kpFull
 	closeTxArgs, err := BuildCloseTxArgs(*state, sigs)
 	if err != nil {
 		return errors.New("error while building fund tx")
 	}
-	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction("close", closeTxArgs, contractAddress, kp)
+	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction("close", closeTxArgs, contractAddress)
 	if err != nil {
 		return errors.New("error while invoking and processing host function: close")
 	}
@@ -224,12 +216,11 @@ func (a *Adjudicator) Register(ctx context.Context, req pchannel.AdjudicatorReq,
 
 func (a *Adjudicator) Dispute(ctx context.Context, state *pchannel.State, sigs []pwallet.Sig) error {
 	contractAddress := a.GetPerunID()
-	kp := a.kpFull
 	closeTxArgs, err := BuildDisputeTxArgs(*state, sigs)
 	if err != nil {
 		return errors.New("error while building fund tx")
 	}
-	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction("dispute", closeTxArgs, contractAddress, kp)
+	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction("dispute", closeTxArgs, contractAddress)
 	if err != nil {
 		return errors.New("error while invoking and processing host function: dispute")
 	}
@@ -243,12 +234,12 @@ func (a *Adjudicator) Dispute(ctx context.Context, state *pchannel.State, sigs [
 func (a *Adjudicator) ForceClose(ctx context.Context, id pchannel.ID, state *pchannel.State, sigs []pwallet.Sig, params *pchannel.Params) error {
 	log.Println("ForceClose called")
 	contractAddress := a.GetPerunID()
-	kp := a.kpFull
+	// kp := a.kpFull
 	forceCloseTxArgs, err := env.BuildForceCloseTxArgs(id)
 	if err != nil {
 		return errors.New("error while building fund tx")
 	}
-	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction("force_close", forceCloseTxArgs, contractAddress, kp)
+	txMeta, err := a.stellarClient.InvokeAndProcessHostFunction("force_close", forceCloseTxArgs, contractAddress)
 	if err != nil {
 		return errors.New("error while invoking and processing host function")
 	}

@@ -134,8 +134,7 @@ polling:
 
 func (s *AdjEventSub) GetChannelState(chanArgs xdr.ScVec) (wire.Channel, error) {
 	contractAddress := s.perunID
-	kp := s.stellarClient.GetKeyPair()
-	txMeta, err := s.stellarClient.InvokeAndProcessHostFunction("get_channel", chanArgs, contractAddress, kp)
+	txMeta, err := s.stellarClient.InvokeAndProcessHostFunction("get_channel", chanArgs, contractAddress)
 	if err != nil {
 		return wire.Channel{}, errors.New("error while processing and submitting get_channel tx")
 	}
@@ -152,8 +151,6 @@ func (s *AdjEventSub) GetChannelState(chanArgs xdr.ScVec) (wire.Channel, error) 
 }
 
 func (s *AdjEventSub) getChanControl() (wire.Control, error) {
-	// query channel state
-
 	getChanArgs, err := env.BuildGetChannelTxArgs(s.cid)
 	if err != nil {
 		return wire.Control{}, err

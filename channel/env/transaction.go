@@ -266,11 +266,11 @@ func BuildForceCloseTxArgs(chanID pchannel.ID) (xdr.ScVec, error) {
 	return getChannelArgs, nil
 }
 
-func (s *StellarClient) InvokeAndProcessHostFunction(fname string, callTxArgs xdr.ScVec, contractAddr xdr.ScAddress, kp *keypair.Full) (xdr.TransactionMeta, error) {
+func (s *StellarClient) InvokeAndProcessHostFunction(fname string, callTxArgs xdr.ScVec, contractAddr xdr.ScAddress) (xdr.TransactionMeta, error) {
 	sharedMtx.Lock()
 	defer sharedMtx.Unlock()
 	fnameXdr := xdr.ScSymbol(fname)
-	hzAcc, err := s.GetHorizonAccount(kp)
+	hzAcc, err := s.GetHorizonAccount()
 	if err != nil {
 		return xdr.TransactionMeta{}, err
 	}
@@ -280,7 +280,7 @@ func (s *StellarClient) InvokeAndProcessHostFunction(fname string, callTxArgs xd
 	preFlightOp, minFee := PreflightHostFunctions(hzClient, &hzAcc, *invokeHostFunctionOp)
 
 	txParams := GetBaseTransactionParamsWithFee(&hzAcc, minFee, &preFlightOp)
-	txSigned, err := CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParams)
+	txSigned, err := s.CreateSignedTxFromParams(txParams)
 	if err != nil {
 		return xdr.TransactionMeta{}, err
 	}
