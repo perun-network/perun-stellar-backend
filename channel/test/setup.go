@@ -178,8 +178,8 @@ func CreateFundStellarAccounts(pairs []*keypair.Full, initialBalance string) err
 	numKps := len(pairs)
 
 	masterClient := env.NewHorizonMasterClient()
-	masterHzClient := masterClient.GetMaster()
-	sourceKey := masterClient.GetSourceKey()
+	masterHzClient := masterClient.GetHorizonClient()
+	sourceKey := masterClient.GetKeyPair()
 
 	hzClient := env.NewHorizonClient()
 

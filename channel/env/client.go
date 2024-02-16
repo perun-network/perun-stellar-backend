@@ -51,13 +51,13 @@ func NewHorizonMasterClient() *StellarClient {
 	}
 }
 
-func (m *StellarClient) GetMaster() *horizonclient.Client {
-	return m.hzClient
-}
+// func (m *StellarClient) GetMaster() *horizonclient.Client {
+// 	return m.hzClient
+// }
 
-func (m *StellarClient) GetSourceKey() *keypair.Full {
-	return m.kp
-}
+// func (m *StellarClient) GetSourceKey() *keypair.Full {
+// 	return m.kp
+// }
 
 func (c *StellarClient) GetHorizonClient() *horizonclient.Client {
 	return c.hzClient
