@@ -31,7 +31,6 @@ const DefaultPollingInterval = time.Duration(6) * time.Second
 
 type Funder struct {
 	stellarClient   *env.StellarClient
-	acc             *wallet.Account
 	perunID         xdr.ScAddress
 	assetID         xdr.ScAddress
 	maxIters        int
@@ -41,7 +40,6 @@ type Funder struct {
 func NewFunder(acc *wallet.Account, stellarClient *env.StellarClient, perunID xdr.ScAddress, assetID xdr.ScAddress) *Funder {
 	return &Funder{
 		stellarClient:   stellarClient,
-		acc:             acc,
 		perunID:         perunID,
 		assetID:         assetID,
 		maxIters:        MaxIterationsUntilAbort,
