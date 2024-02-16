@@ -23,11 +23,6 @@ import (
 const HorizonURL = "http://localhost:8000"
 const NETWORK_PASSPHRASE = "Standalone Network ; February 2017"
 
-type HorizonMasterClient struct {
-	master    *horizonclient.Client
-	sourceKey *keypair.Full
-}
-
 type StellarClient struct {
 	hzClient *horizonclient.Client
 	kp       *keypair.Full
@@ -48,29 +43,29 @@ func (s *StellarClient) GetKeyPair() *keypair.Full {
 	return s.kp
 }
 
-func NewHorizonMasterClient() *HorizonMasterClient {
+func NewHorizonMasterClient() *StellarClient {
 	sourceKey := keypair.Root(NETWORK_PASSPHRASE)
-	return &HorizonMasterClient{
-		master:    &horizonclient.Client{HorizonURL: HorizonURL},
-		sourceKey: sourceKey,
+	return &StellarClient{
+		hzClient: &horizonclient.Client{HorizonURL: HorizonURL},
+		kp:       sourceKey,
 	}
 }
 
-func (m *HorizonMasterClient) GetMaster() *horizonclient.Client {
-	return m.master
+func (m *StellarClient) GetMaster() *horizonclient.Client {
+	return m.hzClient
 }
 
-func (m *HorizonMasterClient) GetSourceKey() *keypair.Full {
-	return m.sourceKey
+func (m *StellarClient) GetSourceKey() *keypair.Full {
+	return m.kp
 }
 
 func (c *StellarClient) GetHorizonClient() *horizonclient.Client {
 	return c.hzClient
 }
 
-func (h *HorizonMasterClient) GetAccount(kp *keypair.Full) (horizon.Account, error) {
+func (h *StellarClient) GetAccount(kp *keypair.Full) (horizon.Account, error) {
 	accountReq := horizonclient.AccountRequest{AccountID: kp.Address()}
-	hzAccount, err := h.master.AccountDetail(accountReq)
+	hzAccount, err := h.hzClient.AccountDetail(accountReq)
 	if err != nil {
 		return hzAccount, err
 	}
