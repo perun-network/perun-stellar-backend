@@ -80,11 +80,11 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 	for i := 0; i < f.maxIters; i++ {
 		select {
 		case <-ctx.Done():
-			return f.AbortChannel(ctx, req.Params, req.State)
+			return f.AbortChannel(ctx, req.State)
 		case <-time.After(f.pollingInterval):
 
 			log.Printf("%s: Polling for opened channel...\n", party)
-			chanState, err := f.GetChannelState(ctx, req.Params, req.State)
+			chanState, err := f.GetChannelState(ctx, req.State)
 			if err != nil {
 				log.Printf("%s: Error while polling for opened channel: %v\n", party, err)
 				continue
@@ -96,14 +96,14 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 			}
 
 			if req.Idx == pchannel.Index(0) && !chanState.Control.FundedA {
-				err := f.FundChannel(ctx, req.Params, req.State, false)
+				err := f.FundChannel(ctx, req.State, false)
 				if err != nil {
 					return err
 				}
 				continue
 			}
 			if req.Idx == pchannel.Index(1) && !chanState.Control.FundedB {
-				err := f.FundChannel(ctx, req.Params, req.State, true)
+				err := f.FundChannel(ctx, req.State, true)
 				if err != nil {
 					return err
 				}
@@ -111,7 +111,7 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 			}
 		}
 	}
-	return f.AbortChannel(ctx, req.Params, req.State)
+	return f.AbortChannel(ctx, req.State)
 }
 
 func (f *Funder) openChannel(ctx context.Context, req pchannel.FundingReq) error {
@@ -142,7 +142,7 @@ func (f *Funder) OpenChannel(ctx context.Context, params *pchannel.Params, state
 	return nil
 }
 
-func (f *Funder) FundChannel(ctx context.Context, params *pchannel.Params, state *pchannel.State, funderIdx bool) error {
+func (f *Funder) FundChannel(ctx context.Context, state *pchannel.State, funderIdx bool) error {
 
 	perunAddress := f.GetPerunID()
 	tokenAddress := f.GetAssetID()
@@ -178,7 +178,7 @@ func (f *Funder) FundChannel(ctx context.Context, params *pchannel.Params, state
 	return nil
 }
 
-func (f *Funder) AbortChannel(ctx context.Context, params *pchannel.Params, state *pchannel.State) error {
+func (f *Funder) AbortChannel(ctx context.Context, state *pchannel.State) error {
 
 	contractAddress := f.GetPerunID()
 	chanId := state.ID
@@ -200,7 +200,7 @@ func (f *Funder) AbortChannel(ctx context.Context, params *pchannel.Params, stat
 	return nil
 }
 
-func (f *Funder) GetChannelState(ctx context.Context, params *pchannel.Params, state *pchannel.State) (wire.Channel, error) {
+func (f *Funder) GetChannelState(ctx context.Context, state *pchannel.State) (wire.Channel, error) {
 
 	contractAddress := f.GetPerunID()
 	chanId := state.ID

@@ -77,7 +77,7 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 	if req.Tx.State.IsFinal {
 		log.Println("Withdraw called")
 
-		if err := a.Close(ctx, req.Tx.ID, req.Tx.State, req.Tx.Sigs); err != nil {
+		if err := a.Close(ctx, req.Tx.State, req.Tx.Sigs); err != nil {
 			chanControl, errChanState := a.GetChannelState(ctx, req.Tx.State)
 			if errChanState != nil {
 				return errChanState
@@ -92,7 +92,7 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 		return a.withdraw(ctx, req)
 
 	} else {
-		err := a.ForceClose(ctx, req.Tx.ID, req.Tx.State, req.Tx.Sigs, req.Params)
+		err := a.ForceClose(ctx, req.Tx.State, req.Tx.Sigs)
 		log.Println("ForceClose called")
 		if errors.Is(err, ErrChannelAlreadyClosed) {
 			return a.withdraw(ctx, req)
@@ -180,7 +180,7 @@ func (a *Adjudicator) withdraw(ctx context.Context, req pchannel.AdjudicatorReq)
 	return nil
 }
 
-func (a *Adjudicator) Close(ctx context.Context, id pchannel.ID, state *pchannel.State, sigs []pwallet.Sig) error {
+func (a *Adjudicator) Close(ctx context.Context, state *pchannel.State, sigs []pwallet.Sig) error {
 
 	log.Println("Close called")
 	contractAddress := a.GetPerunID()
@@ -230,11 +230,11 @@ func (a *Adjudicator) Dispute(ctx context.Context, state *pchannel.State, sigs [
 	return nil
 }
 
-func (a *Adjudicator) ForceClose(ctx context.Context, id pchannel.ID, state *pchannel.State, sigs []pwallet.Sig, params *pchannel.Params) error {
+func (a *Adjudicator) ForceClose(ctx context.Context, state *pchannel.State, sigs []pwallet.Sig) error {
 	log.Println("ForceClose called")
 	contractAddress := a.GetPerunID()
-	// kp := a.kpFull
-	forceCloseTxArgs, err := env.BuildForceCloseTxArgs(id)
+
+	forceCloseTxArgs, err := env.BuildForceCloseTxArgs(state.ID)
 	if err != nil {
 		return errors.New("error while building fund tx")
 	}
