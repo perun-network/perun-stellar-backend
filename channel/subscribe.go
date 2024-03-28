@@ -17,6 +17,7 @@ package channel
 import (
 	"log"
 	pchannel "perun.network/go-perun/channel"
+	"perun.network/perun-stellar-backend/event"
 	"reflect"
 )
 
@@ -30,15 +31,15 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 	}
 
 	select {
-	case event := <-s.getEvents():
-		if event == nil {
+	case ev := <-s.getEvents():
+		if ev == nil {
 			return nil
 		}
 
-		timestamp := event.Tstamp()
+		timestamp := ev.Tstamp()
 
-		switch e := event.(type) {
-		case *DisputedEvent:
+		switch e := ev.(type) {
+		case *event.DisputedEvent:
 			log.Println("DisputedEvent received")
 			dispEvent := pchannel.AdjudicatorEventBase{
 				VersionV: e.Version(),
@@ -49,7 +50,7 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 			s.closer.Close()
 			return ddn
 
-		case *CloseEvent:
+		case *event.CloseEvent:
 
 			log.Println("CloseEvent received")
 			conclEvent := pchannel.AdjudicatorEventBase{
