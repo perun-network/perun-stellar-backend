@@ -32,9 +32,9 @@ jobs:
 
     - name: Run quickstart.sh script
       run: |
-        chmod +x ./quickstart.sh
-        ./quickstart.sh standalone
-        
+            chmod +x ./quickstart.sh
+            ./quickstart.sh standalone &
+            
     - name: Wait for local chain setup
       run: sleep 10
 
