@@ -20,7 +20,8 @@ import (
 	"github.com/stellar/go/xdr"
 	pchannel "perun.network/go-perun/channel"
 	log "perun.network/go-perun/log"
-	"perun.network/perun-stellar-backend/channel/env"
+	"perun.network/perun-stellar-backend/client"
+	"perun.network/perun-stellar-backend/event"
 	"perun.network/perun-stellar-backend/wire"
 	pkgsync "polycry.pt/poly-go/sync"
 	"time"
@@ -36,18 +37,17 @@ type AdjEvent interface {
 	EventDataFromChannel(cchanState wire.Channel, timestamp uint64) error
 	ID() pchannel.ID
 	Timeout() pchannel.Timeout
-	Version() Version
+	Version() event.Version
 	Tstamp() uint64
 }
 
 // AdjudicatorSub implements the AdjudicatorSubscription interface.
 type AdjEventSub struct {
-	queryChanArgs xdr.ScVec
-	stellarClient *env.StellarClient
+	stellarClient *client.Client
 	chanControl   wire.Control
 	cid           pchannel.ID
-	perunID       xdr.ScAddress
-	assetID       xdr.ScAddress
+	perunAddr     xdr.ScAddress
+	assetAddr     xdr.ScAddress
 	events        chan AdjEvent
 	subErrors     chan error
 	err           error
@@ -57,19 +57,14 @@ type AdjEventSub struct {
 	log           log.Embedding
 }
 
-func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *env.StellarClient, perunID xdr.ScAddress, assetID xdr.ScAddress) (*AdjEventSub, error) {
-	getChanArgs, err := env.BuildGetChannelTxArgs(cid)
-	if err != nil {
-		return nil, err
-	}
+func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *client.Client, perunAddr xdr.ScAddress, assetAddr xdr.ScAddress) (*AdjEventSub, error) {
 
 	sub := &AdjEventSub{
-		queryChanArgs: getChanArgs,
 		stellarClient: stellarClient,
 		chanControl:   wire.Control{},
 		cid:           cid,
-		perunID:       perunID,
-		assetID:       assetID,
+		perunAddr:     perunAddr,
+		assetAddr:     assetAddr,
 		events:        make(chan AdjEvent, DefaultBufferSize),
 		subErrors:     make(chan error, 1),
 		pollInterval:  DefaultSubscriptionPollingInterval,
@@ -85,15 +80,17 @@ func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *env.
 
 func (s *AdjEventSub) run(ctx context.Context) {
 	s.log.Log().Info("Listening for channel state changes")
-	chanControl, err := s.getChanControl()
+	chanControl, err := s.stellarClient.GetChannelInfo(ctx, s.perunAddr, s.cid)
 	if err != nil {
 		s.subErrors <- err
 	}
-	s.chanControl = chanControl
+
+	s.chanControl = chanControl.Control
 	finish := func(err error) {
 		s.err = err
 		close(s.events)
 	}
+	var newChanControl wire.Control
 polling:
 	for {
 		s.log.Log().Debug("AdjudicatorSub is listening for Adjudicator Events")
@@ -106,7 +103,8 @@ polling:
 			return
 		case <-time.After(s.pollInterval):
 
-			newChanControl, err := s.getChanControl()
+			newChanInfo, err := s.stellarClient.GetChannelInfo(ctx, s.perunAddr, s.cid) // getChanControl()
+			newChanControl = newChanInfo.Control
 
 			if err != nil {
 
@@ -132,39 +130,6 @@ polling:
 	}
 }
 
-func (s *AdjEventSub) GetChannelState(chanArgs xdr.ScVec) (wire.Channel, error) {
-	contractAddress := s.perunID
-	txMeta, err := s.stellarClient.InvokeAndProcessHostFunction("get_channel", chanArgs, contractAddress)
-	if err != nil {
-		return wire.Channel{}, errors.New("error while processing and submitting get_channel tx")
-	}
-
-	retVal := txMeta.V3.SorobanMeta.ReturnValue
-	var getChan wire.Channel
-
-	err = getChan.FromScVal(retVal)
-	if err != nil {
-		return wire.Channel{}, errors.New("error while decoding return value")
-	}
-	return getChan, nil
-
-}
-
-func (s *AdjEventSub) getChanControl() (wire.Control, error) {
-	getChanArgs, err := env.BuildGetChannelTxArgs(s.cid)
-	if err != nil {
-		return wire.Control{}, err
-	}
-
-	chanParams, err := s.GetChannelState(getChanArgs)
-	if err != nil {
-		return wire.Control{}, err
-	}
-	chanControl := chanParams.Control
-
-	return chanControl, nil
-}
-
 func DifferencesInControls(controlCurr, controlNext wire.Control) (AdjEvent, error) {
 
 	if controlCurr.FundedA != controlNext.FundedA {
@@ -172,7 +137,7 @@ func DifferencesInControls(controlCurr, controlNext wire.Control) (AdjEvent, err
 			return nil, errors.New("channel cannot be unfunded A before withdrawal")
 		}
 		if controlNext.WithdrawnA && controlNext.WithdrawnB {
-			return &FundEvent{}, nil
+			return &event.FundEvent{}, nil
 		}
 	}
 
@@ -181,7 +146,7 @@ func DifferencesInControls(controlCurr, controlNext wire.Control) (AdjEvent, err
 			return nil, errors.New("channel cannot be unfunded B before withdrawal")
 		}
 		if controlNext.WithdrawnA && controlNext.WithdrawnB {
-			return &FundEvent{}, nil
+			return &event.FundEvent{}, nil
 		}
 	}
 
@@ -190,9 +155,9 @@ func DifferencesInControls(controlCurr, controlNext wire.Control) (AdjEvent, err
 			return nil, errors.New("channel cannot be reopened after closing")
 		}
 		if !controlCurr.Closed && controlNext.Closed {
-			return &CloseEvent{}, nil
+			return &event.CloseEvent{}, nil
 		}
-		return &CloseEvent{}, nil
+		return &event.CloseEvent{}, nil
 	}
 
 	if controlCurr.WithdrawnA != controlNext.WithdrawnA {
@@ -200,7 +165,7 @@ func DifferencesInControls(controlCurr, controlNext wire.Control) (AdjEvent, err
 			return nil, errors.New("channel cannot be unwithdrawn")
 		}
 		if controlNext.WithdrawnA && controlNext.WithdrawnB {
-			return &WithdrawnEvent{}, nil
+			return &event.WithdrawnEvent{}, nil
 		}
 	}
 
@@ -209,7 +174,7 @@ func DifferencesInControls(controlCurr, controlNext wire.Control) (AdjEvent, err
 			return nil, errors.New("channel cannot be unwithdrawn")
 		}
 		if controlNext.WithdrawnA && controlNext.WithdrawnB {
-			return &WithdrawnEvent{}, nil
+			return &event.WithdrawnEvent{}, nil
 		}
 	}
 
@@ -217,7 +182,7 @@ func DifferencesInControls(controlCurr, controlNext wire.Control) (AdjEvent, err
 		if controlCurr.Disputed {
 			return nil, errors.New("channel cannot be undisputed")
 		}
-		return &DisputedEvent{}, nil
+		return &event.DisputedEvent{}, nil
 	}
 
 	return nil, nil

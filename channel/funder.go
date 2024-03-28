@@ -20,7 +20,7 @@ import (
 	"github.com/stellar/go/xdr"
 	"log"
 	pchannel "perun.network/go-perun/channel"
-	"perun.network/perun-stellar-backend/channel/env"
+	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/wallet"
 	"perun.network/perun-stellar-backend/wire"
 	"time"
@@ -30,29 +30,29 @@ const MaxIterationsUntilAbort = 20
 const DefaultPollingInterval = time.Duration(6) * time.Second
 
 type Funder struct {
-	stellarClient   *env.StellarClient
-	perunID         xdr.ScAddress
-	assetID         xdr.ScAddress
+	stellarClient   *client.Client
+	perunAddr       xdr.ScAddress
+	assetAddr       xdr.ScAddress
 	maxIters        int
 	pollingInterval time.Duration
 }
 
-func NewFunder(acc *wallet.Account, stellarClient *env.StellarClient, perunID xdr.ScAddress, assetID xdr.ScAddress) *Funder {
+func NewFunder(acc *wallet.Account, stellarClient *client.Client, perunAddr xdr.ScAddress, assetAddr xdr.ScAddress) *Funder {
 	return &Funder{
 		stellarClient:   stellarClient,
-		perunID:         perunID,
-		assetID:         assetID,
+		perunAddr:       perunAddr,
+		assetAddr:       assetAddr,
 		maxIters:        MaxIterationsUntilAbort,
 		pollingInterval: DefaultPollingInterval,
 	}
 }
 
-func (f *Funder) GetPerunID() xdr.ScAddress {
-	return f.perunID
+func (f *Funder) GetPerunAddr() xdr.ScAddress {
+	return f.perunAddr
 }
 
-func (f *Funder) GetAssetID() xdr.ScAddress {
-	return f.assetID
+func (f *Funder) GetAssetAddr() xdr.ScAddress {
+	return f.assetAddr
 }
 
 func (f *Funder) Fund(ctx context.Context, req pchannel.FundingReq) error {
@@ -80,11 +80,11 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 	for i := 0; i < f.maxIters; i++ {
 		select {
 		case <-ctx.Done():
-			return f.AbortChannel(ctx, req.Params, req.State)
+			return f.AbortChannel(ctx, req.State)
 		case <-time.After(f.pollingInterval):
 
 			log.Printf("%s: Polling for opened channel...\n", party)
-			chanState, err := f.GetChannelState(ctx, req.Params, req.State)
+			chanState, err := f.stellarClient.GetChannelInfo(ctx, f.perunAddr, req.State.ID)
 			if err != nil {
 				log.Printf("%s: Error while polling for opened channel: %v\n", party, err)
 				continue
@@ -96,14 +96,14 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 			}
 
 			if req.Idx == pchannel.Index(0) && !chanState.Control.FundedA {
-				err := f.FundChannel(ctx, req.Params, req.State, false)
+				err := f.FundChannel(ctx, req.State, false)
 				if err != nil {
 					return err
 				}
 				continue
 			}
 			if req.Idx == pchannel.Index(1) && !chanState.Control.FundedB {
-				err := f.FundChannel(ctx, req.Params, req.State, true)
+				err := f.FundChannel(ctx, req.State, true)
 				if err != nil {
 					return err
 				}
@@ -111,117 +111,33 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 			}
 		}
 	}
-	return f.AbortChannel(ctx, req.Params, req.State)
+	return f.AbortChannel(ctx, req.State)
 }
 
 func (f *Funder) openChannel(ctx context.Context, req pchannel.FundingReq) error {
-	err := f.OpenChannel(ctx, req.Params, req.State)
+	err := f.stellarClient.Open(ctx, f.perunAddr, req.Params, req.State)
 	if err != nil {
 		return errors.New("error while opening channel in party A")
 	}
 	return nil
 }
 
-func (f *Funder) OpenChannel(ctx context.Context, params *pchannel.Params, state *pchannel.State) error {
+func (f *Funder) FundChannel(ctx context.Context, state *pchannel.State, funderIdx bool) error {
 
-	perunAddress := f.GetPerunID()
-	openTxArgs, err := env.BuildOpenTxArgs(params, state)
-	if err != nil {
-		return errors.New("error while building open tx")
-	}
-	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction("open", openTxArgs, perunAddress)
-	if err != nil {
-		return errors.New("error while invoking and processing host function: open")
-	}
-
-	_, err = DecodeEventsPerun(txMeta)
-	if err != nil {
-		return errors.New("error while decoding events")
-	}
-
-	return nil
-}
-
-func (f *Funder) FundChannel(ctx context.Context, params *pchannel.Params, state *pchannel.State, funderIdx bool) error {
-
-	perunAddress := f.GetPerunID()
-	tokenAddress := f.GetAssetID()
-
-	chanId := state.ID
-
-	fundTxArgs, err := env.BuildFundTxArgs(chanId, funderIdx)
-	if err != nil {
-		return errors.New("error while building fund tx")
-	}
 	balsStellar, err := wire.MakeBalances(state.Allocation)
 	if err != nil {
 		return errors.New("error while making balances")
 	}
 
-	tokenIDAddrFromBals := balsStellar.Token
-
-	sameContractTokenID := tokenIDAddrFromBals.Equals(tokenAddress)
-	if !sameContractTokenID {
-		return errors.New("tokenIDAddrFromBals not equal to tokenContractAddress")
+	if !balsStellar.Token.Equals(f.assetAddr) {
+		return errors.New("asset address is not equal to the address stored in the state")
 	}
 
-	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction("fund", fundTxArgs, perunAddress)
-	if err != nil {
-		return errors.New("error while invoking and processing host function: fund")
-	}
-
-	_, err = DecodeEventsPerun(txMeta)
-	if err != nil {
-		return errors.New("error while decoding events")
-	}
-
-	return nil
+	return f.stellarClient.Fund(ctx, f.perunAddr, f.assetAddr, state.ID, funderIdx)
 }
 
-func (f *Funder) AbortChannel(ctx context.Context, params *pchannel.Params, state *pchannel.State) error {
-
-	contractAddress := f.GetPerunID()
-	chanId := state.ID
-
-	openTxArgs, err := env.BuildGetChannelTxArgs(chanId)
-	if err != nil {
-		return errors.New("error while building get_channel tx")
-	}
-	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction("abort_funding", openTxArgs, contractAddress)
-	if err != nil {
-		return errors.New("error while invoking and processing host function: abort_funding")
-	}
-
-	_, err = DecodeEventsPerun(txMeta)
-	if err != nil {
-		return errors.New("error while decoding events")
-	}
-
-	return nil
-}
-
-func (f *Funder) GetChannelState(ctx context.Context, params *pchannel.Params, state *pchannel.State) (wire.Channel, error) {
-
-	contractAddress := f.GetPerunID()
-	chanId := state.ID
-
-	getchTxArgs, err := env.BuildGetChannelTxArgs(chanId)
-	if err != nil {
-		return wire.Channel{}, errors.New("error while building get_channel tx")
-	}
-	txMeta, err := f.stellarClient.InvokeAndProcessHostFunction("get_channel", getchTxArgs, contractAddress)
-	if err != nil {
-		return wire.Channel{}, errors.New("error while processing and submitting get_channel tx")
-	}
-
-	retVal := txMeta.V3.SorobanMeta.ReturnValue
-	var getChan wire.Channel
-
-	err = getChan.FromScVal(retVal)
-	if err != nil {
-		return wire.Channel{}, errors.New("error while decoding return value")
-	}
-	return getChan, nil
+func (f *Funder) AbortChannel(ctx context.Context, state *pchannel.State) error {
+	return f.stellarClient.Abort(ctx, f.perunAddr, state)
 }
 
 func getPartyByIndex(funderIdx pchannel.Index) string {

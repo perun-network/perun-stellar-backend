@@ -30,8 +30,8 @@ import (
 	ptest "perun.network/go-perun/channel/test"
 	pwallet "perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/channel"
-	"perun.network/perun-stellar-backend/channel/env"
 	"perun.network/perun-stellar-backend/channel/types"
+	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/wallet"
 	pkgtest "polycry.pt/poly-go/test"
 	"testing"
@@ -49,14 +49,14 @@ const (
 type Setup struct {
 	t              *testing.T
 	accs           []*wallet.Account
-	stellarClients []*env.StellarClient
+	stellarClients []*client.Client
 	Rng            *mathrand.Rand
 	funders        []*channel.Funder
 	adjs           []*channel.Adjudicator
 	assetID        pchannel.Asset
 }
 
-func (s *Setup) GetStellarClients() []*env.StellarClient {
+func (s *Setup) GetStellarClients() []*client.Client {
 	return s.stellarClients
 }
 
@@ -99,7 +99,7 @@ func NewTestSetup(t *testing.T) *Setup {
 	aliceClient := stellarClients[0]
 	bobClient := stellarClients[1]
 	channelAccs := []*wallet.Account{accs[0], accs[1]}
-	channelClients := []*env.StellarClient{aliceClient, bobClient}
+	channelClients := []*client.Client{aliceClient, bobClient}
 
 	funders, adjs := createFundersAndAdjudicators(channelAccs, stellarClients, perunAddress, tokenAddress)
 
@@ -123,7 +123,7 @@ func setupAccountsAndContracts(t *testing.T, deployerKp *keypair.Full, kps []*ke
 	}
 }
 
-func createFundersAndAdjudicators(accs []*wallet.Account, clients []*env.StellarClient, perunAddress, tokenAddress xdr.ScAddress) ([]*channel.Funder, []*channel.Adjudicator) {
+func createFundersAndAdjudicators(accs []*wallet.Account, clients []*client.Client, perunAddress, tokenAddress xdr.ScAddress) ([]*channel.Funder, []*channel.Adjudicator) {
 	funders := make([]*channel.Funder, len(accs))
 	adjs := make([]*channel.Adjudicator, len(accs))
 	for i, acc := range accs {
@@ -133,10 +133,10 @@ func createFundersAndAdjudicators(accs []*wallet.Account, clients []*env.Stellar
 	return funders, adjs
 }
 
-func NewStellarClients(kps []*keypair.Full) []*env.StellarClient {
-	clients := make([]*env.StellarClient, len(kps))
+func NewStellarClients(kps []*keypair.Full) []*client.Client {
+	clients := make([]*client.Client, len(kps))
 	for i, kp := range kps {
-		clients[i] = env.NewStellarClient(kp)
+		clients[i] = client.New(kp)
 	}
 	return clients
 }
@@ -177,11 +177,11 @@ func CreateFundStellarAccounts(pairs []*keypair.Full, initialBalance string) err
 
 	numKps := len(pairs)
 
-	masterClient := env.NewHorizonMasterClient()
+	masterClient := client.NewHorizonMasterClient()
 	masterHzClient := masterClient.GetHorizonClient()
-	sourceKey := keypair.Root(env.NETWORK_PASSPHRASE)
+	sourceKey := keypair.Root(client.NETWORK_PASSPHRASE)
 
-	hzClient := env.NewHorizonClient()
+	hzClient := client.NewHorizonClient()
 
 	ops := make([]txnbuild.Operation, numKps)
 
@@ -206,9 +206,9 @@ func CreateFundStellarAccounts(pairs []*keypair.Full, initialBalance string) err
 		}
 	}
 
-	txParams := env.GetBaseTransactionParamsWithFee(&masterAccount, txnbuild.MinBaseFee, ops...)
+	txParams := client.GetBaseTransactionParamsWithFee(&masterAccount, txnbuild.MinBaseFee, ops...)
 
-	txSigned, err := env.CreateSignedTransactionWithParams([]*keypair.Full{sourceKey}, txParams)
+	txSigned, err := client.CreateSignedTransactionWithParams([]*keypair.Full{sourceKey}, txParams)
 
 	if err != nil {
 		panic(err)

@@ -20,8 +20,8 @@ import (
 	"github.com/stellar/go/xdr"
 	"github.com/stretchr/testify/require"
 	"perun.network/perun-stellar-backend/channel"
-	"perun.network/perun-stellar-backend/channel/env"
 	"perun.network/perun-stellar-backend/channel/types"
+	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/wire/scval"
 	"testing"
 )
@@ -88,7 +88,7 @@ func BuildInitTokenArgs(adminAddr xdr.ScAddress, decimals uint32, tokenName stri
 
 func InitTokenContract(kp *keypair.Full, contractIDAddress xdr.ScAddress) error {
 
-	stellarClient := env.NewStellarClient(kp)
+	stellarClient := client.New(kp)
 	adminScAddr, err := types.MakeAccountAddress(kp)
 	if err != nil {
 		panic(err)
@@ -113,7 +113,7 @@ func InitTokenContract(kp *keypair.Full, contractIDAddress xdr.ScAddress) error 
 
 func GetTokenName(kp *keypair.Full, contractAddress xdr.ScAddress) error {
 
-	stellarClient := env.NewStellarClient(kp)
+	stellarClient := client.New(kp)
 	TokenNameArgs := xdr.ScVec{}
 
 	_, err := stellarClient.InvokeAndProcessHostFunction("name", TokenNameArgs, contractAddress)
@@ -165,7 +165,7 @@ func BuildTransferTokenArgs(from xdr.ScAddress, to xdr.ScAddress, amount xdr.Int
 }
 
 func Deploy(t *testing.T, kp *keypair.Full, contractPath string) (xdr.ScAddress, xdr.Hash) {
-	deployerClient := env.NewStellarClient(kp)
+	deployerClient := client.New(kp)
 	hzClient := deployerClient.GetHorizonClient()
 	deployerAccReq := horizonclient.AccountRequest{AccountID: kp.Address()}
 	deployerAcc, err := hzClient.AccountDetail(deployerAccReq)
@@ -173,19 +173,19 @@ func Deploy(t *testing.T, kp *keypair.Full, contractPath string) (xdr.ScAddress,
 	require.NoError(t, err)
 
 	installContractOpInstall := channel.AssembleInstallContractCodeOp(kp.Address(), contractPath)
-	preFlightOp, minFeeInstall := env.PreflightHostFunctions(hzClient, &deployerAcc, *installContractOpInstall)
-	txParamsInstall := env.GetBaseTransactionParamsWithFee(&deployerAcc, int64(minFeeInstall), &preFlightOp)
-	txSignedInstall, err := env.CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParamsInstall)
+	preFlightOp, minFeeInstall := client.PreflightHostFunctions(hzClient, &deployerAcc, *installContractOpInstall)
+	txParamsInstall := client.GetBaseTransactionParamsWithFee(&deployerAcc, int64(minFeeInstall), &preFlightOp)
+	txSignedInstall, err := client.CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParamsInstall)
 	require.NoError(t, err)
 
 	_, err = hzClient.SubmitTransaction(txSignedInstall)
 
 	require.NoError(t, err)
 
-	createContractOp := channel.AssembleCreateContractOp(kp.Address(), contractPath, "a1", env.NETWORK_PASSPHRASE)
-	preFlightOpCreate, minFeeCreate := env.PreflightHostFunctions(hzClient, &deployerAcc, *createContractOp)
-	txParamsCreate := env.GetBaseTransactionParamsWithFee(&deployerAcc, int64(minFeeCreate), &preFlightOpCreate)
-	txSignedCreate, err := env.CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParamsCreate)
+	createContractOp := channel.AssembleCreateContractOp(kp.Address(), contractPath, "a1", client.NETWORK_PASSPHRASE)
+	preFlightOpCreate, minFeeCreate := client.PreflightHostFunctions(hzClient, &deployerAcc, *createContractOp)
+	txParamsCreate := client.GetBaseTransactionParamsWithFee(&deployerAcc, int64(minFeeCreate), &preFlightOpCreate)
+	txSignedCreate, err := client.CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParamsCreate)
 
 	require.NoError(t, err)
 
@@ -203,7 +203,7 @@ func Deploy(t *testing.T, kp *keypair.Full, contractPath string) (xdr.ScAddress,
 }
 
 func MintToken(kp *keypair.Full, contractAddr xdr.ScAddress, amount uint64, recipientAddr xdr.ScAddress) error {
-	stellarClient := env.NewStellarClient(kp)
+	stellarClient := client.New(kp)
 
 	amountTo128Xdr := xdr.Int128Parts{Hi: 0, Lo: xdr.Uint64(amount)}
 
@@ -211,7 +211,7 @@ func MintToken(kp *keypair.Full, contractAddr xdr.ScAddress, amount uint64, reci
 	if err != nil {
 		panic(err)
 	}
-	mintTokenArgs, err := env.BuildMintTokenArgs(recipientAddr, amountSc)
+	mintTokenArgs, err := client.BuildMintTokenArgs(recipientAddr, amountSc)
 	if err != nil {
 		panic(err)
 	}

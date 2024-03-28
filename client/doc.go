@@ -12,5 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package env provides the functionality to connect to the Stellar blockchain and broadcast transactions to the network and decode its response.
-package env
+// Package client provides the functionality to connect to the Stellar blockchain, broadcast transactions and decode its response.
+package client
