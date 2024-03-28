@@ -43,7 +43,7 @@ else
 fi
 
 currentDir=$(pwd)
-docker run -dti \
+docker run -d \
   --volume ${currentDir}:/workspace \
   --name soroban-preview \
   -p 8001:8000 \
@@ -53,7 +53,7 @@ docker run -dti \
 
 # Run the stellar quickstart image
 
-docker run --rm -ti \
+docker run --rm \
   --name stellar \
   --pull always \
   --network soroban-network \
