@@ -16,3 +16,7 @@
 
 settings.json
 launch.json
+
+# temp files related to the blockchain setup
+*.soroban/
+*.soroban-perun-dapp
