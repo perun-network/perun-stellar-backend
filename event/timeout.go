@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2024 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,80 +15,16 @@
 package event
 
 import (
-	"context"
 	pchannel "perun.network/go-perun/channel"
-	"perun.network/go-perun/log"
 	"time"
-)
-
-type (
-	// ExpiredTimeout is always expired.
-	// Implements the Perun Timeout interface.
-	ExpiredTimeout struct{}
-
-	// Timeout can be used to wait until a specific timepoint is reached by
-	// the blockchain. Implements the Perun Timeout interface.
-	Timeout struct {
-		log.Embedding
-
-		when         time.Time
-		pollInterval time.Duration
-	}
-
-	// TimePoint as defined by pallet Timestamp.
-	TimePoint uint64
 )
 
 // DefaultTimeoutPollInterval default value for the PollInterval of a Timeout.
 const DefaultTimeoutPollInterval = 1 * time.Second
 
-// NewExpiredTimeout returns a new ExpiredTimeout.
-func NewExpiredTimeout() *ExpiredTimeout {
-	return &ExpiredTimeout{}
-}
-
-func (*ExpiredTimeout) IsElapsed(context.Context) bool {
-	return true
-}
-
-// Wait returns nil.
-func (*ExpiredTimeout) Wait(context.Context) error {
-	return nil
-}
-
 // NewTimeTimeout returns a new Timeout which expires at the given time.
 func NewTimeTimeout(when time.Time) pchannel.Timeout {
 	return &pchannel.TimeTimeout{Time: when}
-}
-
-// IsElapsed returns whether the timeout is elapsed.
-func (t *Timeout) IsElapsed(ctx context.Context) bool {
-	now := time.Now()
-
-	elapsed := t.when.Before(now) || t.when.Equal(now)
-
-	delta := now.Sub(t.when)
-	if elapsed {
-		t.Log().Printf("Timeout elapsed since %v", delta)
-	} else {
-		t.Log().Printf("Timeout target in %v", delta)
-	}
-
-	return elapsed
-}
-
-// Wait waits for the timeout or until the context is cancelled.
-func (t *Timeout) Wait(ctx context.Context) error {
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(t.pollInterval):
-			if t.IsElapsed(ctx) {
-				return nil
-			}
-		}
-	}
 }
 
 // MakeTimeout creates a new timeout.

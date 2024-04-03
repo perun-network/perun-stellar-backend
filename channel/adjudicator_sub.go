@@ -40,7 +40,7 @@ type AdjEventSub struct {
 	cid               pchannel.ID
 	perunAddr         xdr.ScAddress
 	assetAddr         xdr.ScAddress
-	events            chan pchannel.AdjudicatorEvent
+	events            chan event.PerunEvent
 	subErrors         chan error
 	err               error
 	cancel            context.CancelFunc
@@ -57,7 +57,7 @@ func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *clie
 		cid:           cid,
 		perunAddr:     perunAddr,
 		assetAddr:     assetAddr,
-		events:        make(chan pchannel.AdjudicatorEvent, DefaultBufferSize),
+		events:        make(chan event.PerunEvent, DefaultBufferSize),
 		subErrors:     make(chan error, 1),
 		pollInterval:  DefaultSubscriptionPollingInterval,
 		closer:        new(pkgsync.Closer),
@@ -122,7 +122,7 @@ polling:
 	}
 }
 
-func DifferencesInControls(controlCurr, controlNext wire.Control) (pchannel.AdjudicatorEvent, error) {
+func DifferencesInControls(controlCurr, controlNext wire.Control) (event.PerunEvent, error) {
 
 	if controlCurr.FundedA != controlNext.FundedA {
 		if controlCurr.FundedA {

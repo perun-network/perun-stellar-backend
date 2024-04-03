@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2024 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,8 +19,6 @@ import (
 	"github.com/stellar/go/xdr"
 	pchannel "perun.network/go-perun/channel"
 	"perun.network/perun-stellar-backend/wire"
-
-	"time"
 )
 
 type Version = uint64
@@ -62,21 +60,18 @@ type controlsState map[string]bool
 type (
 	PerunEvent interface {
 		ID() pchannel.ID
-		Timeout() pchannel.Timeout
 		Version() Version
 	}
 
 	OpenEvent struct {
-		Channel   wire.Channel
-		IDV       pchannel.ID
-		VersionV  Version
-		Timestamp uint64
+		Channel  wire.Channel
+		IDV      pchannel.ID
+		VersionV Version
 	}
 	FundEvent struct {
-		Channel   wire.Channel
-		IDV       pchannel.ID
-		VersionV  Version
-		Timestamp uint64
+		Channel  wire.Channel
+		IDV      pchannel.ID
+		VersionV Version
 	}
 
 	CloseEvent struct {
@@ -118,15 +113,6 @@ func (e *OpenEvent) ID() pchannel.ID {
 func (e *OpenEvent) Version() Version {
 	return e.VersionV
 }
-func (e *OpenEvent) Tstamp() uint64 {
-	return e.Timestamp
-}
-
-func (e *OpenEvent) Timeout() pchannel.Timeout {
-	when := time.Now().Add(10 * time.Second)
-	// pollInterval := 1 * time.Second
-	return NewTimeTimeout(when)
-}
 
 func (e *WithdrawnEvent) GetChannel() wire.Channel {
 	return e.Channel
@@ -137,11 +123,6 @@ func (e *WithdrawnEvent) ID() pchannel.ID {
 }
 func (e *WithdrawnEvent) Version() Version {
 	return e.VersionV
-}
-
-func (e *WithdrawnEvent) Timeout() pchannel.Timeout {
-	when := time.Now().Add(10 * time.Second)
-	return NewTimeTimeout(when)
 }
 
 func (e *CloseEvent) GetChannel() wire.Channel {
@@ -155,29 +136,11 @@ func (e *CloseEvent) Version() Version {
 	return e.VersionV
 }
 
-func (e *CloseEvent) Timeout() pchannel.Timeout {
-	when := time.Now().Add(10 * time.Second)
-	return NewTimeTimeout(when)
-}
-
-func (e *FundEvent) Timeout() pchannel.Timeout {
-	when := time.Now().Add(10 * time.Second)
-	return NewTimeTimeout(when)
-}
-
 func (e *FundEvent) ID() pchannel.ID {
 	return e.IDV
 }
 func (e *FundEvent) Version() Version {
 	return e.VersionV
-}
-func (e *FundEvent) Tstamp() uint64 {
-	return e.Timestamp
-}
-
-func (e *DisputedEvent) Timeout() pchannel.Timeout {
-	when := time.Now().Add(10 * time.Second)
-	return NewTimeTimeout(when)
 }
 
 func (e *DisputedEvent) ID() pchannel.ID {

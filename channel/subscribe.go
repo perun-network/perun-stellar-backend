@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2024 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 		}
 
 		switch e := ev.(type) {
-		case *pchannel.RegisteredEvent:
+		case *event.DisputedEvent:
 			log.Println("DisputedEvent received")
 			dispEvent := pchannel.AdjudicatorEventBase{
 				VersionV: e.Version(),
@@ -82,7 +82,7 @@ func (s *AdjEventSub) Close() error {
 	return nil
 }
 
-func (s *AdjEventSub) getEvents() <-chan pchannel.AdjudicatorEvent {
+func (s *AdjEventSub) getEvents() <-chan event.PerunEvent {
 	return s.events
 }
 
