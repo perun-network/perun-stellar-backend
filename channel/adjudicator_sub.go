@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2024 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,29 +32,21 @@ const (
 	DefaultSubscriptionPollingInterval = time.Duration(5) * time.Second
 )
 
-type AdjEvent interface {
-	// Sets the necessary event data from the channel information
-	EventDataFromChannel(cchanState wire.Channel, timestamp uint64) error
-	ID() pchannel.ID
-	Timeout() pchannel.Timeout
-	Version() event.Version
-	Tstamp() uint64
-}
-
 // AdjudicatorSub implements the AdjudicatorSubscription interface.
 type AdjEventSub struct {
-	stellarClient *client.Client
-	chanControl   wire.Control
-	cid           pchannel.ID
-	perunAddr     xdr.ScAddress
-	assetAddr     xdr.ScAddress
-	events        chan AdjEvent
-	subErrors     chan error
-	err           error
-	cancel        context.CancelFunc
-	closer        *pkgsync.Closer
-	pollInterval  time.Duration
-	log           log.Embedding
+	challengeDuration *time.Duration
+	stellarClient     *client.Client
+	chanControl       wire.Control
+	cid               pchannel.ID
+	perunAddr         xdr.ScAddress
+	assetAddr         xdr.ScAddress
+	events            chan pchannel.AdjudicatorEvent
+	subErrors         chan error
+	err               error
+	cancel            context.CancelFunc
+	closer            *pkgsync.Closer
+	pollInterval      time.Duration
+	log               log.Embedding
 }
 
 func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *client.Client, perunAddr xdr.ScAddress, assetAddr xdr.ScAddress) (*AdjEventSub, error) {
@@ -65,7 +57,7 @@ func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *clie
 		cid:           cid,
 		perunAddr:     perunAddr,
 		assetAddr:     assetAddr,
-		events:        make(chan AdjEvent, DefaultBufferSize),
+		events:        make(chan pchannel.AdjudicatorEvent, DefaultBufferSize),
 		subErrors:     make(chan error, 1),
 		pollInterval:  DefaultSubscriptionPollingInterval,
 		closer:        new(pkgsync.Closer),
@@ -130,7 +122,7 @@ polling:
 	}
 }
 
-func DifferencesInControls(controlCurr, controlNext wire.Control) (AdjEvent, error) {
+func DifferencesInControls(controlCurr, controlNext wire.Control) (pchannel.AdjudicatorEvent, error) {
 
 	if controlCurr.FundedA != controlNext.FundedA {
 		if controlCurr.FundedA {

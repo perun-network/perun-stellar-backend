@@ -19,6 +19,7 @@ import (
 	pchannel "perun.network/go-perun/channel"
 	"perun.network/perun-stellar-backend/event"
 	"reflect"
+	"time"
 )
 
 func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
@@ -30,21 +31,25 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 		return nil
 	}
 
+	var challengeElapsed time.Time
+
+	if s.challengeDuration != nil {
+		challengeElapsed = time.Now().Add(*s.challengeDuration)
+	}
+
 	select {
 	case ev := <-s.getEvents():
 		if ev == nil {
 			return nil
 		}
 
-		timestamp := ev.Tstamp()
-
 		switch e := ev.(type) {
-		case *event.DisputedEvent:
+		case *pchannel.RegisteredEvent:
 			log.Println("DisputedEvent received")
 			dispEvent := pchannel.AdjudicatorEventBase{
 				VersionV: e.Version(),
 				IDV:      e.ID(),
-				TimeoutV: MakeTimeout(timestamp),
+				TimeoutV: event.NewTimeTimeout(challengeElapsed),
 			}
 			ddn := &pchannel.RegisteredEvent{AdjudicatorEventBase: dispEvent, State: nil, Sigs: nil}
 			s.closer.Close()
@@ -56,7 +61,7 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 			conclEvent := pchannel.AdjudicatorEventBase{
 				VersionV: e.Version(),
 				IDV:      e.ID(),
-				TimeoutV: MakeTimeout(timestamp),
+				TimeoutV: event.NewTimeTimeout(challengeElapsed),
 			}
 			ccn := &pchannel.ConcludedEvent{AdjudicatorEventBase: conclEvent}
 			s.closer.Close()
@@ -77,7 +82,7 @@ func (s *AdjEventSub) Close() error {
 	return nil
 }
 
-func (s *AdjEventSub) getEvents() <-chan AdjEvent {
+func (s *AdjEventSub) getEvents() <-chan pchannel.AdjudicatorEvent {
 	return s.events
 }
 

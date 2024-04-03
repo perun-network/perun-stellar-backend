@@ -19,6 +19,7 @@ import (
 	"github.com/stellar/go/xdr"
 	pchannel "perun.network/go-perun/channel"
 	"perun.network/perun-stellar-backend/wire"
+
 	"time"
 )
 
@@ -79,10 +80,9 @@ type (
 	}
 
 	CloseEvent struct {
-		Channel   wire.Channel
-		IDV       pchannel.ID
-		VersionV  Version
-		Timestamp uint64
+		Channel  wire.Channel
+		IDV      pchannel.ID
+		VersionV Version
 	}
 
 	WithdrawnEvent struct {
@@ -93,10 +93,9 @@ type (
 	}
 
 	DisputedEvent struct {
-		Channel   wire.Channel
-		IDV       pchannel.ID
-		VersionV  Version
-		Timestamp uint64
+		Channel  wire.Channel
+		IDV      pchannel.ID
+		VersionV Version
 	}
 )
 
@@ -125,8 +124,8 @@ func (e *OpenEvent) Tstamp() uint64 {
 
 func (e *OpenEvent) Timeout() pchannel.Timeout {
 	when := time.Now().Add(10 * time.Second)
-	pollInterval := 1 * time.Second
-	return NewTimeout(when, pollInterval)
+	// pollInterval := 1 * time.Second
+	return NewTimeTimeout(when)
 }
 
 func (e *WithdrawnEvent) GetChannel() wire.Channel {
@@ -139,14 +138,10 @@ func (e *WithdrawnEvent) ID() pchannel.ID {
 func (e *WithdrawnEvent) Version() Version {
 	return e.VersionV
 }
-func (e WithdrawnEvent) Tstamp() uint64 {
-	return e.Timestamp
-}
 
 func (e *WithdrawnEvent) Timeout() pchannel.Timeout {
 	when := time.Now().Add(10 * time.Second)
-	pollInterval := 1 * time.Second
-	return NewTimeout(when, pollInterval)
+	return NewTimeTimeout(when)
 }
 
 func (e *CloseEvent) GetChannel() wire.Channel {
@@ -159,20 +154,15 @@ func (e *CloseEvent) ID() pchannel.ID {
 func (e *CloseEvent) Version() Version {
 	return e.VersionV
 }
-func (e *CloseEvent) Tstamp() uint64 {
-	return e.Timestamp
-}
 
 func (e *CloseEvent) Timeout() pchannel.Timeout {
 	when := time.Now().Add(10 * time.Second)
-	pollInterval := 1 * time.Second
-	return NewTimeout(when, pollInterval)
+	return NewTimeTimeout(when)
 }
 
 func (e *FundEvent) Timeout() pchannel.Timeout {
 	when := time.Now().Add(10 * time.Second)
-	pollInterval := 1 * time.Second
-	return NewTimeout(when, pollInterval)
+	return NewTimeTimeout(when)
 }
 
 func (e *FundEvent) ID() pchannel.ID {
@@ -187,8 +177,7 @@ func (e *FundEvent) Tstamp() uint64 {
 
 func (e *DisputedEvent) Timeout() pchannel.Timeout {
 	when := time.Now().Add(10 * time.Second)
-	pollInterval := 1 * time.Second
-	return NewTimeout(when, pollInterval)
+	return NewTimeTimeout(when)
 }
 
 func (e *DisputedEvent) ID() pchannel.ID {
@@ -196,9 +185,6 @@ func (e *DisputedEvent) ID() pchannel.ID {
 }
 func (e *DisputedEvent) Version() Version {
 	return e.VersionV
-}
-func (e *DisputedEvent) Tstamp() uint64 {
-	return e.Timestamp
 }
 
 func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
@@ -350,53 +336,5 @@ func checkOpen(cState controlsState) error {
 			return errors.New(key + " is not false")
 		}
 	}
-	return nil
-}
-
-func (e *CloseEvent) EventDataFromChannel(chanState wire.Channel, timestamp uint64) error {
-
-	chanID := chanState.State.ChannelID
-	var cid [32]byte
-	copy(cid[:], chanID[:])
-
-	e.IDV = cid
-	e.Timestamp = timestamp
-	e.Channel = chanState
-	return nil
-}
-
-func (e *FundEvent) EventDataFromChannel(chanState wire.Channel, timestamp uint64) error {
-
-	chanID := chanState.State.ChannelID
-	var cid [32]byte
-	copy(cid[:], chanID[:])
-
-	e.IDV = cid
-	e.Timestamp = timestamp
-	e.Channel = chanState
-	return nil
-}
-
-func (e *WithdrawnEvent) EventDataFromChannel(chanState wire.Channel, timestamp uint64) error {
-
-	chanID := chanState.State.ChannelID
-	var cid [32]byte
-	copy(cid[:], chanID[:])
-
-	e.IDV = cid
-	e.Timestamp = timestamp
-	e.Channel = chanState
-	return nil
-}
-
-func (e *DisputedEvent) EventDataFromChannel(chanState wire.Channel, timestamp uint64) error {
-
-	chanID := chanState.State.ChannelID
-	var cid [32]byte
-	copy(cid[:], chanID[:])
-
-	e.IDV = cid
-	e.Timestamp = timestamp
-	e.Channel = chanState
 	return nil
 }

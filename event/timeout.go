@@ -16,6 +16,7 @@ package event
 
 import (
 	"context"
+	pchannel "perun.network/go-perun/channel"
 	"perun.network/go-perun/log"
 	"time"
 )
@@ -55,9 +56,9 @@ func (*ExpiredTimeout) Wait(context.Context) error {
 	return nil
 }
 
-// NewTimeout returns a new Timeout which expires at the given time.
-func NewTimeout(when time.Time, pollInterval time.Duration) *Timeout {
-	return &Timeout{log.MakeEmbedding(log.Default()), when, pollInterval}
+// NewTimeTimeout returns a new Timeout which expires at the given time.
+func NewTimeTimeout(when time.Time) pchannel.Timeout {
+	return &pchannel.TimeTimeout{Time: when}
 }
 
 // IsElapsed returns whether the timeout is elapsed.
@@ -91,9 +92,9 @@ func (t *Timeout) Wait(ctx context.Context) error {
 }
 
 // MakeTimeout creates a new timeout.
-func MakeTimeout(challDurSec uint64) *Timeout {
+func MakeTimeout(challDurSec uint64) pchannel.Timeout {
 	expirationTime := time.Now().Add(MakeTime(challDurSec))
-	return NewTimeout(expirationTime, DefaultTimeoutPollInterval)
+	return NewTimeTimeout(expirationTime)
 }
 
 // MakeTime creates a new time from the argument.
