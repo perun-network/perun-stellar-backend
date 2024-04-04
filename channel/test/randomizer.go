@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2024 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,8 +15,9 @@
 package test
 
 import (
+	"crypto/rand"
 	"github.com/stellar/go/xdr"
-	"math/rand"
+	mrand "math/rand"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/channel/test"
 	"perun.network/perun-stellar-backend/channel/types"
@@ -26,12 +27,14 @@ type Randomizer struct{}
 
 var _ test.Randomizer = (*Randomizer)(nil)
 
-func (*Randomizer) NewRandomAsset(*rand.Rand) channel.Asset {
+func (*Randomizer) NewRandomAsset(*mrand.Rand) channel.Asset {
 	return NewRandomStellarAsset()
 }
 
 func NewRandomStellarAsset() *types.StellarAsset {
 	var contractID xdr.Hash
-	rand.Read(contractID[:])
+	if _, err := rand.Read(contractID[:]); err != nil {
+		return nil
+	}
 	return types.NewStellarAsset(contractID)
 }
