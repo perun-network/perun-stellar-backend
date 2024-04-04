@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2024 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,15 +36,13 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 			return nil
 		}
 
-		timestamp := ev.Tstamp()
-
 		switch e := ev.(type) {
 		case *event.DisputedEvent:
 			log.Println("DisputedEvent received")
 			dispEvent := pchannel.AdjudicatorEventBase{
 				VersionV: e.Version(),
 				IDV:      e.ID(),
-				TimeoutV: MakeTimeout(timestamp),
+				TimeoutV: event.MakeTimeout(*s.challengeDuration),
 			}
 			ddn := &pchannel.RegisteredEvent{AdjudicatorEventBase: dispEvent, State: nil, Sigs: nil}
 			s.closer.Close()
@@ -56,7 +54,7 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 			conclEvent := pchannel.AdjudicatorEventBase{
 				VersionV: e.Version(),
 				IDV:      e.ID(),
-				TimeoutV: MakeTimeout(timestamp),
+				TimeoutV: event.MakeTimeout(*s.challengeDuration),
 			}
 			ccn := &pchannel.ConcludedEvent{AdjudicatorEventBase: conclEvent}
 			s.closer.Close()
@@ -77,7 +75,7 @@ func (s *AdjEventSub) Close() error {
 	return nil
 }
 
-func (s *AdjEventSub) getEvents() <-chan AdjEvent {
+func (s *AdjEventSub) getEvents() <-chan event.PerunEvent {
 	return s.events
 }
 

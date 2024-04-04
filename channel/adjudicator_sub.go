@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2024 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,44 +32,37 @@ const (
 	DefaultSubscriptionPollingInterval = time.Duration(5) * time.Second
 )
 
-type AdjEvent interface {
-	// Sets the necessary event data from the channel information
-	EventDataFromChannel(cchanState wire.Channel, timestamp uint64) error
-	ID() pchannel.ID
-	Timeout() pchannel.Timeout
-	Version() event.Version
-	Tstamp() uint64
-}
-
 // AdjudicatorSub implements the AdjudicatorSubscription interface.
 type AdjEventSub struct {
-	stellarClient *client.Client
-	chanControl   wire.Control
-	cid           pchannel.ID
-	perunAddr     xdr.ScAddress
-	assetAddr     xdr.ScAddress
-	events        chan AdjEvent
-	subErrors     chan error
-	err           error
-	cancel        context.CancelFunc
-	closer        *pkgsync.Closer
-	pollInterval  time.Duration
-	log           log.Embedding
+	challengeDuration *time.Duration
+	stellarClient     *client.Client
+	chanControl       wire.Control
+	cid               pchannel.ID
+	perunAddr         xdr.ScAddress
+	assetAddr         xdr.ScAddress
+	events            chan event.PerunEvent
+	subErrors         chan error
+	err               error
+	cancel            context.CancelFunc
+	closer            *pkgsync.Closer
+	pollInterval      time.Duration
+	log               log.Embedding
 }
 
-func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *client.Client, perunAddr xdr.ScAddress, assetAddr xdr.ScAddress) (*AdjEventSub, error) {
+func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *client.Client, perunAddr xdr.ScAddress, assetAddr xdr.ScAddress, challengeDuration *time.Duration) (*AdjEventSub, error) {
 
 	sub := &AdjEventSub{
-		stellarClient: stellarClient,
-		chanControl:   wire.Control{},
-		cid:           cid,
-		perunAddr:     perunAddr,
-		assetAddr:     assetAddr,
-		events:        make(chan AdjEvent, DefaultBufferSize),
-		subErrors:     make(chan error, 1),
-		pollInterval:  DefaultSubscriptionPollingInterval,
-		closer:        new(pkgsync.Closer),
-		log:           log.MakeEmbedding(log.Default()),
+		challengeDuration: challengeDuration,
+		stellarClient:     stellarClient,
+		chanControl:       wire.Control{},
+		cid:               cid,
+		perunAddr:         perunAddr,
+		assetAddr:         assetAddr,
+		events:            make(chan event.PerunEvent, DefaultBufferSize),
+		subErrors:         make(chan error, 1),
+		pollInterval:      DefaultSubscriptionPollingInterval,
+		closer:            new(pkgsync.Closer),
+		log:               log.MakeEmbedding(log.Default()),
 	}
 
 	ctx, sub.cancel = context.WithCancel(ctx)
@@ -121,8 +114,8 @@ polling:
 				continue polling
 
 			} else {
-				s.log.Log().Debug("Event detected, evaluating events...")
-				s.log.Log().Debugf("Found event: %v", adjEvent)
+				s.log.Log().Debug("Contract event detected, evaluating...")
+				s.log.Log().Debugf("Found contract event: %v", adjEvent)
 				s.events <- adjEvent
 				return
 			}
@@ -130,7 +123,7 @@ polling:
 	}
 }
 
-func DifferencesInControls(controlCurr, controlNext wire.Control) (AdjEvent, error) {
+func DifferencesInControls(controlCurr, controlNext wire.Control) (event.PerunEvent, error) {
 
 	if controlCurr.FundedA != controlNext.FundedA {
 		if controlCurr.FundedA {
@@ -186,13 +179,4 @@ func DifferencesInControls(controlCurr, controlNext wire.Control) (AdjEvent, err
 	}
 
 	return nil, nil
-}
-
-func IdenticalControls(controlCurr, controlNext wire.Control) bool {
-	return controlCurr.FundedA == controlNext.FundedA &&
-		controlCurr.FundedB == controlNext.FundedB &&
-		controlCurr.Closed == controlNext.Closed &&
-		controlCurr.WithdrawnA == controlNext.WithdrawnA &&
-		controlCurr.WithdrawnB == controlNext.WithdrawnB &&
-		controlCurr.Disputed == controlNext.Disputed
 }
