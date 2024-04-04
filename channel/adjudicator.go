@@ -23,10 +23,7 @@ import (
 	"perun.network/go-perun/log"
 	pwallet "perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/client"
-	"perun.network/perun-stellar-backend/event"
 	"perun.network/perun-stellar-backend/wallet"
-	"perun.network/perun-stellar-backend/wire"
-	"perun.network/perun-stellar-backend/wire/scval"
 	"time"
 )
 
@@ -46,7 +43,6 @@ type Adjudicator struct {
 }
 
 // NewAdjudicator returns a new Adjudicator.
-
 func NewAdjudicator(acc *wallet.Account, stellarClient *client.Client, perunID xdr.ScAddress, assetID xdr.ScAddress) *Adjudicator {
 	return &Adjudicator{
 		challengeDuration: &DefaultChallengeDuration,
@@ -112,80 +108,23 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 	return nil
 }
 
-func (a *Adjudicator) BuildWithdrawTxArgs(req pchannel.AdjudicatorReq) (xdr.ScVec, error) {
-
-	chanIDStellar := req.Tx.ID[:]
-	partyIdx := req.Idx
-	var withdrawIdx xdr.ScVal
-	if partyIdx == 0 {
-		withdrawIdx = scval.MustWrapBool(false)
-	} else if partyIdx == 1 {
-		withdrawIdx = scval.MustWrapBool(true)
-	} else {
-		return xdr.ScVec{}, errors.New("invalid party index")
-	}
-	var chanid xdr.ScBytes
-	copy(chanid, chanIDStellar)
-	channelID, err := scval.WrapScBytes(chanIDStellar)
-	if err != nil {
-		return xdr.ScVec{}, err
-	}
-
-	withdrawArgs := xdr.ScVec{
-		channelID,
-		withdrawIdx,
-	}
-	return withdrawArgs, nil
-
-}
-
 func (a *Adjudicator) withdraw(ctx context.Context, req pchannel.AdjudicatorReq) error {
-
 	perunAddress := a.GetPerunAddr()
-	withdrawTxArgs, err := a.BuildWithdrawTxArgs(req)
-	if err != nil {
-		return errors.New("error while building fund tx")
-	}
-	txMeta, err := a.StellarClient.InvokeAndProcessHostFunction("withdraw", withdrawTxArgs, perunAddress)
-	if err != nil {
-		return errors.New("error while invoking and processing host function: withdraw")
-	}
-
-	_, err = event.DecodeEventsPerun(txMeta)
-	if err != nil {
-		return errors.New("error while decoding events")
-	}
-
-	return nil
+	return a.StellarClient.Withdraw(ctx, perunAddress, req)
 }
 
 func (a *Adjudicator) Close(ctx context.Context, state *pchannel.State, sigs []pwallet.Sig) error {
 
 	log.Println("Close called")
-	contractAddress := a.GetPerunAddr()
-	closeTxArgs, err := BuildCloseTxArgs(*state, sigs)
-	if err != nil {
-		return errors.New("error while building fund tx")
-	}
-	txMeta, err := a.StellarClient.InvokeAndProcessHostFunction("close", closeTxArgs, contractAddress)
-	if err != nil {
-		return errors.New("error while invoking and processing host function: close")
-	}
+	perunAddr := a.GetPerunAddr()
 
-	_, err = event.DecodeEventsPerun(txMeta)
-	if err != nil {
-		return errors.New("error while decoding events")
-	}
-
-	return nil
+	return a.StellarClient.Close(ctx, perunAddr, state, sigs)
 }
 
 // Register registers and disputes a channel.
 func (a *Adjudicator) Register(ctx context.Context, req pchannel.AdjudicatorReq, states []pchannel.SignedState) error {
 	log.Println("Register called")
-	sigs := req.Tx.Sigs
-	state := req.Tx.State
-	err := a.Dispute(ctx, state, sigs)
+	err := a.Dispute(ctx, req.Tx.State, req.Tx.Sigs)
 	if err != nil {
 		return fmt.Errorf("error while disputing channel: %w", err)
 	}
@@ -194,79 +133,11 @@ func (a *Adjudicator) Register(ctx context.Context, req pchannel.AdjudicatorReq,
 
 func (a *Adjudicator) Dispute(ctx context.Context, state *pchannel.State, sigs []pwallet.Sig) error {
 	contractAddress := a.GetPerunAddr()
-	closeTxArgs, err := BuildDisputeTxArgs(*state, sigs)
-	if err != nil {
-		return errors.New("error while building fund tx")
-	}
-	txMeta, err := a.StellarClient.InvokeAndProcessHostFunction("dispute", closeTxArgs, contractAddress)
-	if err != nil {
-		return errors.New("error while invoking and processing host function: dispute")
-	}
-	_, err = event.DecodeEventsPerun(txMeta)
-	if err != nil {
-		return errors.New("error while decoding events")
-	}
-	return nil
+	return a.StellarClient.Dispute(ctx, contractAddress, state, sigs)
 }
 
 func (a *Adjudicator) ForceClose(ctx context.Context, state *pchannel.State, sigs []pwallet.Sig) error {
 	return a.StellarClient.ForceClose(ctx, a.perunAddr, state.ID)
-}
-
-func BuildCloseTxArgs(state pchannel.State, sigs []pwallet.Sig) (xdr.ScVec, error) {
-
-	wireState, err := wire.MakeState(state)
-	if err != nil {
-		return xdr.ScVec{}, err
-	}
-
-	sigAXdr, err := scval.WrapScBytes(sigs[0])
-	if err != nil {
-		return xdr.ScVec{}, err
-	}
-	sigBXdr, err := scval.WrapScBytes(sigs[1])
-	if err != nil {
-		return xdr.ScVec{}, err
-	}
-	xdrState, err := wireState.ToScVal()
-	if err != nil {
-		return xdr.ScVec{}, err
-	}
-
-	fundArgs := xdr.ScVec{
-		xdrState,
-		sigAXdr,
-		sigBXdr,
-	}
-	return fundArgs, nil
-}
-
-func BuildDisputeTxArgs(state pchannel.State, sigs []pwallet.Sig) (xdr.ScVec, error) {
-
-	wireState, err := wire.MakeState(state)
-	if err != nil {
-		return xdr.ScVec{}, err
-	}
-
-	sigAXdr, err := scval.WrapScBytes(sigs[0])
-	if err != nil {
-		return xdr.ScVec{}, err
-	}
-	sigBXdr, err := scval.WrapScBytes(sigs[1])
-	if err != nil {
-		return xdr.ScVec{}, err
-	}
-	xdrState, err := wireState.ToScVal()
-	if err != nil {
-		return xdr.ScVec{}, err
-	}
-
-	fundArgs := xdr.ScVec{
-		xdrState,
-		sigAXdr,
-		sigBXdr,
-	}
-	return fundArgs, nil
 }
 
 func (a Adjudicator) Progress(ctx context.Context, req pchannel.ProgressReq) error {

@@ -46,22 +46,20 @@ func buildChanIdTxArgs(chanID pchannel.ID) (xdr.ScVec, error) {
 	return getChannelArgs, nil
 }
 
-func buildFundTxArgs(chanID pchannel.ID, funderIdx bool) (xdr.ScVec, error) {
-	channelID, err := scval.WrapScBytes(chanID[:])
+func buildChanIdxTxArgs(chanID pchannel.ID, withdrawerIdx bool) (xdr.ScVec, error) {
+
+	withdrawerXdrIdx := scval.MustWrapBool(withdrawerIdx)
+
+	channelIDXdr, err := scval.WrapScBytes(chanID[:])
 	if err != nil {
 		return xdr.ScVec{}, err
 	}
 
-	userIdStellar, err := scval.WrapBool(funderIdx)
-	if err != nil {
-		return xdr.ScVec{}, err
+	withdrawArgs := xdr.ScVec{
+		channelIDXdr,
+		withdrawerXdrIdx,
 	}
-
-	fundArgs := xdr.ScVec{
-		channelID,
-		userIdStellar,
-	}
-	return fundArgs, nil
+	return withdrawArgs, nil
 }
 
 func buildSignedStateTxArgs(state pchannel.State, sigs []pwallet.Sig) (xdr.ScVec, error) {

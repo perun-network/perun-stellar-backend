@@ -73,7 +73,7 @@ func (c *Client) Abort(ctx context.Context, perunAddr xdr.ScAddress, state *pcha
 
 func (c *Client) Fund(ctx context.Context, perunAddr xdr.ScAddress, assetAddr xdr.ScAddress, chanID pchannel.ID, fudnerIdx bool) error {
 
-	fundTxArgs, err := buildFundTxArgs(chanID, fudnerIdx)
+	fundTxArgs, err := buildChanIdxTxArgs(chanID, fudnerIdx)
 	if err != nil {
 		return errors.New("error while building fund tx")
 	}
@@ -142,6 +142,37 @@ func (c *Client) Dispute(ctx context.Context, perunAddr xdr.ScAddress, state *pc
 	if err != nil {
 		return errors.New("error while decoding events")
 	}
+	return nil
+}
+
+func (c *Client) Withdraw(ctx context.Context, perunAddr xdr.ScAddress, req pchannel.AdjudicatorReq) error {
+	chanIDStellar := req.Tx.State.ID
+	partyIdx := req.Idx
+
+	var withdrawerIdx bool
+
+	if partyIdx == 0 {
+		withdrawerIdx = false
+	} else if partyIdx == 1 {
+		withdrawerIdx = true
+	} else {
+		return errors.New("invalid party index for withdrawal")
+	}
+
+	withdrawTxArgs, err := buildChanIdxTxArgs(chanIDStellar, withdrawerIdx)
+	if err != nil {
+		return errors.New("error while building fund tx")
+	}
+	txMeta, err := c.InvokeAndProcessHostFunction("withdraw", withdrawTxArgs, perunAddr)
+	if err != nil {
+		return errors.New("error while invoking and processing host function: withdraw")
+	}
+
+	_, err = event.DecodeEventsPerun(txMeta)
+	if err != nil {
+		return errors.New("error while decoding events")
+	}
+
 	return nil
 }
 
