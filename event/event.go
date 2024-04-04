@@ -261,11 +261,6 @@ func GetChannelFromEvents(evData xdr.ScVal) (wire.Channel, error) {
 		return wire.Channel{}, err
 	}
 
-	if err != nil {
-		return wire.Channel{}, err
-
-	}
-
 	return chanStellar, nil
 }
 

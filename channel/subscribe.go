@@ -19,7 +19,6 @@ import (
 	pchannel "perun.network/go-perun/channel"
 	"perun.network/perun-stellar-backend/event"
 	"reflect"
-	"time"
 )
 
 func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
@@ -29,12 +28,6 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 
 	if s.getEvents() == nil {
 		return nil
-	}
-
-	var challengeElapsed time.Time
-
-	if s.challengeDuration != nil {
-		challengeElapsed = time.Now().Add(*s.challengeDuration)
 	}
 
 	select {
@@ -49,7 +42,7 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 			dispEvent := pchannel.AdjudicatorEventBase{
 				VersionV: e.Version(),
 				IDV:      e.ID(),
-				TimeoutV: event.NewTimeTimeout(challengeElapsed),
+				TimeoutV: event.MakeTimeout(*s.challengeDuration),
 			}
 			ddn := &pchannel.RegisteredEvent{AdjudicatorEventBase: dispEvent, State: nil, Sigs: nil}
 			s.closer.Close()
@@ -61,7 +54,7 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 			conclEvent := pchannel.AdjudicatorEventBase{
 				VersionV: e.Version(),
 				IDV:      e.ID(),
-				TimeoutV: event.NewTimeTimeout(challengeElapsed),
+				TimeoutV: event.MakeTimeout(*s.challengeDuration),
 			}
 			ccn := &pchannel.ConcludedEvent{AdjudicatorEventBase: conclEvent}
 			s.closer.Close()

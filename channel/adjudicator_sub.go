@@ -49,19 +49,20 @@ type AdjEventSub struct {
 	log               log.Embedding
 }
 
-func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *client.Client, perunAddr xdr.ScAddress, assetAddr xdr.ScAddress) (*AdjEventSub, error) {
+func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *client.Client, perunAddr xdr.ScAddress, assetAddr xdr.ScAddress, challengeDuration *time.Duration) (*AdjEventSub, error) {
 
 	sub := &AdjEventSub{
-		stellarClient: stellarClient,
-		chanControl:   wire.Control{},
-		cid:           cid,
-		perunAddr:     perunAddr,
-		assetAddr:     assetAddr,
-		events:        make(chan event.PerunEvent, DefaultBufferSize),
-		subErrors:     make(chan error, 1),
-		pollInterval:  DefaultSubscriptionPollingInterval,
-		closer:        new(pkgsync.Closer),
-		log:           log.MakeEmbedding(log.Default()),
+		challengeDuration: challengeDuration,
+		stellarClient:     stellarClient,
+		chanControl:       wire.Control{},
+		cid:               cid,
+		perunAddr:         perunAddr,
+		assetAddr:         assetAddr,
+		events:            make(chan event.PerunEvent, DefaultBufferSize),
+		subErrors:         make(chan error, 1),
+		pollInterval:      DefaultSubscriptionPollingInterval,
+		closer:            new(pkgsync.Closer),
+		log:               log.MakeEmbedding(log.Default()),
 	}
 
 	ctx, sub.cancel = context.WithCancel(ctx)
@@ -113,8 +114,8 @@ polling:
 				continue polling
 
 			} else {
-				s.log.Log().Debug("Event detected, evaluating events...")
-				s.log.Log().Debugf("Found event: %v", adjEvent)
+				s.log.Log().Debug("Contract event detected, evaluating...")
+				s.log.Log().Debugf("Found contract event: %v", adjEvent)
 				s.events <- adjEvent
 				return
 			}
@@ -178,13 +179,4 @@ func DifferencesInControls(controlCurr, controlNext wire.Control) (event.PerunEv
 	}
 
 	return nil, nil
-}
-
-func IdenticalControls(controlCurr, controlNext wire.Control) bool {
-	return controlCurr.FundedA == controlNext.FundedA &&
-		controlCurr.FundedB == controlNext.FundedB &&
-		controlCurr.Closed == controlNext.Closed &&
-		controlCurr.WithdrawnA == controlNext.WithdrawnA &&
-		controlCurr.WithdrawnB == controlNext.WithdrawnB &&
-		controlCurr.Disputed == controlNext.Disputed
 }

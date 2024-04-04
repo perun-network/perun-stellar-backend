@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2024 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,27 +32,31 @@ import (
 
 var ErrChannelAlreadyClosed = errors.New("channel is already closed")
 
+var DefaultChallengeDuration = time.Duration(20) * time.Second
+
 type Adjudicator struct {
-	log             log.Embedding
-	StellarClient   *client.Client
-	acc             *wallet.Account
-	assetAddr       xdr.ScAddress
-	perunAddr       xdr.ScAddress
-	maxIters        int
-	pollingInterval time.Duration
+	challengeDuration *time.Duration
+	log               log.Embedding
+	StellarClient     *client.Client
+	acc               *wallet.Account
+	assetAddr         xdr.ScAddress
+	perunAddr         xdr.ScAddress
+	maxIters          int
+	pollingInterval   time.Duration
 }
 
 // NewAdjudicator returns a new Adjudicator.
 
 func NewAdjudicator(acc *wallet.Account, stellarClient *client.Client, perunID xdr.ScAddress, assetID xdr.ScAddress) *Adjudicator {
 	return &Adjudicator{
-		StellarClient:   stellarClient,
-		acc:             acc,
-		perunAddr:       perunID,
-		assetAddr:       assetID,
-		maxIters:        MaxIterationsUntilAbort,
-		pollingInterval: DefaultPollingInterval,
-		log:             log.MakeEmbedding(log.Default()),
+		challengeDuration: &DefaultChallengeDuration,
+		StellarClient:     stellarClient,
+		acc:               acc,
+		perunAddr:         perunID,
+		assetAddr:         assetID,
+		maxIters:          MaxIterationsUntilAbort,
+		pollingInterval:   DefaultPollingInterval,
+		log:               log.MakeEmbedding(log.Default()),
 	}
 }
 
@@ -68,7 +72,7 @@ func (a *Adjudicator) Subscribe(ctx context.Context, cid pchannel.ID) (pchannel.
 	c := a.StellarClient
 	perunAddr := a.GetPerunAddr()
 	assetAddr := a.GetAssetAddr()
-	return NewAdjudicatorSub(ctx, cid, c, perunAddr, assetAddr)
+	return NewAdjudicatorSub(ctx, cid, c, perunAddr, assetAddr, a.challengeDuration)
 }
 
 func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq, smap pchannel.StateMap) error {
