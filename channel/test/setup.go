@@ -43,7 +43,7 @@ const (
 	StellarAssetContractPath = "../testdata/perun_soroban_token.wasm"
 	initLumensBalance        = "10000000"
 	initTokenBalance         = uint64(2000000)
-	DefaultTestTimeout       = 200
+	DefaultTestTimeout       = 20
 )
 
 type Setup struct {
@@ -257,8 +257,8 @@ func NewParamsWithAddressStateWithAsset(t *testing.T, partsAddr []pwallet.Addres
 	))
 }
 
-func (s *Setup) NewCtx() context.Context {
-	timeout := time.Duration(float64(DefaultTestTimeout) * float64(time.Second))
+func (s *Setup) NewCtx(testTimeout float64) context.Context {
+	timeout := time.Duration(testTimeout * float64(time.Second))
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	s.t.Cleanup(cancel)
 	return ctx

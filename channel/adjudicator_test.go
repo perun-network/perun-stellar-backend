@@ -41,7 +41,7 @@ func TestHappyChannel(t *testing.T) {
 	freqs := []*pchannel.FundingReq{freqAlice, freqBob}
 
 	funders := setup.GetFunders()
-	ctx := setup.NewCtx()
+	ctx := setup.NewCtx(chtest.DefaultTestTimeout)
 	err := chtest.FundAll(ctx, funders, freqs)
 	require.NoError(t, err)
 
@@ -52,8 +52,8 @@ func TestHappyChannel(t *testing.T) {
 		adjAlice := setup.GetAdjudicators()[0]
 		adjBob := setup.GetAdjudicators()[1]
 
-		ctxAliceWithdraw := setup.NewCtx()
-		ctxBobWithdraw := setup.NewCtx()
+		ctxAliceWithdraw := setup.NewCtx(chtest.DefaultTestTimeout)
+		ctxBobWithdraw := setup.NewCtx(chtest.DefaultTestTimeout)
 
 		adjState := perunState
 		next := adjState.Clone()

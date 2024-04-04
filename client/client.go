@@ -54,13 +54,13 @@ func (c *Client) Open(ctx context.Context, perunAddr xdr.ScAddress, params *pcha
 func (c *Client) Abort(ctx context.Context, perunAddr xdr.ScAddress, state *pchannel.State) error {
 
 	chanId := state.ID
-	openTxArgs, err := buildChanIdTxArgs(chanId)
+	abortTxArgs, err := buildChanIdTxArgs(chanId)
 	if err != nil {
-		return errors.New("error while building open tx")
+		return errors.New("error while building abort_funding tx")
 	}
-	txMeta, err := c.InvokeAndProcessHostFunction("open", openTxArgs, perunAddr)
+	txMeta, err := c.InvokeAndProcessHostFunction("abort_funding", abortTxArgs, perunAddr)
 	if err != nil {
-		return errors.New("error while invoking and processing host function: open")
+		return errors.New("error while invoking and processing host function: abort_funding")
 	}
 
 	_, err = event.DecodeEventsPerun(txMeta)

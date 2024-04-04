@@ -80,7 +80,13 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 	for i := 0; i < f.maxIters; i++ {
 		select {
 		case <-ctx.Done():
-			return f.AbortChannel(ctx, req.State)
+			timeoutErr := makeTimeoutErr([]pchannel.Index{req.Idx}, 0)
+			errAbort := f.AbortChannel(ctx, req.State)
+			if errAbort != nil {
+				return errAbort
+			}
+			return timeoutErr
+
 		case <-time.After(f.pollingInterval):
 
 			log.Printf("%s: Polling for opened channel...\n", party)
@@ -145,4 +151,18 @@ func getPartyByIndex(funderIdx pchannel.Index) string {
 		return "Party B"
 	}
 	return "Party A"
+}
+
+// makeTimeoutErr returns a FundingTimeoutError for a specific Asset for a specific Funder.
+func makeTimeoutErr(remains []pchannel.Index, assetIdx int) error {
+	indices := make([]pchannel.Index, 0, len(remains))
+
+	indices = append(indices, remains...)
+
+	return pchannel.NewFundingTimeoutError(
+		[]*pchannel.AssetFundingError{{
+			Asset:         pchannel.Index(assetIdx),
+			TimedOutPeers: indices,
+		}},
+	)
 }
