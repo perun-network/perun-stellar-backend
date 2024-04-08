@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 // Copyright 2024 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,10 +14,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-//go:build integration
-// +build integration
-
 package channel_test
 
 import (
@@ -97,6 +96,66 @@ func TestHappyChannel(t *testing.T) {
 		require.NoError(t, err)
 
 		require.True(t, stellarChanBob.Control.WithdrawnB)
+
+	}
+
+}
+
+func TestChannel_RegisterFinal(t *testing.T) {
+	setup := chtest.NewTestSetup(t)
+	stellarAsset := setup.GetTokenAsset()
+	accs := setup.GetAccounts()
+	addrAlice := accs[0].Address()
+	addrBob := accs[1].Address()
+	addrList := []pwallet.Address{addrAlice, addrBob}
+	perunParams, perunState := chtest.NewParamsWithAddressStateWithAsset(t, addrList, stellarAsset)
+
+	freqAlice := pchannel.NewFundingReq(perunParams, perunState, 0, perunState.Balances)
+	freqBob := pchannel.NewFundingReq(perunParams, perunState, 1, perunState.Balances)
+
+	freqs := []*pchannel.FundingReq{freqAlice, freqBob}
+
+	funders := setup.GetFunders()
+	ctx := setup.NewCtx(chtest.DefaultTestTimeout)
+	err := chtest.FundAll(ctx, funders, freqs)
+	require.NoError(t, err)
+
+	// funding complete
+
+	// Withdrawal
+	{
+		adjAlice := setup.GetAdjudicators()[0]
+
+		ctxAliceRegister := setup.NewCtx(chtest.DefaultTestTimeout)
+
+		adjState := perunState
+		next := adjState.Clone()
+		next.Version++
+		next.IsFinal = true
+		encodedState, err := channel.EncodeState(next)
+		require.NoError(t, err)
+		signAlice, err := accs[0].SignData(encodedState)
+		require.NoError(t, err)
+		signBob, err := accs[1].SignData(encodedState)
+		require.NoError(t, err)
+		sigs := []pwallet.Sig{signAlice, signBob}
+		tx := pchannel.Transaction{State: next, Sigs: sigs}
+
+		reqAlice := pchannel.AdjudicatorReq{
+			Params:    perunParams,
+			Tx:        tx,
+			Acc:       accs[0],
+			Idx:       pchannel.Index(0),
+			Secondary: false}
+
+		require.NoError(t, adjAlice.Register(ctxAliceRegister, reqAlice, nil))
+
+		perunAddrAlice := adjAlice.GetPerunAddr()
+		stellarChanAlice, err := adjAlice.StellarClient.GetChannelInfo(ctx, perunAddrAlice, next.ID)
+
+		require.True(t, stellarChanAlice.Control.Disputed)
+
+		require.NoError(t, err)
 
 	}
 
