@@ -40,8 +40,8 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 		case *event.DisputedEvent:
 			log.Println("DisputedEvent received")
 			dispEvent := pchannel.AdjudicatorEventBase{
-				VersionV: e.Version(),
-				IDV:      e.ID(),
+				VersionV: e.GetVersion(),
+				IDV:      e.GetID(),
 				TimeoutV: event.MakeTimeout(*s.challengeDuration),
 			}
 			ddn := &pchannel.RegisteredEvent{AdjudicatorEventBase: dispEvent, State: nil, Sigs: nil}
@@ -52,8 +52,8 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 
 			log.Println("CloseEvent received")
 			conclEvent := pchannel.AdjudicatorEventBase{
-				VersionV: e.Version(),
-				IDV:      e.ID(),
+				VersionV: e.GetVersion(),
+				IDV:      e.GetID(),
 				TimeoutV: event.MakeTimeout(*s.challengeDuration),
 			}
 			ccn := &pchannel.ConcludedEvent{AdjudicatorEventBase: conclEvent}
