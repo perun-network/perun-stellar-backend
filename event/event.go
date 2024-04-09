@@ -32,8 +32,9 @@ const (
 	EventTypeClosed                  // channel closed -> withdrawing enabled
 	EventTypeWithdrawing             // participant/s withdrawing
 	EventTypeWithdrawn               // participants have withdrawn
-	EventTypeForceClosed             // participant has force closed the channel
+	EventTypeForceClose              // participant has force closed the channel
 	EventTypeDisputed                // participant has disputed the channel
+	EventTypeError                   // inconsistent event
 )
 
 const AssertPerunSymbol = "perun"
@@ -46,51 +47,62 @@ var (
 		xdr.ScSymbol("closed"):   EventTypeClosed,
 		xdr.ScSymbol("withdraw"): EventTypeWithdrawing,
 		xdr.ScSymbol("pay_c"):    EventTypeWithdrawn,
-		xdr.ScSymbol("f_closed"): EventTypeForceClosed,
+		xdr.ScSymbol("f_closed"): EventTypeForceClose,
 		xdr.ScSymbol("dispute"):  EventTypeDisputed,
 	}
 
 	ErrNotStellarPerunContract = errors.New("event was not from a Perun payment channel contract")
 	ErrEventUnsupported        = errors.New("this type of event is unsupported")
 	ErrEventIntegrity          = errors.New("contract ID does not match payment channel + passphrase")
+	ErrNoFundEvent             = errors.New("fund event not found")
+	ErrNoCloseEvent            = errors.New("close event not found")
+	ErrNoWithdrawEvent         = errors.New("withdraw event not found")
+	ErrNoDisputeEvent          = errors.New("dispute event not found")
+	ErrNoForceCloseEvent       = errors.New("force close event not found")
 )
 
 type controlsState map[string]bool
 
 type (
 	PerunEvent interface {
-		ID() pchannel.ID
-		Version() Version
+		GetID() pchannel.ID
+		GetChannel() wire.Channel
+		GetVersion() Version
+		GetType() (EventType, error)
 	}
 
 	OpenEvent struct {
-		Channel  wire.Channel
-		IDV      pchannel.ID
-		VersionV Version
+		channel wire.Channel
+		// eventType EventType
+		idv      pchannel.ID
+		versionV Version
 	}
 	FundEvent struct {
-		Channel  wire.Channel
-		IDV      pchannel.ID
-		VersionV Version
+		channel wire.Channel
+		// eventType EventType
+		idv      pchannel.ID
+		versionV Version
 	}
 
 	CloseEvent struct {
-		Channel  wire.Channel
-		IDV      pchannel.ID
-		VersionV Version
+		channel wire.Channel
+		// eventType EventType
+		idv      pchannel.ID
+		versionV Version
 	}
 
 	WithdrawnEvent struct {
-		Channel   wire.Channel
-		IDV       pchannel.ID
-		VersionV  Version
-		Timestamp uint64
+		channel wire.Channel
+		// eventType EventType
+		idv      pchannel.ID
+		versionV Version
 	}
 
 	DisputedEvent struct {
-		Channel  wire.Channel
-		IDV      pchannel.ID
-		VersionV Version
+		channel wire.Channel
+		// eventType EventType
+		idv      pchannel.ID
+		versionV Version
 	}
 )
 
@@ -104,50 +116,93 @@ func (e *StellarEvent) GetType() EventType {
 }
 
 func (e *OpenEvent) GetChannel() wire.Channel {
-	return e.Channel
+	return e.channel
+}
+func (e *OpenEvent) GetType() (EventType, error) {
+	return EventTypeOpen, nil
 }
 
-func (e *OpenEvent) ID() pchannel.ID {
-	return e.IDV
+func (e *OpenEvent) GetID() pchannel.ID {
+	return e.idv
 }
-func (e *OpenEvent) Version() Version {
-	return e.VersionV
+func (e *OpenEvent) GetVersion() Version {
+	return e.versionV
 }
 
 func (e *WithdrawnEvent) GetChannel() wire.Channel {
-	return e.Channel
+	return e.channel
 }
 
-func (e *WithdrawnEvent) ID() pchannel.ID {
-	return e.IDV
+func (e *WithdrawnEvent) GetType() (EventType, error) {
+	withdrawnA := e.channel.Control.WithdrawnA
+	withdrawnB := e.channel.Control.WithdrawnB
+
+	if withdrawnA && withdrawnB {
+		return EventTypeWithdrawn, nil
+	} else if withdrawnA != withdrawnB {
+		return EventTypeWithdrawing, nil
+	}
+	return EventTypeError, errors.New("withdraw event has no consistent type: not withdrawn")
 }
-func (e *WithdrawnEvent) Version() Version {
-	return e.VersionV
+
+func (e *WithdrawnEvent) GetID() pchannel.ID {
+	return e.idv
+}
+func (e *WithdrawnEvent) GetVersion() Version {
+	return e.versionV
 }
 
 func (e *CloseEvent) GetChannel() wire.Channel {
-	return e.Channel
+	return e.channel
 }
 
-func (e *CloseEvent) ID() pchannel.ID {
-	return e.IDV
-}
-func (e *CloseEvent) Version() Version {
-	return e.VersionV
+func (e *CloseEvent) GetType() (EventType, error) {
+	return EventTypeClosed, nil
 }
 
-func (e *FundEvent) ID() pchannel.ID {
-	return e.IDV
+func (e *CloseEvent) GetID() pchannel.ID {
+	return e.idv
 }
-func (e *FundEvent) Version() Version {
-	return e.VersionV
+func (e *CloseEvent) GetVersion() Version {
+	return e.versionV
+}
+func (e *FundEvent) GetChannel() wire.Channel {
+	return e.channel
 }
 
-func (e *DisputedEvent) ID() pchannel.ID {
-	return e.IDV
+func (e *FundEvent) GetType() (EventType, error) {
+	fundedA := e.channel.Control.FundedA
+	fundedB := e.channel.Control.FundedB
+
+	if fundedA && fundedB {
+		return EventTypeFundedChannel, nil
+	} else if fundedA != fundedB {
+		return EventTypeFundChannel, nil
+	}
+	return EventTypeError, errors.New("funding event has no consistent type: not funded")
 }
-func (e *DisputedEvent) Version() Version {
-	return e.VersionV
+
+func (e *FundEvent) GetID() pchannel.ID {
+	return e.idv
+}
+func (e *FundEvent) GetVersion() Version {
+	return e.versionV
+}
+
+func (e *DisputedEvent) GetID() pchannel.ID {
+	return e.idv
+}
+
+func (e *DisputedEvent) GetChannel() wire.Channel {
+	return e.channel
+}
+
+func (e *DisputedEvent) GetVersion() Version {
+	return e.versionV
+}
+
+func (e *DisputedEvent) GetType() (EventType, error) {
+	return EventTypeDisputed, nil
 }
 
 func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
@@ -160,7 +215,7 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 		topics := ev.Body.V0.Topics
 
 		if len(topics) < 2 {
-			return []PerunEvent{}, ErrNotStellarPerunContract
+			return nil, ErrNotStellarPerunContract
 		}
 		perunString, ok := topics[0].GetSym()
 
@@ -169,19 +224,19 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 		}
 
 		if perunString != AssertPerunSymbol {
-			return []PerunEvent{}, ErrNotStellarPerunContract
+			return nil, ErrNotStellarPerunContract
 		}
 		if !ok {
-			return []PerunEvent{}, ErrNotStellarPerunContract
+			return nil, ErrNotStellarPerunContract
 		}
 
 		fn, ok := topics[1].GetSym()
 		if !ok {
-			return []PerunEvent{}, ErrNotStellarPerunContract
+			return nil, ErrNotStellarPerunContract
 		}
 
 		if eventType, found := STELLAR_PERUN_CHANNEL_CONTRACT_TOPICS[fn]; !found {
-			return []PerunEvent{}, ErrNotStellarPerunContract
+			return nil, ErrNotStellarPerunContract
 		} else {
 			sev.Type = eventType
 		}
@@ -191,7 +246,7 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 
 			openEventchanStellar, err := GetChannelFromEvents(ev.Body.V0.Data)
 			if err != nil {
-				return []PerunEvent{}, err
+				return nil, err
 			}
 
 			controlsOpen := initControlState(openEventchanStellar.Control)
@@ -202,7 +257,7 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 			}
 
 			openEvent := OpenEvent{
-				Channel: openEventchanStellar,
+				channel: openEventchanStellar,
 			}
 
 			evs = append(evs, &openEvent)
@@ -210,32 +265,43 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 		case EventTypeFundChannel:
 			fundEventchanStellar, _, err := GetChannelBoolFromEvents(ev.Body.V0.Data)
 			if err != nil {
-				return []PerunEvent{}, err
+				return nil, err
 			}
 
 			fundEvent := FundEvent{
-				Channel: fundEventchanStellar,
+				channel: fundEventchanStellar,
 			}
 			evs = append(evs, &fundEvent)
 		case EventTypeClosed:
 			closedEventchanStellar, err := GetChannelFromEvents(ev.Body.V0.Data)
 			if err != nil {
-				return []PerunEvent{}, err
+				return nil, err
 			}
 
 			closeEvent := CloseEvent{
-				Channel: closedEventchanStellar,
+				channel: closedEventchanStellar,
 			}
 			evs = append(evs, &closeEvent)
 		case EventTypeWithdrawn:
 			withdrawnEventchanStellar, err := GetChannelFromEvents(ev.Body.V0.Data)
 			if err != nil {
-				return []PerunEvent{}, err
+				return nil, err
 			}
 			withdrawnEvent := WithdrawnEvent{
-				Channel: withdrawnEventchanStellar,
+				channel: withdrawnEventchanStellar,
 			}
 			evs = append(evs, &withdrawnEvent)
+
+		case EventTypeDisputed:
+			disputedEventchanStellar, err := GetChannelFromEvents(ev.Body.V0.Data)
+			if err != nil {
+				return nil, err
+			}
+			disputedEvent := DisputedEvent{
+				channel: disputedEventchanStellar,
+			}
+			evs = append(evs, &disputedEvent)
+
 		}
 
 	}
@@ -294,5 +360,116 @@ func checkOpen(cState controlsState) error {
 			return errors.New(key + " is not false")
 		}
 	}
+	return nil
+}
+
+func AssertOpenEvent(perunEvents []PerunEvent) error {
+
+	if len(perunEvents) == 0 {
+		return errors.New("no open event found after opening a channel")
+	}
+
+	for _, ev := range perunEvents {
+		eventType, err := ev.GetType()
+		if err != nil {
+			return errors.New("could not retrieve type from event")
+		}
+		switch eventType {
+		case EventTypeOpen:
+			return nil
+		case EventTypeDisputed:
+			return errors.New("disputed already before channel open")
+		case EventTypeFundChannel, EventTypeFundedChannel:
+			if ev.GetChannel().Control.FundedA || ev.GetChannel().Control.FundedB {
+				return nil
+			} else {
+				return errors.New("funded channel not open yet")
+			}
+		}
+	}
+	return errors.New("no event found after opening a channel")
+}
+
+func AssertFundedEvent(perunEvents []PerunEvent) error {
+	for _, ev := range perunEvents {
+		eventType, err := ev.GetType()
+		if err != nil {
+			return err
+		}
+		switch eventType {
+		case EventTypeFundChannel, EventTypeFundedChannel:
+			return nil
+		default:
+			return ErrNoFundEvent
+		}
+	}
+
+	return nil
+}
+
+func AssertCloseEvent(perunEvents []PerunEvent) error {
+	for _, ev := range perunEvents {
+		eventType, err := ev.GetType()
+		if err != nil {
+			return err
+		}
+		switch eventType {
+		case EventTypeClosed:
+			return nil
+		default:
+			return ErrNoCloseEvent
+		}
+	}
+
+	return nil
+}
+
+func AssertWithdrawEvent(perunEvents []PerunEvent) error {
+	for _, ev := range perunEvents {
+		eventType, err := ev.GetType()
+		if err != nil {
+			return err
+		}
+		switch eventType {
+		case EventTypeWithdrawing, EventTypeWithdrawn:
+			return nil
+		default:
+			return ErrNoWithdrawEvent
+		}
+	}
+
+	return nil
+}
+func AssertForceCloseEvent(perunEvents []PerunEvent) error {
+	for _, ev := range perunEvents {
+		eventType, err := ev.GetType()
+		if err != nil {
+			return err
+		}
+		switch eventType {
+		case EventTypeForceClose:
+			return nil
+		default:
+			return ErrNoForceCloseEvent
+		}
+	}
+
+	return nil
+}
+
+func AssertDisputeEvent(perunEvents []PerunEvent) error {
+	for _, ev := range perunEvents {
+		eventType, err := ev.GetType()
+		if err != nil {
+			return err
+		}
+		switch eventType {
+		case EventTypeDisputed:
+			return nil
+		default:
+			return ErrNoDisputeEvent
+		}
+	}
+
 	return nil
 }
