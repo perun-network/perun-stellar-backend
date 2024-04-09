@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"errors"
 	"github.com/creachadair/jrpc2"
 	"github.com/creachadair/jrpc2/jhttp"
 	"github.com/stellar/go/clients/horizonclient"
@@ -75,7 +74,7 @@ func (c *Client) InvokeAndProcessHostFunction(fname string, callTxArgs xdr.ScVec
 	// Decode transaction metadata
 	txMeta, err := DecodeTxMeta(tx)
 	if err != nil {
-		return xdr.TransactionMeta{}, errors.New("error while decoding tx meta")
+		return xdr.TransactionMeta{}, ErrCouldNotDecodeTxMeta
 	}
 	_ = txMeta.V3.SorobanMeta.ReturnValue
 

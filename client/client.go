@@ -31,6 +31,8 @@ import (
 
 var _ StellarClient = (*Client)(nil)
 
+var ErrCouldNotDecodeTxMeta = errors.New("could not decode tx output")
+
 type Client struct {
 	hzClient  *horizonclient.Client
 	keyHolder keyHolder
@@ -59,7 +61,7 @@ func (c *Client) Open(ctx context.Context, perunAddr xdr.ScAddress, params *pcha
 
 	evs, err := event.DecodeEventsPerun(txMeta)
 	if err != nil {
-		return errors.New("error while decoding events")
+		return err
 	}
 
 	err = event.AssertOpenEvent(evs)
@@ -84,7 +86,7 @@ func (c *Client) Abort(ctx context.Context, perunAddr xdr.ScAddress, state *pcha
 
 	_, err = event.DecodeEventsPerun(txMeta)
 	if err != nil {
-		return errors.New("error while decoding events")
+		return err
 	}
 
 	return nil
@@ -99,7 +101,7 @@ func (c *Client) Fund(ctx context.Context, perunAddr xdr.ScAddress, assetAddr xd
 
 	txMeta, err := c.InvokeAndProcessHostFunction("fund", fundTxArgs, perunAddr)
 	if err != nil {
-		return errors.New("error while invoking and processing host function: fund")
+		return err
 	}
 
 	evs, err := event.DecodeEventsPerun(txMeta)
@@ -143,7 +145,7 @@ func (c *Client) Close(ctx context.Context, perunAddr xdr.ScAddress, state *pcha
 
 	evs, err := event.DecodeEventsPerun(txMeta)
 	if err != nil {
-		return errors.New("error while decoding events")
+		return err
 	}
 
 	err = event.AssertCloseEvent(evs)
@@ -173,7 +175,7 @@ func (c *Client) ForceClose(ctx context.Context, perunAddr xdr.ScAddress, chanId
 	}
 	evs, err := event.DecodeEventsPerun(txMeta)
 	if err != nil {
-		return errors.New("error while decoding events")
+		return err
 	}
 
 	err = event.AssertForceCloseEvent(evs)
@@ -207,7 +209,7 @@ func (c *Client) Dispute(ctx context.Context, perunAddr xdr.ScAddress, state *pc
 	evs, err := event.DecodeEventsPerun(txMeta)
 
 	if err != nil {
-		return errors.New("error while decoding events")
+		return err
 	}
 
 	err = event.AssertDisputeEvent(evs)
@@ -243,7 +245,7 @@ func (c *Client) Withdraw(ctx context.Context, perunAddr xdr.ScAddress, req pcha
 
 	evs, err := event.DecodeEventsPerun(txMeta)
 	if err != nil {
-		return event.ErrEventDecode
+		return err
 	}
 
 	err = event.AssertWithdrawEvent(evs)

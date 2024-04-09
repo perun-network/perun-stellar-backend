@@ -54,7 +54,6 @@ var (
 	ErrNotStellarPerunContract = errors.New("event was not from a Perun payment channel contract")
 	ErrEventUnsupported        = errors.New("this type of event is unsupported")
 	ErrEventIntegrity          = errors.New("contract ID does not match payment channel + passphrase")
-	ErrEventDecode             = errors.New("error while decoding events")
 	ErrNoFundEvent             = errors.New("fund event not found")
 	ErrNoCloseEvent            = errors.New("close event not found")
 	ErrNoWithdrawEvent         = errors.New("withdraw event not found")
@@ -73,38 +72,37 @@ type (
 	}
 
 	OpenEvent struct {
-		channel   wire.Channel
-		eventType EventType
-		idv       pchannel.ID
-		versionV  Version
+		channel wire.Channel
+		// eventType EventType
+		idv      pchannel.ID
+		versionV Version
 	}
 	FundEvent struct {
-		channel   wire.Channel
-		eventType EventType
-		idv       pchannel.ID
-		versionV  Version
+		channel wire.Channel
+		// eventType EventType
+		idv      pchannel.ID
+		versionV Version
 	}
 
 	CloseEvent struct {
-		channel   wire.Channel
-		eventType EventType
-		idv       pchannel.ID
-		versionV  Version
+		channel wire.Channel
+		// eventType EventType
+		idv      pchannel.ID
+		versionV Version
 	}
 
 	WithdrawnEvent struct {
-		channel   wire.Channel
-		eventType EventType
-		idv       pchannel.ID
-		versionV  Version
-		// Timestamp uint64
+		channel wire.Channel
+		// eventType EventType
+		idv      pchannel.ID
+		versionV Version
 	}
 
 	DisputedEvent struct {
-		channel   wire.Channel
-		eventType EventType
-		idv       pchannel.ID
-		versionV  Version
+		channel wire.Channel
+		// eventType EventType
+		idv      pchannel.ID
+		versionV Version
 	}
 )
 
