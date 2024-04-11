@@ -15,6 +15,7 @@
 package channel
 
 import (
+	"fmt"
 	"log"
 	pchannel "perun.network/go-perun/channel"
 	"perun.network/perun-stellar-backend/event"
@@ -27,11 +28,13 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 	}
 
 	if s.getEvents() == nil {
+		fmt.Println("outputs if nil event")
 		return nil
 	}
 
 	select {
 	case ev := <-s.getEvents():
+		fmt.Println("ev: ", ev)
 		if ev == nil {
 			return nil
 		}
@@ -45,7 +48,7 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 				TimeoutV: event.MakeTimeout(*s.challengeDuration),
 			}
 			ddn := &pchannel.RegisteredEvent{AdjudicatorEventBase: dispEvent, State: nil, Sigs: nil}
-			s.closer.Close()
+			// s.closer.Close()
 			return ddn
 
 		case *event.CloseEvent:
@@ -57,7 +60,7 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 				TimeoutV: event.MakeTimeout(*s.challengeDuration),
 			}
 			ccn := &pchannel.ConcludedEvent{AdjudicatorEventBase: conclEvent}
-			s.closer.Close()
+			// s.closer.Close()
 			return ccn
 
 		default:

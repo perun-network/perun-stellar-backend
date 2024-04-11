@@ -17,14 +17,17 @@ package channel
 import (
 	"context"
 	"errors"
+	"fmt"
+	"time"
+
 	"github.com/stellar/go/xdr"
+	"perun.network/go-perun/channel"
 	pchannel "perun.network/go-perun/channel"
 	log "perun.network/go-perun/log"
 	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/event"
 	"perun.network/perun-stellar-backend/wire"
 	pkgsync "polycry.pt/poly-go/sync"
-	"time"
 )
 
 const (
@@ -47,9 +50,10 @@ type AdjEventSub struct {
 	closer            *pkgsync.Closer
 	pollInterval      time.Duration
 	log               log.Embedding
+	eventSink         *StellarEventSink
 }
 
-func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *client.Client, perunAddr xdr.ScAddress, assetAddr xdr.ScAddress, challengeDuration *time.Duration) (*AdjEventSub, error) {
+func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *client.Client, perunAddr xdr.ScAddress, assetAddr xdr.ScAddress, challengeDuration *time.Duration, eventSink *StellarEventSink) (channel.AdjudicatorSubscription, error) {
 
 	sub := &AdjEventSub{
 		challengeDuration: challengeDuration,
@@ -60,6 +64,7 @@ func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *clie
 		assetAddr:         assetAddr,
 		events:            make(chan event.PerunEvent, DefaultBufferSize),
 		subErrors:         make(chan error, 1),
+		eventSink:         eventSink,
 		pollInterval:      DefaultSubscriptionPollingInterval,
 		closer:            new(pkgsync.Closer),
 		log:               log.MakeEmbedding(log.Default()),
@@ -73,6 +78,8 @@ func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *clie
 
 func (s *AdjEventSub) run(ctx context.Context) {
 	s.log.Log().Info("Listening for channel state changes")
+	fmt.Println("Listening for channel state changes")
+
 	chanControl, err := s.stellarClient.GetChannelInfo(ctx, s.perunAddr, s.cid)
 	if err != nil {
 		s.subErrors <- err
@@ -83,42 +90,49 @@ func (s *AdjEventSub) run(ctx context.Context) {
 		s.err = err
 		close(s.events)
 	}
-	var newChanControl wire.Control
-polling:
+	// var newChanControl wire.Control
+	// polling:
 	for {
 		s.log.Log().Debug("AdjudicatorSub is listening for Adjudicator Events")
 		select {
+
+		case ev := <-s.eventSink.eventChan:
+			fmt.Println("Received event")
+			s.events <- ev
+
 		case err := <-s.subErrors:
 			finish(err)
 			return
 		case <-ctx.Done():
+			fmt.Println("context done in run")
 			finish(nil)
 			return
-		case <-time.After(s.pollInterval):
+			// case <-time.After(s.pollInterval):
 
-			newChanInfo, err := s.stellarClient.GetChannelInfo(ctx, s.perunAddr, s.cid) // getChanControl()
-			newChanControl = newChanInfo.Control
+			// 	newChanInfo, err := s.stellarClient.GetChannelInfo(ctx, s.perunAddr, s.cid) // getChanControl()
+			// 	newChanControl = newChanInfo.Control
 
-			if err != nil {
+			// 	if err != nil {
 
-				s.subErrors <- err
-			}
-			adjEvent, err := DifferencesInControls(s.chanControl, newChanControl)
-			if err != nil {
-				s.subErrors <- err
-			}
+			// 		s.subErrors <- err
+			// 	}
+			// 	adjEvent, err := DifferencesInControls(s.chanControl, newChanControl)
+			// 	fmt.Println("received event: ", adjEvent)
+			// 	if err != nil {
+			// 		s.subErrors <- err
+			// 	}
 
-			if adjEvent == nil {
-				s.chanControl = newChanControl
-				s.log.Log().Debug("No events yet, continuing polling...")
-				continue polling
+			// 	if adjEvent == nil {
+			// 		s.chanControl = newChanControl
+			// 		s.log.Log().Debug("No events yet, continuing polling...")
+			// 		continue polling
 
-			} else {
-				s.log.Log().Debug("Contract event detected, evaluating...")
-				s.log.Log().Debugf("Found contract event: %v", adjEvent)
-				s.events <- adjEvent
-				return
-			}
+			// 	} else {
+			// 		s.log.Log().Debug("Contract event detected, evaluating...")
+			// 		s.log.Log().Debugf("Found contract event: %v", adjEvent)
+			// 		s.events <- adjEvent
+			// 		return
+			// 	}
 		}
 	}
 }

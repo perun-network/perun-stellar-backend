@@ -131,35 +131,35 @@ func (c *Client) Fund(ctx context.Context, perunAddr xdr.ScAddress, assetAddr xd
 	return nil
 }
 
-func (c *Client) Close(ctx context.Context, perunAddr xdr.ScAddress, state *pchannel.State, sigs []pwallet.Sig) error {
+func (c *Client) Close(ctx context.Context, perunAddr xdr.ScAddress, state *pchannel.State, sigs []pwallet.Sig) ([]event.PerunEvent, error) {
 
 	log.Println("Close called")
 	closeTxArgs, err := buildSignedStateTxArgs(*state, sigs)
 	if err != nil {
-		return errors.New("error while building fund tx")
+		return nil, errors.New("error while building close tx")
 	}
 	txMeta, err := c.InvokeAndProcessHostFunction("close", closeTxArgs, perunAddr)
 	if err != nil {
-		return errors.New("error while invoking and processing host function: close")
+		return nil, errors.New("error while invoking and processing host function: close")
 	}
 
 	evs, err := event.DecodeEventsPerun(txMeta)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = event.AssertCloseEvent(evs)
 	if err == event.ErrNoCloseEvent {
 		chanInfo, err := c.GetChannelInfo(ctx, perunAddr, state.ID)
 		if err != nil {
-			return errors.New("could not get channel info")
+			return nil, errors.New("could not get channel info")
 		}
 		if chanInfo.Control.Closed {
-			return nil
+			return nil, nil
 		}
 	}
 
-	return event.ErrNoCloseEvent
+	return evs, event.ErrNoCloseEvent
 }
 
 func (c *Client) ForceClose(ctx context.Context, perunAddr xdr.ScAddress, chanId pchannel.ID) error {

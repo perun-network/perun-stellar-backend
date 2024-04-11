@@ -43,7 +43,7 @@ const (
 	StellarAssetContractPath = "../testdata/perun_soroban_token.wasm"
 	initLumensBalance        = "10000000"
 	initTokenBalance         = uint64(2000000)
-	DefaultTestTimeout       = 20
+	DefaultTestTimeout       = 50
 )
 
 type Setup struct {

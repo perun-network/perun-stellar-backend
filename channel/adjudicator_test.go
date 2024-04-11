@@ -1,6 +1,3 @@
-//go:build integration
-// +build integration
-
 // Copyright 2024 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,6 +14,7 @@
 package channel_test
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/require"
 	pchannel "perun.network/go-perun/channel"
 	pwallet "perun.network/go-perun/wallet"
@@ -58,6 +56,7 @@ func TestHappyChannel(t *testing.T) {
 		next := adjState.Clone()
 		next.Version++
 		next.IsFinal = true
+
 		encodedState, err := channel.EncodeState(next)
 		require.NoError(t, err)
 		signAlice, err := accs[0].SignData(encodedState)
@@ -80,6 +79,9 @@ func TestHappyChannel(t *testing.T) {
 			Acc:       accs[1],
 			Idx:       pchannel.Index(1),
 			Secondary: false}
+
+		_, err = adjAlice.Subscribe(ctx, next.ID)
+		require.NoError(t, err)
 
 		require.NoError(t, adjAlice.Withdraw(ctxAliceWithdraw, reqAlice, nil))
 		perunAddrAlice := adjAlice.GetPerunAddr()
@@ -127,6 +129,7 @@ func TestChannel_RegisterFinal(t *testing.T) {
 		adjAlice := setup.GetAdjudicators()[0]
 
 		ctxAliceRegister := setup.NewCtx(chtest.DefaultTestTimeout)
+		ctxAliceSub := setup.NewCtx(60)
 
 		adjState := perunState
 		next := adjState.Clone()
@@ -148,7 +151,19 @@ func TestChannel_RegisterFinal(t *testing.T) {
 			Idx:       pchannel.Index(0),
 			Secondary: false}
 
+		sub, err := adjAlice.Subscribe(ctxAliceSub, adjState.ID)
+		require.NoError(t, err)
+		fmt.Println("we are here after subscribe")
+		// fmt.Println("outp1: ", outp1)
 		require.NoError(t, adjAlice.Register(ctxAliceRegister, reqAlice, nil))
+		fmt.Println("we are here after register")
+
+		outp2 := sub.Next()
+		fmt.Println("outp2: ", outp2)
+
+		// outp3 := sub.Next()
+
+		// fmt.Println("outp3: ", outp3)
 
 		perunAddrAlice := adjAlice.GetPerunAddr()
 		stellarChanAlice, err := adjAlice.StellarClient.GetChannelInfo(ctx, perunAddrAlice, next.ID)
@@ -160,3 +175,100 @@ func TestChannel_RegisterFinal(t *testing.T) {
 	}
 
 }
+
+// func TestChannel_RegisterTwice(t *testing.T) {
+// 	setup := chtest.NewTestSetup(t)
+// 	stellarAsset := setup.GetTokenAsset()
+// 	accs := setup.GetAccounts()
+// 	addrAlice := accs[0].Address()
+// 	addrBob := accs[1].Address()
+// 	addrList := []pwallet.Address{addrAlice, addrBob}
+// 	perunParams, perunState := chtest.NewParamsWithAddressStateWithAsset(t, addrList, stellarAsset)
+
+// 	freqAlice := pchannel.NewFundingReq(perunParams, perunState, 0, perunState.Balances)
+// 	freqBob := pchannel.NewFundingReq(perunParams, perunState, 1, perunState.Balances)
+
+// 	freqs := []*pchannel.FundingReq{freqAlice, freqBob}
+
+// 	funders := setup.GetFunders()
+// 	ctx := setup.NewCtx(chtest.DefaultTestTimeout)
+// 	err := chtest.FundAll(ctx, funders, freqs)
+// 	require.NoError(t, err)
+
+// 	// funding complete
+// 	adjAlice := setup.GetAdjudicators()[0]
+
+// 	ctxAliceRegister := setup.NewCtx(chtest.DefaultTestTimeout)
+
+// 	adjState := perunState
+// 	secondState := adjState.Clone()
+// 	secondState.Version++
+// 	secondState.IsFinal = true
+// 	// First register
+// 	{
+
+// 		encodedState, err := channel.EncodeState(secondState)
+// 		require.NoError(t, err)
+// 		signAlice, err := accs[0].SignData(encodedState)
+// 		require.NoError(t, err)
+// 		signBob, err := accs[1].SignData(encodedState)
+// 		require.NoError(t, err)
+// 		sigs := []pwallet.Sig{signAlice, signBob}
+// 		tx := pchannel.Transaction{State: secondState, Sigs: sigs}
+
+// 		reqAlice := pchannel.AdjudicatorReq{
+// 			Params:    perunParams,
+// 			Tx:        tx,
+// 			Acc:       accs[0],
+// 			Idx:       pchannel.Index(0),
+// 			Secondary: false}
+
+// 		require.NoError(t, adjAlice.Register(ctxAliceRegister, reqAlice, nil))
+
+// 		perunAddrAlice := adjAlice.GetPerunAddr()
+// 		stellarChanAlice, err := adjAlice.StellarClient.GetChannelInfo(ctx, perunAddrAlice, secondState.ID)
+
+// 		require.True(t, stellarChanAlice.Control.Disputed)
+
+// 		require.NoError(t, err)
+
+// 	}
+
+// 	// second register
+
+// 	{
+// 		adjAlice := setup.GetAdjudicators()[0]
+
+// 		ctxAliceRegister := setup.NewCtx(chtest.DefaultTestTimeout)
+
+// 		// adjState := perunState
+// 		thirdState := secondState.Clone()
+// 		thirdState.Version++
+// 		encodedState, err := channel.EncodeState(thirdState)
+// 		require.NoError(t, err)
+// 		signAlice, err := accs[0].SignData(encodedState)
+// 		require.NoError(t, err)
+// 		signBob, err := accs[1].SignData(encodedState)
+// 		require.NoError(t, err)
+// 		sigs := []pwallet.Sig{signAlice, signBob}
+// 		tx := pchannel.Transaction{State: thirdState, Sigs: sigs}
+
+// 		reqAlice := pchannel.AdjudicatorReq{
+// 			Params:    perunParams,
+// 			Tx:        tx,
+// 			Acc:       accs[0],
+// 			Idx:       pchannel.Index(0),
+// 			Secondary: false}
+
+// 		require.NoError(t, adjAlice.Register(ctxAliceRegister, reqAlice, nil))
+
+// 		perunAddrAlice := adjAlice.GetPerunAddr()
+// 		stellarChanAlice, err := adjAlice.StellarClient.GetChannelInfo(ctx, perunAddrAlice, thirdState.ID)
+
+// 		require.True(t, stellarChanAlice.Control.Disputed)
+
+// 		require.NoError(t, err)
+
+// 	}
+
+// }
