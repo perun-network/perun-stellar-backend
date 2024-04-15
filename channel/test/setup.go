@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2024 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import (
 	"log"
 	"math/big"
 	mathrand "math/rand"
+	"path/filepath"
 	pchannel "perun.network/go-perun/channel"
 	ptest "perun.network/go-perun/channel/test"
 	pwallet "perun.network/go-perun/wallet"
@@ -34,21 +35,23 @@ import (
 	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/wallet"
 	pkgtest "polycry.pt/poly-go/test"
+	"runtime"
 	"testing"
 	"time"
 )
 
 const (
-	PerunContractPath        = "../testdata/perun_soroban_contract.wasm"
-	StellarAssetContractPath = "../testdata/perun_soroban_token.wasm"
+	PerunContractPath        = "testdata/perun_soroban_contract.wasm"
+	StellarAssetContractPath = "testdata/perun_soroban_token.wasm"
 	initLumensBalance        = "10000000"
 	initTokenBalance         = uint64(2000000)
-	DefaultTestTimeout       = 20
+	DefaultTestTimeout       = 30
 )
 
 type Setup struct {
 	t              *testing.T
 	accs           []*wallet.Account
+	ws             []*wallet.EphemeralWallet
 	stellarClients []*client.Client
 	Rng            *mathrand.Rand
 	funders        []*channel.Funder
@@ -76,20 +79,47 @@ func (s *Setup) GetAccounts() []*wallet.Account {
 	return s.accs
 }
 
+func (s *Setup) GetWallets() []*wallet.EphemeralWallet {
+	return s.ws
+}
+
+func getProjectRoot() (string, error) {
+	_, b, _, _ := runtime.Caller(1)
+	basepath := filepath.Dir(b)
+
+	fp, err := filepath.Abs(filepath.Join(basepath, "../..")) //filepath.Abs(filepath.Join(basepath, "../.."))
+	return fp, err
+}
+
+func getDataFilePath(filename string) (string, error) {
+	root, err := getProjectRoot()
+	if err != nil {
+		return "", err
+	}
+
+	fp := filepath.Join(root, "", filename) //filepath.Join(root, "testdata", filename)
+	return fp, nil
+}
+
 func NewTestSetup(t *testing.T) *Setup {
 
-	accs, kpsToFund := MakeRandPerunAccs(4)
+	accs, kpsToFund, ws := MakeRandPerunAccsWallets(4)
 	require.NoError(t, CreateFundStellarAccounts(kpsToFund, initLumensBalance))
 
 	depTokenKp := kpsToFund[2]
 	depPerunKp := kpsToFund[3]
 
-	tokenAddress, _ := Deploy(t, depTokenKp, StellarAssetContractPath)
-	perunAddress, _ := Deploy(t, depPerunKp, PerunContractPath)
+	relPathPerun, err := getDataFilePath(PerunContractPath)
+	require.NoError(t, err)
+	relPathAsset, err := getDataFilePath(StellarAssetContractPath)
+	require.NoError(t, err)
+
+	tokenAddress, _ := Deploy(t, depTokenKp, relPathAsset)
+	perunAddress, _ := Deploy(t, depPerunKp, relPathPerun)
 
 	require.NoError(t, InitTokenContract(depTokenKp, tokenAddress))
 
-	setupAccountsAndContracts(t, depTokenKp, kpsToFund[:2], tokenAddress, initTokenBalance)
+	SetupAccountsAndContracts(t, depTokenKp, kpsToFund[:2], tokenAddress, initTokenBalance)
 
 	assetContractID, err := types.NewStellarAssetFromScAddress(tokenAddress)
 	require.NoError(t, err)
@@ -97,15 +127,20 @@ func NewTestSetup(t *testing.T) *Setup {
 	stellarClients := NewStellarClients(kpsToFund)
 
 	aliceClient := stellarClients[0]
+	aliceWallet := ws[0]
 	bobClient := stellarClients[1]
+	bobWallet := ws[1]
+
 	channelAccs := []*wallet.Account{accs[0], accs[1]}
 	channelClients := []*client.Client{aliceClient, bobClient}
+	channelWallets := []*wallet.EphemeralWallet{aliceWallet, bobWallet}
 
-	funders, adjs := createFundersAndAdjudicators(channelAccs, stellarClients, perunAddress, tokenAddress)
+	funders, adjs := CreateFundersAndAdjudicators(channelAccs, stellarClients, perunAddress, tokenAddress)
 
 	setup := Setup{
 		t:              t,
 		accs:           channelAccs,
+		ws:             channelWallets,
 		stellarClients: channelClients,
 		funders:        funders,
 		adjs:           adjs,
@@ -115,7 +150,7 @@ func NewTestSetup(t *testing.T) *Setup {
 	return &setup
 }
 
-func setupAccountsAndContracts(t *testing.T, deployerKp *keypair.Full, kps []*keypair.Full, tokenAddress xdr.ScAddress, tokenBalance uint64) {
+func SetupAccountsAndContracts(t *testing.T, deployerKp *keypair.Full, kps []*keypair.Full, tokenAddress xdr.ScAddress, tokenBalance uint64) {
 	for _, kp := range kps {
 		addr, err := types.MakeAccountAddress(kp)
 		require.NoError(t, err)
@@ -123,7 +158,7 @@ func setupAccountsAndContracts(t *testing.T, deployerKp *keypair.Full, kps []*ke
 	}
 }
 
-func createFundersAndAdjudicators(accs []*wallet.Account, clients []*client.Client, perunAddress, tokenAddress xdr.ScAddress) ([]*channel.Funder, []*channel.Adjudicator) {
+func CreateFundersAndAdjudicators(accs []*wallet.Account, clients []*client.Client, perunAddress, tokenAddress xdr.ScAddress) ([]*channel.Funder, []*channel.Adjudicator) {
 	funders := make([]*channel.Funder, len(accs))
 	adjs := make([]*channel.Adjudicator, len(accs))
 	for i, acc := range accs {
@@ -141,16 +176,18 @@ func NewStellarClients(kps []*keypair.Full) []*client.Client {
 	return clients
 }
 
-func MakeRandPerunAccs(count int) ([]*wallet.Account, []*keypair.Full) {
+func MakeRandPerunAccsWallets(count int) ([]*wallet.Account, []*keypair.Full, []*wallet.EphemeralWallet) {
 	accs := make([]*wallet.Account, count)
 	kps := make([]*keypair.Full, count)
+	ws := make([]*wallet.EphemeralWallet, count)
 
 	for i := 0; i < count; i++ {
-		acc, kp := MakeRandPerunAcc()
+		acc, kp, w := MakeRandPerunAccWallet()
 		accs[i] = acc
 		kps[i] = kp
+		ws[i] = w
 	}
-	return accs, kps
+	return accs, kps, ws
 }
 
 func MakeRandPerunAcc() (*wallet.Account, *keypair.Full) {
@@ -171,6 +208,26 @@ func MakeRandPerunAcc() (*wallet.Account, *keypair.Full) {
 		panic(err)
 	}
 	return acc, kp
+}
+
+func MakeRandPerunAccWallet() (*wallet.Account, *keypair.Full, *wallet.EphemeralWallet) {
+	w := wallet.NewEphemeralWallet()
+
+	var b [8]byte
+	_, err := rand.Read(b[:])
+	if err != nil {
+		panic(err)
+	}
+
+	seed := binary.LittleEndian.Uint64(b[:])
+
+	r := mathrand.New(mathrand.NewSource(int64(seed)))
+
+	acc, kp, err := w.AddNewAccount(r)
+	if err != nil {
+		panic(err)
+	}
+	return acc, kp, w
 }
 
 func CreateFundStellarAccounts(pairs []*keypair.Full, initialBalance string) error {
@@ -230,7 +287,7 @@ func CreateFundStellarAccounts(pairs []*keypair.Full, initialBalance string) err
 	}
 
 	for _, keys := range pairs {
-		log.Printf("Funded %s (%s) with %s XLM.\n",
+		log.Printf("Funded Stellar L1 account %s (%s) with %s XLM.\n",
 			keys.Seed(), keys.Address(), initialBalance)
 	}
 

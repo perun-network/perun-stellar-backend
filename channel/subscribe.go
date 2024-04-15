@@ -29,7 +29,6 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 	if s.getEvents() == nil {
 		return nil
 	}
-
 	select {
 	case ev := <-s.getEvents():
 		if ev == nil {
@@ -38,27 +37,26 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 
 		switch e := ev.(type) {
 		case *event.DisputedEvent:
-			log.Println("DisputedEvent received")
+			log.Println("DisputedEvent received - build RegisteredEvent")
 			dispEvent := pchannel.AdjudicatorEventBase{
-				VersionV: e.GetVersion(),
-				IDV:      e.GetID(),
+				VersionV: e.Version(),
+				IDV:      e.ID(),
 				TimeoutV: event.MakeTimeout(*s.challengeDuration),
 			}
-			ddn := &pchannel.RegisteredEvent{AdjudicatorEventBase: dispEvent, State: nil, Sigs: nil}
-			s.closer.Close()
-			return ddn
+			adjDispEvent := &pchannel.RegisteredEvent{AdjudicatorEventBase: dispEvent, State: nil, Sigs: nil}
+			return adjDispEvent
 
 		case *event.CloseEvent:
 
-			log.Println("CloseEvent received")
+			log.Println("CloseEvent received - build ConcludedEvent")
+
 			conclEvent := pchannel.AdjudicatorEventBase{
-				VersionV: e.GetVersion(),
-				IDV:      e.GetID(),
+				VersionV: e.Version(),
+				IDV:      e.ID(),
 				TimeoutV: event.MakeTimeout(*s.challengeDuration),
 			}
-			ccn := &pchannel.ConcludedEvent{AdjudicatorEventBase: conclEvent}
-			s.closer.Close()
-			return ccn
+			adjConclEvent := &pchannel.ConcludedEvent{AdjudicatorEventBase: conclEvent}
+			return adjConclEvent
 
 		default:
 			log.Printf("Received an unknown event type: %v\n", reflect.TypeOf(e))

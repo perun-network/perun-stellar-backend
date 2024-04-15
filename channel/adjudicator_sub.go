@@ -32,7 +32,6 @@ const (
 	DefaultSubscriptionPollingInterval = time.Duration(5) * time.Second
 )
 
-// AdjudicatorSub implements the AdjudicatorSubscription interface.
 type AdjEventSub struct {
 	challengeDuration *time.Duration
 	stellarClient     *client.Client
@@ -49,7 +48,7 @@ type AdjEventSub struct {
 	log               log.Embedding
 }
 
-func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *client.Client, perunAddr xdr.ScAddress, assetAddr xdr.ScAddress, challengeDuration *time.Duration) (*AdjEventSub, error) {
+func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *client.Client, perunAddr xdr.ScAddress, assetAddr xdr.ScAddress, challengeDuration *time.Duration) (pchannel.AdjudicatorSubscription, error) {
 
 	sub := &AdjEventSub{
 		challengeDuration: challengeDuration,
@@ -92,15 +91,14 @@ polling:
 			finish(err)
 			return
 		case <-ctx.Done():
+			s.log.Log().Debug("Timeout during Adjudicator Subscription")
 			finish(nil)
 			return
 		case <-time.After(s.pollInterval):
-
-			newChanInfo, err := s.stellarClient.GetChannelInfo(ctx, s.perunAddr, s.cid) // getChanControl()
+			newChanInfo, err := s.stellarClient.GetChannelInfo(ctx, s.perunAddr, s.cid)
 			newChanControl = newChanInfo.Control
 
 			if err != nil {
-
 				s.subErrors <- err
 			}
 			adjEvent, err := DifferencesInControls(s.chanControl, newChanControl)
@@ -117,7 +115,6 @@ polling:
 				s.log.Log().Debug("Contract event detected, evaluating...")
 				s.log.Log().Debugf("Found contract event: %v", adjEvent)
 				s.events <- adjEvent
-				return
 			}
 		}
 	}
@@ -128,9 +125,6 @@ func DifferencesInControls(controlCurr, controlNext wire.Control) (event.PerunEv
 	if controlCurr.FundedA != controlNext.FundedA {
 		if controlCurr.FundedA {
 			return nil, errors.New("channel cannot be unfunded A before withdrawal")
-		}
-		if controlNext.WithdrawnA && controlNext.WithdrawnB {
-			return &event.FundEvent{}, nil
 		}
 	}
 
@@ -150,6 +144,10 @@ func DifferencesInControls(controlCurr, controlNext wire.Control) (event.PerunEv
 		if !controlCurr.Closed && controlNext.Closed {
 			return &event.CloseEvent{}, nil
 		}
+		return &event.CloseEvent{}, nil
+	}
+
+	if controlCurr.Closed && controlNext.Closed {
 		return &event.CloseEvent{}, nil
 	}
 

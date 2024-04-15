@@ -81,16 +81,21 @@ func TestHappyChannel(t *testing.T) {
 			Idx:       pchannel.Index(1),
 			Secondary: false}
 
+		_, err = adjAlice.Subscribe(ctx, next.ID)
+		require.NoError(t, err)
 		require.NoError(t, adjAlice.Withdraw(ctxAliceWithdraw, reqAlice, nil))
+		// ev := subAlice.Next()
+		// if _, ok := ev.(pchannel.ConcludedEvent); ok {
+		// 	fmt.Println("event concluded is here")
+		// }
+
 		perunAddrAlice := adjAlice.GetPerunAddr()
 		stellarChanAlice, err := adjAlice.StellarClient.GetChannelInfo(ctx, perunAddrAlice, next.ID)
-
 		require.True(t, stellarChanAlice.Control.WithdrawnA)
 
 		require.NoError(t, err)
 		require.NoError(t, adjBob.Withdraw(ctx, reqBob, nil))
 		perunAddrBob := adjBob.GetPerunAddr()
-
 		stellarChanBob, err := adjBob.StellarClient.GetChannelInfo(ctxBobWithdraw, perunAddrBob, next.ID)
 
 		require.NoError(t, err)

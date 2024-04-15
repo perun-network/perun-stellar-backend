@@ -65,44 +65,45 @@ type controlsState map[string]bool
 
 type (
 	PerunEvent interface {
-		GetID() pchannel.ID
+		ID() pchannel.ID
 		GetChannel() wire.Channel
-		GetVersion() Version
+		Version() Version
 		GetType() (EventType, error)
+		Timeout() pchannel.Timeout
 	}
 
 	OpenEvent struct {
-		channel wire.Channel
-		// eventType EventType
+		channel  wire.Channel
 		idv      pchannel.ID
 		versionV Version
+		timeout  pchannel.Timeout
 	}
 	FundEvent struct {
-		channel wire.Channel
-		// eventType EventType
+		channel  wire.Channel
 		idv      pchannel.ID
 		versionV Version
+		timeout  pchannel.Timeout
 	}
 
 	CloseEvent struct {
-		channel wire.Channel
-		// eventType EventType
+		channel  wire.Channel
 		idv      pchannel.ID
 		versionV Version
+		timeout  pchannel.Timeout
 	}
 
 	WithdrawnEvent struct {
-		channel wire.Channel
-		// eventType EventType
+		channel  wire.Channel
 		idv      pchannel.ID
 		versionV Version
+		timeout  pchannel.Timeout
 	}
 
 	DisputedEvent struct {
-		channel wire.Channel
-		// eventType EventType
+		channel  wire.Channel
 		idv      pchannel.ID
 		versionV Version
+		timeout  pchannel.Timeout
 	}
 )
 
@@ -122,11 +123,15 @@ func (e *OpenEvent) GetType() (EventType, error) {
 	return EventTypeOpen, nil
 }
 
-func (e *OpenEvent) GetID() pchannel.ID {
+func (e *OpenEvent) ID() pchannel.ID {
 	return e.idv
 }
-func (e *OpenEvent) GetVersion() Version {
+func (e *OpenEvent) Version() Version {
 	return e.versionV
+}
+
+func (e *OpenEvent) Timeout() pchannel.Timeout {
+	return e.timeout
 }
 
 func (e *WithdrawnEvent) GetChannel() wire.Channel {
@@ -145,11 +150,15 @@ func (e *WithdrawnEvent) GetType() (EventType, error) {
 	return EventTypeError, errors.New("withdraw event has no consistent type: not withdrawn")
 }
 
-func (e *WithdrawnEvent) GetID() pchannel.ID {
+func (e *WithdrawnEvent) ID() pchannel.ID {
 	return e.idv
 }
-func (e *WithdrawnEvent) GetVersion() Version {
+func (e *WithdrawnEvent) Version() Version {
 	return e.versionV
+}
+
+func (e *WithdrawnEvent) Timeout() pchannel.Timeout {
+	return e.timeout
 }
 
 func (e *CloseEvent) GetChannel() wire.Channel {
@@ -160,12 +169,17 @@ func (e *CloseEvent) GetType() (EventType, error) {
 	return EventTypeClosed, nil
 }
 
-func (e *CloseEvent) GetID() pchannel.ID {
+func (e *CloseEvent) ID() pchannel.ID {
 	return e.idv
 }
-func (e *CloseEvent) GetVersion() Version {
+func (e *CloseEvent) Version() Version {
 	return e.versionV
 }
+
+func (e *CloseEvent) Timeout() pchannel.Timeout {
+	return e.timeout
+}
+
 func (e *FundEvent) GetChannel() wire.Channel {
 	return e.channel
 }
@@ -182,14 +196,18 @@ func (e *FundEvent) GetType() (EventType, error) {
 	return EventTypeError, errors.New("funding event has no consistent type: not funded")
 }
 
-func (e *FundEvent) GetID() pchannel.ID {
+func (e *FundEvent) ID() pchannel.ID {
 	return e.idv
 }
-func (e *FundEvent) GetVersion() Version {
+func (e *FundEvent) Version() Version {
 	return e.versionV
 }
 
-func (e *DisputedEvent) GetID() pchannel.ID {
+func (e *FundEvent) Timeout() pchannel.Timeout {
+	return e.timeout
+}
+
+func (e *DisputedEvent) ID() pchannel.ID {
 	return e.idv
 }
 
@@ -197,8 +215,12 @@ func (e *DisputedEvent) GetChannel() wire.Channel {
 	return e.channel
 }
 
-func (e *DisputedEvent) GetVersion() Version {
+func (e *DisputedEvent) Version() Version {
 	return e.versionV
+}
+
+func (e *DisputedEvent) Timeout() pchannel.Timeout {
+	return e.timeout
 }
 
 func (e *DisputedEvent) GetType() (EventType, error) {

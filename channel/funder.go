@@ -82,6 +82,7 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 		case <-ctx.Done():
 			timeoutErr := makeTimeoutErr([]pchannel.Index{req.Idx}, 0)
 			errAbort := f.AbortChannel(ctx, req.State)
+			log.Printf("%s: Aborting channel due to timeout...\n", party)
 			if errAbort != nil {
 				return errAbort
 			}
