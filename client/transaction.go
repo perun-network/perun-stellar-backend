@@ -10,11 +10,8 @@ import (
 	"github.com/stellar/go/txnbuild"
 	"github.com/stellar/go/xdr"
 	"strconv"
-	"sync"
 	"time"
 )
-
-var sharedMtx sync.Mutex
 
 const sorobanRPCPort = 8000
 
@@ -50,8 +47,8 @@ func CreateSignedTransactionWithParams(signers []*keypair.Full, txParams txnbuil
 }
 
 func (c *Client) InvokeAndProcessHostFunction(fname string, callTxArgs xdr.ScVec, contractAddr xdr.ScAddress) (xdr.TransactionMeta, error) {
-	sharedMtx.Lock()
-	defer sharedMtx.Unlock()
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
 	fnameXdr := xdr.ScSymbol(fname)
 	hzAcc, err := c.GetHorizonAccount()
 	if err != nil {
