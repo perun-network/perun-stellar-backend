@@ -21,9 +21,9 @@ import (
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/xdr"
 	"log"
-
 	pchannel "perun.network/go-perun/channel"
 	pwallet "perun.network/go-perun/wallet"
+	"sync"
 
 	"perun.network/perun-stellar-backend/event"
 	"perun.network/perun-stellar-backend/wire"
@@ -36,6 +36,7 @@ var ErrCouldNotDecodeTxMeta = errors.New("could not decode tx output")
 type Client struct {
 	hzClient  *horizonclient.Client
 	keyHolder keyHolder
+	mtx       sync.Mutex
 }
 type keyHolder struct {
 	kp *keypair.Full
@@ -45,6 +46,7 @@ func New(kp *keypair.Full) *Client {
 	return &Client{
 		hzClient:  NewHorizonClient(),
 		keyHolder: newKeyHolder(kp),
+		mtx:       sync.Mutex{},
 	}
 }
 
