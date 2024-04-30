@@ -49,18 +49,18 @@ const (
 )
 
 type Setup struct {
-	t              *testing.T
-	accs           []*wallet.Account
-	ws             []*wallet.EphemeralWallet
-	stellarClients []*client.Client
-	Rng            *mathrand.Rand
-	funders        []*channel.Funder
-	adjs           []*channel.Adjudicator
-	assetID        pchannel.Asset
+	t       *testing.T
+	accs    []*wallet.Account
+	ws      []*wallet.EphemeralWallet
+	cbs     []*client.ContractBackend
+	Rng     *mathrand.Rand
+	funders []*channel.Funder
+	adjs    []*channel.Adjudicator
+	assetID pchannel.Asset
 }
 
-func (s *Setup) GetStellarClients() []*client.Client {
-	return s.stellarClients
+func (s *Setup) GetStellarClients() []*client.ContractBackend {
+	return s.cbs
 }
 
 func (s *Setup) GetFunders() []*channel.Funder {
@@ -97,7 +97,7 @@ func getDataFilePath(filename string) (string, error) {
 		return "", err
 	}
 
-	fp := filepath.Join(root, "", filename) //filepath.Join(root, "testdata", filename)
+	fp := filepath.Join(root, "", filename)
 	return fp, nil
 }
 
@@ -124,27 +124,28 @@ func NewTestSetup(t *testing.T) *Setup {
 	assetContractID, err := types.NewStellarAssetFromScAddress(tokenAddress)
 	require.NoError(t, err)
 
-	stellarClients := NewStellarClients(kpsToFund)
+	cbs := NewContractBackendsFromKeys(kpsToFund[:2])
 
-	aliceClient := stellarClients[0]
+	aliceCB := cbs[0]
 	aliceWallet := ws[0]
-	bobClient := stellarClients[1]
+
+	bobCB := cbs[1]
 	bobWallet := ws[1]
 
 	channelAccs := []*wallet.Account{accs[0], accs[1]}
-	channelClients := []*client.Client{aliceClient, bobClient}
+	channelCBs := []*client.ContractBackend{aliceCB, bobCB}
 	channelWallets := []*wallet.EphemeralWallet{aliceWallet, bobWallet}
 
-	funders, adjs := CreateFundersAndAdjudicators(channelAccs, stellarClients, perunAddress, tokenAddress)
+	funders, adjs := CreateFundersAndAdjudicators(channelAccs, cbs, perunAddress, tokenAddress)
 
 	setup := Setup{
-		t:              t,
-		accs:           channelAccs,
-		ws:             channelWallets,
-		stellarClients: channelClients,
-		funders:        funders,
-		adjs:           adjs,
-		assetID:        assetContractID,
+		t:       t,
+		accs:    channelAccs,
+		ws:      channelWallets,
+		cbs:     channelCBs,
+		funders: funders,
+		adjs:    adjs,
+		assetID: assetContractID,
 	}
 
 	return &setup
@@ -157,23 +158,29 @@ func SetupAccountsAndContracts(t *testing.T, deployerKp *keypair.Full, kps []*ke
 		require.NoError(t, MintToken(deployerKp, tokenAddress, tokenBalance, addr))
 	}
 }
-
-func CreateFundersAndAdjudicators(accs []*wallet.Account, clients []*client.Client, perunAddress, tokenAddress xdr.ScAddress) ([]*channel.Funder, []*channel.Adjudicator) {
+func CreateFundersAndAdjudicators(accs []*wallet.Account, cbs []*client.ContractBackend, perunAddress, tokenAddress xdr.ScAddress) ([]*channel.Funder, []*channel.Adjudicator) {
 	funders := make([]*channel.Funder, len(accs))
 	adjs := make([]*channel.Adjudicator, len(accs))
 	for i, acc := range accs {
-		funders[i] = channel.NewFunder(acc, clients[i], perunAddress, tokenAddress)
-		adjs[i] = channel.NewAdjudicator(acc, clients[i], perunAddress, tokenAddress)
+		funders[i] = channel.NewFunder(acc, cbs[i], perunAddress, tokenAddress)
+		adjs[i] = channel.NewAdjudicator(acc, cbs[i], perunAddress, tokenAddress)
 	}
 	return funders, adjs
 }
 
-func NewStellarClients(kps []*keypair.Full) []*client.Client {
-	clients := make([]*client.Client, len(kps))
+func NewContractBackendsFromKeys(kps []*keypair.Full) []*client.ContractBackend {
+	cbs := make([]*client.ContractBackend, len(kps))
+	// generate Configs
 	for i, kp := range kps {
-		clients[i] = client.New(kp)
+		cbs[i] = NewContractBackendFromKey(kp)
 	}
-	return clients
+	return cbs
+}
+
+func NewContractBackendFromKey(kp *keypair.Full) *client.ContractBackend {
+	trConfig := client.TransactorConfig{}
+	trConfig.SetKeyPair(kp)
+	return client.NewContractBackend(&trConfig)
 }
 
 func MakeRandPerunAccsWallets(count int) ([]*wallet.Account, []*keypair.Full, []*wallet.EphemeralWallet) {

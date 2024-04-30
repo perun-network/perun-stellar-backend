@@ -9,7 +9,7 @@ import (
 	"perun.network/perun-stellar-backend/wire"
 )
 
-type StellarClient interface {
+type Invoker interface {
 	Open(ctx context.Context, perunAddr xdr.ScAddress, params *pchannel.Params, state *pchannel.State) error
 	Abort(ctx context.Context, perunAddr xdr.ScAddress, state *pchannel.State) error
 	Fund(ctx context.Context, perunAddr xdr.ScAddress, assetAddr xdr.ScAddress, chanId pchannel.ID, funderIdx bool) error

@@ -4,7 +4,6 @@ import (
 	"github.com/stellar/go/xdr"
 	pchannel "perun.network/go-perun/channel"
 	pwallet "perun.network/go-perun/wallet"
-
 	"perun.network/perun-stellar-backend/wire"
 	"perun.network/perun-stellar-backend/wire/scval"
 )
