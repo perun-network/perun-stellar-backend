@@ -34,7 +34,7 @@ const (
 
 type AdjEventSub struct {
 	challengeDuration *time.Duration
-	stellarClient     *client.Client
+	cb                *client.ContractBackend
 	chanControl       wire.Control
 	cid               pchannel.ID
 	perunAddr         xdr.ScAddress
@@ -48,11 +48,11 @@ type AdjEventSub struct {
 	log               log.Embedding
 }
 
-func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *client.Client, perunAddr xdr.ScAddress, assetAddr xdr.ScAddress, challengeDuration *time.Duration) (pchannel.AdjudicatorSubscription, error) {
+func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, cb *client.ContractBackend, perunAddr xdr.ScAddress, assetAddr xdr.ScAddress, challengeDuration *time.Duration) (pchannel.AdjudicatorSubscription, error) {
 
 	sub := &AdjEventSub{
 		challengeDuration: challengeDuration,
-		stellarClient:     stellarClient,
+		cb:                cb,
 		chanControl:       wire.Control{},
 		cid:               cid,
 		perunAddr:         perunAddr,
@@ -72,7 +72,7 @@ func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, stellarClient *clie
 
 func (s *AdjEventSub) run(ctx context.Context) {
 	s.log.Log().Info("Listening for channel state changes")
-	chanControl, err := s.stellarClient.GetChannelInfo(ctx, s.perunAddr, s.cid)
+	chanControl, err := s.cb.GetChannelInfo(ctx, s.perunAddr, s.cid)
 	if err != nil {
 		s.subErrors <- err
 	}
@@ -95,7 +95,7 @@ polling:
 			finish(nil)
 			return
 		case <-time.After(s.pollInterval):
-			newChanInfo, err := s.stellarClient.GetChannelInfo(ctx, s.perunAddr, s.cid)
+			newChanInfo, err := s.cb.GetChannelInfo(ctx, s.perunAddr, s.cid)
 			newChanControl = newChanInfo.Control
 
 			if err != nil {

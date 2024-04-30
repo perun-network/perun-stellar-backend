@@ -23,40 +23,29 @@ import (
 	"log"
 	pchannel "perun.network/go-perun/channel"
 	pwallet "perun.network/go-perun/wallet"
-	"sync"
-
 	"perun.network/perun-stellar-backend/event"
 	"perun.network/perun-stellar-backend/wire"
 )
-
-var _ StellarClient = (*Client)(nil)
 
 var ErrCouldNotDecodeTxMeta = errors.New("could not decode tx output")
 
 type Client struct {
 	hzClient  *horizonclient.Client
 	keyHolder keyHolder
-	mtx       sync.Mutex
 }
+
 type keyHolder struct {
 	kp *keypair.Full
 }
 
-func New(kp *keypair.Full) *Client {
-	return &Client{
-		hzClient:  NewHorizonClient(),
-		keyHolder: newKeyHolder(kp),
-		mtx:       sync.Mutex{},
-	}
-}
-
-func (c *Client) Open(ctx context.Context, perunAddr xdr.ScAddress, params *pchannel.Params, state *pchannel.State) error {
+func (cb *ContractBackend) Open(ctx context.Context, perunAddr xdr.ScAddress, params *pchannel.Params, state *pchannel.State) error {
 
 	openTxArgs, err := buildOpenTxArgs(*params, *state)
 	if err != nil {
 		return errors.New("error while building open tx")
 	}
-	txMeta, err := c.InvokeAndProcessHostFunction("open", openTxArgs, perunAddr)
+	txMeta, err := cb.InvokeSignedTx("open", openTxArgs, perunAddr)
+
 	if err != nil {
 		return errors.New("error while invoking and processing host function: open")
 	}
@@ -74,14 +63,14 @@ func (c *Client) Open(ctx context.Context, perunAddr xdr.ScAddress, params *pcha
 	return nil
 }
 
-func (c *Client) Abort(ctx context.Context, perunAddr xdr.ScAddress, state *pchannel.State) error {
+func (cb *ContractBackend) Abort(ctx context.Context, perunAddr xdr.ScAddress, state *pchannel.State) error {
 
 	chanId := state.ID
 	abortTxArgs, err := buildChanIdTxArgs(chanId)
 	if err != nil {
 		return errors.New("error while building abort_funding tx")
 	}
-	txMeta, err := c.InvokeAndProcessHostFunction("abort_funding", abortTxArgs, perunAddr)
+	txMeta, err := cb.InvokeSignedTx("abort_funding", abortTxArgs, perunAddr)
 	if err != nil {
 		return errors.New("error while invoking and processing host function: abort_funding")
 	}
@@ -94,14 +83,14 @@ func (c *Client) Abort(ctx context.Context, perunAddr xdr.ScAddress, state *pcha
 	return nil
 }
 
-func (c *Client) Fund(ctx context.Context, perunAddr xdr.ScAddress, assetAddr xdr.ScAddress, chanID pchannel.ID, fudnerIdx bool) error {
+func (cb *ContractBackend) Fund(ctx context.Context, perunAddr xdr.ScAddress, assetAddr xdr.ScAddress, chanID pchannel.ID, fudnerIdx bool) error {
 
 	fundTxArgs, err := buildChanIdxTxArgs(chanID, fudnerIdx)
 	if err != nil {
 		return errors.New("error while building fund tx")
 	}
 
-	txMeta, err := c.InvokeAndProcessHostFunction("fund", fundTxArgs, perunAddr)
+	txMeta, err := cb.InvokeSignedTx("fund", fundTxArgs, perunAddr)
 	if err != nil {
 		return err
 	}
@@ -114,7 +103,7 @@ func (c *Client) Fund(ctx context.Context, perunAddr xdr.ScAddress, assetAddr xd
 	err = event.AssertFundedEvent(evs)
 
 	if err == event.ErrNoFundEvent {
-		chanFunded, err := c.GetChannelInfo(ctx, perunAddr, chanID)
+		chanFunded, err := cb.GetChannelInfo(ctx, perunAddr, chanID)
 		if err != nil {
 			return err
 		}
@@ -133,14 +122,14 @@ func (c *Client) Fund(ctx context.Context, perunAddr xdr.ScAddress, assetAddr xd
 	return nil
 }
 
-func (c *Client) Close(ctx context.Context, perunAddr xdr.ScAddress, state *pchannel.State, sigs []pwallet.Sig) error {
+func (cb *ContractBackend) Close(ctx context.Context, perunAddr xdr.ScAddress, state *pchannel.State, sigs []pwallet.Sig) error {
 
 	log.Println("Close called")
 	closeTxArgs, err := buildSignedStateTxArgs(*state, sigs)
 	if err != nil {
 		return errors.New("error while building fund tx")
 	}
-	txMeta, err := c.InvokeAndProcessHostFunction("close", closeTxArgs, perunAddr)
+	txMeta, err := cb.InvokeSignedTx("close", closeTxArgs, perunAddr)
 	if err != nil {
 		return errors.New("error while invoking and processing host function: close")
 	}
@@ -152,7 +141,7 @@ func (c *Client) Close(ctx context.Context, perunAddr xdr.ScAddress, state *pcha
 
 	err = event.AssertCloseEvent(evs)
 	if err == event.ErrNoCloseEvent {
-		chanInfo, err := c.GetChannelInfo(ctx, perunAddr, state.ID)
+		chanInfo, err := cb.GetChannelInfo(ctx, perunAddr, state.ID)
 		if err != nil {
 			return errors.New("could not get channel info")
 		}
@@ -164,14 +153,14 @@ func (c *Client) Close(ctx context.Context, perunAddr xdr.ScAddress, state *pcha
 	return event.ErrNoCloseEvent
 }
 
-func (c *Client) ForceClose(ctx context.Context, perunAddr xdr.ScAddress, chanId pchannel.ID) error {
+func (cb *ContractBackend) ForceClose(ctx context.Context, perunAddr xdr.ScAddress, chanId pchannel.ID) error {
 	log.Println("ForceClose called")
 
 	forceCloseTxArgs, err := buildChanIdTxArgs(chanId)
 	if err != nil {
 		return errors.New("error while building fund tx")
 	}
-	txMeta, err := c.InvokeAndProcessHostFunction("force_close", forceCloseTxArgs, perunAddr)
+	txMeta, err := cb.InvokeSignedTx("force_close", forceCloseTxArgs, perunAddr)
 	if err != nil {
 		return errors.New("error while invoking and processing host function")
 	}
@@ -182,7 +171,7 @@ func (c *Client) ForceClose(ctx context.Context, perunAddr xdr.ScAddress, chanId
 
 	err = event.AssertForceCloseEvent(evs)
 	if err == event.ErrNoForceCloseEvent {
-		chanInfo, err := c.GetChannelInfo(ctx, perunAddr, chanId)
+		chanInfo, err := cb.GetChannelInfo(ctx, perunAddr, chanId)
 		if err != nil {
 			return errors.New("could not retrieve channel info")
 		}
@@ -199,12 +188,12 @@ func (c *Client) ForceClose(ctx context.Context, perunAddr xdr.ScAddress, chanId
 	return nil
 }
 
-func (c *Client) Dispute(ctx context.Context, perunAddr xdr.ScAddress, state *pchannel.State, sigs []pwallet.Sig) error {
+func (cb *ContractBackend) Dispute(ctx context.Context, perunAddr xdr.ScAddress, state *pchannel.State, sigs []pwallet.Sig) error {
 	closeTxArgs, err := buildSignedStateTxArgs(*state, sigs)
 	if err != nil {
 		return errors.New("error while building fund tx")
 	}
-	txMeta, err := c.InvokeAndProcessHostFunction("dispute", closeTxArgs, perunAddr)
+	txMeta, err := cb.InvokeSignedTx("dispute", closeTxArgs, perunAddr)
 	if err != nil {
 		return errors.New("error while invoking and processing host function: dispute")
 	}
@@ -216,7 +205,7 @@ func (c *Client) Dispute(ctx context.Context, perunAddr xdr.ScAddress, state *pc
 
 	err = event.AssertDisputeEvent(evs)
 	if err == event.ErrNoDisputeEvent {
-		chanInfo, err := c.GetChannelInfo(ctx, perunAddr, state.ID)
+		chanInfo, err := cb.GetChannelInfo(ctx, perunAddr, state.ID)
 		if err != nil {
 			return errors.New("could not retrieve channel info")
 		}
@@ -229,7 +218,7 @@ func (c *Client) Dispute(ctx context.Context, perunAddr xdr.ScAddress, state *pc
 
 	return nil
 }
-func (c *Client) Withdraw(ctx context.Context, perunAddr xdr.ScAddress, req pchannel.AdjudicatorReq) error {
+func (cb *ContractBackend) Withdraw(ctx context.Context, perunAddr xdr.ScAddress, req pchannel.AdjudicatorReq) error {
 	chanID, partyIdx := req.Tx.State.ID, req.Idx
 	withdrawerIdx := partyIdx == 1
 	if partyIdx > 1 {
@@ -240,7 +229,7 @@ func (c *Client) Withdraw(ctx context.Context, perunAddr xdr.ScAddress, req pcha
 	if err != nil {
 		return errors.New("error building fund tx")
 	}
-	txMeta, err := c.InvokeAndProcessHostFunction("withdraw", withdrawTxArgs, perunAddr)
+	txMeta, err := cb.InvokeSignedTx("withdraw", withdrawTxArgs, perunAddr)
 	if err != nil {
 		return errors.New("error in host function: withdraw")
 	}
@@ -255,7 +244,7 @@ func (c *Client) Withdraw(ctx context.Context, perunAddr xdr.ScAddress, req pcha
 		return err
 	}
 
-	chanInfo, err := c.GetChannelInfo(ctx, perunAddr, chanID)
+	chanInfo, err := cb.GetChannelInfo(ctx, perunAddr, chanID)
 	if err != nil {
 		return err
 	}
@@ -266,13 +255,13 @@ func (c *Client) Withdraw(ctx context.Context, perunAddr xdr.ScAddress, req pcha
 	return event.ErrNoWithdrawEvent
 }
 
-func (c *Client) GetChannelInfo(ctx context.Context, perunAddr xdr.ScAddress, chanId pchannel.ID) (wire.Channel, error) {
+func (cb *ContractBackend) GetChannelInfo(ctx context.Context, perunAddr xdr.ScAddress, chanId pchannel.ID) (wire.Channel, error) {
 
 	getchTxArgs, err := buildChanIdTxArgs(chanId)
 	if err != nil {
 		return wire.Channel{}, errors.New("error while building get_channel tx")
 	}
-	txMeta, err := c.InvokeAndProcessHostFunction("get_channel", getchTxArgs, perunAddr)
+	txMeta, err := cb.InvokeSignedTx("get_channel", getchTxArgs, perunAddr)
 	if err != nil {
 		return wire.Channel{}, errors.New("error while processing and submitting get_channel tx")
 	}

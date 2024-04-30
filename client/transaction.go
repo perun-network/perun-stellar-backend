@@ -5,7 +5,6 @@ import (
 	"github.com/creachadair/jrpc2"
 	"github.com/creachadair/jrpc2/jhttp"
 	"github.com/stellar/go/clients/horizonclient"
-	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/protocols/horizon"
 	"github.com/stellar/go/txnbuild"
 	"github.com/stellar/go/xdr"
@@ -15,67 +14,19 @@ import (
 
 const sorobanRPCPort = 8000
 
-func (s *Client) CreateSignedTxFromParams(txParams txnbuild.TransactionParams) (*txnbuild.Transaction, error) {
+func (st *StellarSigner) createSignedTxFromParams(txParams txnbuild.TransactionParams) (*txnbuild.Transaction, error) {
 
 	txUnsigned, err := txnbuild.NewTransaction(txParams)
 	if err != nil {
 		return nil, err
 	}
 
-	tx, err := txUnsigned.Sign(NETWORK_PASSPHRASE, s.keyHolder.kp)
+	tx, err := txUnsigned.Sign(NETWORK_PASSPHRASE, st.keyPair)
 	if err != nil {
 		return nil, err
 	}
 
 	return tx, nil
-}
-
-func CreateSignedTransactionWithParams(signers []*keypair.Full, txParams txnbuild.TransactionParams,
-) (*txnbuild.Transaction, error) {
-	tx, err := txnbuild.NewTransaction(txParams)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, signer := range signers {
-		tx, err = tx.Sign(NETWORK_PASSPHRASE, signer)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return tx, nil
-}
-
-func (c *Client) InvokeAndProcessHostFunction(fname string, callTxArgs xdr.ScVec, contractAddr xdr.ScAddress) (xdr.TransactionMeta, error) {
-	c.mtx.Lock()
-	defer c.mtx.Unlock()
-	fnameXdr := xdr.ScSymbol(fname)
-	hzAcc, err := c.GetHorizonAccount()
-	if err != nil {
-		return xdr.TransactionMeta{}, err
-	}
-	hzClient := c.GetHorizonClient()
-
-	invokeHostFunctionOp := BuildContractCallOp(hzAcc, fnameXdr, callTxArgs, contractAddr)
-	preFlightOp, minFee := PreflightHostFunctions(hzClient, &hzAcc, *invokeHostFunctionOp)
-
-	txParams := GetBaseTransactionParamsWithFee(&hzAcc, minFee, &preFlightOp)
-	txSigned, err := c.CreateSignedTxFromParams(txParams)
-	if err != nil {
-		return xdr.TransactionMeta{}, err
-	}
-	tx, err := hzClient.SubmitTransaction(txSigned)
-	if err != nil {
-		return xdr.TransactionMeta{}, err
-	}
-	// Decode transaction metadata
-	txMeta, err := DecodeTxMeta(tx)
-	if err != nil {
-		return xdr.TransactionMeta{}, ErrCouldNotDecodeTxMeta
-	}
-	_ = txMeta.V3.SorobanMeta.ReturnValue
-
-	return txMeta, nil
 }
 
 func DecodeTxMeta(tx horizon.Transaction) (xdr.TransactionMeta, error) {

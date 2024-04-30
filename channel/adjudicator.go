@@ -34,7 +34,7 @@ var DefaultChallengeDuration = time.Duration(20) * time.Second
 type Adjudicator struct {
 	challengeDuration *time.Duration
 	log               log.Embedding
-	StellarClient     *client.Client
+	CB                *client.ContractBackend
 	acc               *wallet.Account
 	assetAddr         xdr.ScAddress
 	perunAddr         xdr.ScAddress
@@ -43,10 +43,10 @@ type Adjudicator struct {
 }
 
 // NewAdjudicator returns a new Adjudicator.
-func NewAdjudicator(acc *wallet.Account, stellarClient *client.Client, perunID xdr.ScAddress, assetID xdr.ScAddress) *Adjudicator {
+func NewAdjudicator(acc *wallet.Account, cb *client.ContractBackend, perunID xdr.ScAddress, assetID xdr.ScAddress) *Adjudicator {
 	return &Adjudicator{
 		challengeDuration: &DefaultChallengeDuration,
-		StellarClient:     stellarClient,
+		CB:                cb,
 		acc:               acc,
 		perunAddr:         perunID,
 		assetAddr:         assetID,
@@ -65,10 +65,9 @@ func (a *Adjudicator) GetAssetAddr() xdr.ScAddress {
 }
 
 func (a *Adjudicator) Subscribe(ctx context.Context, cid pchannel.ID) (pchannel.AdjudicatorSubscription, error) {
-	c := a.StellarClient
 	perunAddr := a.GetPerunAddr()
 	assetAddr := a.GetAssetAddr()
-	return NewAdjudicatorSub(ctx, cid, c, perunAddr, assetAddr, a.challengeDuration)
+	return NewAdjudicatorSub(ctx, cid, a.CB, perunAddr, assetAddr, a.challengeDuration)
 }
 
 func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq, smap pchannel.StateMap) error {
@@ -77,7 +76,7 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 		log.Println("Withdraw called")
 
 		if err := a.Close(ctx, req.Tx.State, req.Tx.Sigs); err != nil {
-			chanControl, errChanState := a.StellarClient.GetChannelInfo(ctx, a.perunAddr, req.Tx.State.ID)
+			chanControl, errChanState := a.CB.GetChannelInfo(ctx, a.perunAddr, req.Tx.State.ID)
 			if errChanState != nil {
 				return errChanState
 			}
@@ -110,7 +109,7 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 
 func (a *Adjudicator) withdraw(ctx context.Context, req pchannel.AdjudicatorReq) error {
 	perunAddress := a.GetPerunAddr()
-	return a.StellarClient.Withdraw(ctx, perunAddress, req)
+	return a.CB.Withdraw(ctx, perunAddress, req)
 }
 
 func (a *Adjudicator) Close(ctx context.Context, state *pchannel.State, sigs []pwallet.Sig) error {
@@ -118,7 +117,7 @@ func (a *Adjudicator) Close(ctx context.Context, state *pchannel.State, sigs []p
 	log.Println("Close called")
 	perunAddr := a.GetPerunAddr()
 
-	return a.StellarClient.Close(ctx, perunAddr, state, sigs)
+	return a.CB.Close(ctx, perunAddr, state, sigs)
 }
 
 // Register registers and disputes a channel.
@@ -133,11 +132,11 @@ func (a *Adjudicator) Register(ctx context.Context, req pchannel.AdjudicatorReq,
 
 func (a *Adjudicator) Dispute(ctx context.Context, state *pchannel.State, sigs []pwallet.Sig) error {
 	contractAddress := a.GetPerunAddr()
-	return a.StellarClient.Dispute(ctx, contractAddress, state, sigs)
+	return a.CB.Dispute(ctx, contractAddress, state, sigs)
 }
 
 func (a *Adjudicator) ForceClose(ctx context.Context, state *pchannel.State, sigs []pwallet.Sig) error {
-	return a.StellarClient.ForceClose(ctx, a.perunAddr, state.ID)
+	return a.CB.ForceClose(ctx, a.perunAddr, state.ID)
 }
 
 func (a Adjudicator) Progress(ctx context.Context, req pchannel.ProgressReq) error {

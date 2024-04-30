@@ -15,6 +15,7 @@
 package test
 
 import (
+	"errors"
 	"github.com/stellar/go/clients/horizonclient"
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/xdr"
@@ -22,6 +23,7 @@ import (
 	"perun.network/perun-stellar-backend/channel"
 	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/client"
+	"perun.network/perun-stellar-backend/event"
 	"perun.network/perun-stellar-backend/wire/scval"
 	"testing"
 )
@@ -88,7 +90,8 @@ func BuildInitTokenArgs(adminAddr xdr.ScAddress, decimals uint32, tokenName stri
 
 func InitTokenContract(kp *keypair.Full, contractIDAddress xdr.ScAddress) error {
 
-	stellarClient := client.New(kp)
+	cb := NewContractBackendFromKey(kp)
+
 	adminScAddr, err := types.MakeAccountAddress(kp)
 	if err != nil {
 		panic(err)
@@ -103,9 +106,15 @@ func InitTokenContract(kp *keypair.Full, contractIDAddress xdr.ScAddress) error 
 	if err != nil {
 		panic(err)
 	}
-	_, err = stellarClient.InvokeAndProcessHostFunction("initialize", initArgs, contractIDAddress)
+
+	txMeta, err := cb.InvokeSignedTx("initialize", initArgs, contractIDAddress)
 	if err != nil {
-		panic(err)
+		return errors.New("error while invoking and processing host function: abort_funding")
+	}
+
+	_, err = event.DecodeEventsPerun(txMeta)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -113,10 +122,10 @@ func InitTokenContract(kp *keypair.Full, contractIDAddress xdr.ScAddress) error 
 
 func GetTokenName(kp *keypair.Full, contractAddress xdr.ScAddress) error {
 
-	stellarClient := client.New(kp)
+	cb := NewContractBackendFromKey(kp)
 	TokenNameArgs := xdr.ScVec{}
 
-	_, err := stellarClient.InvokeAndProcessHostFunction("name", TokenNameArgs, contractAddress)
+	_, err := cb.InvokeSignedTx("name", TokenNameArgs, contractAddress)
 	if err != nil {
 		panic(err)
 	}
@@ -165,8 +174,9 @@ func BuildTransferTokenArgs(from xdr.ScAddress, to xdr.ScAddress, amount xdr.Int
 }
 
 func Deploy(t *testing.T, kp *keypair.Full, contractPath string) (xdr.ScAddress, xdr.Hash) {
-	deployerClient := client.New(kp)
-	hzClient := deployerClient.GetHorizonClient()
+	deployerCB := NewContractBackendFromKey(kp)
+	tr := deployerCB.GetTransactor()
+	hzClient := tr.GetHorizonClient()
 	deployerAccReq := horizonclient.AccountRequest{AccountID: kp.Address()}
 	deployerAcc, err := hzClient.AccountDetail(deployerAccReq)
 
@@ -203,7 +213,7 @@ func Deploy(t *testing.T, kp *keypair.Full, contractPath string) (xdr.ScAddress,
 }
 
 func MintToken(kp *keypair.Full, contractAddr xdr.ScAddress, amount uint64, recipientAddr xdr.ScAddress) error {
-	stellarClient := client.New(kp)
+	cb := NewContractBackendFromKey(kp)
 
 	amountTo128Xdr := xdr.Int128Parts{Hi: 0, Lo: xdr.Uint64(amount)}
 
@@ -215,7 +225,7 @@ func MintToken(kp *keypair.Full, contractAddr xdr.ScAddress, amount uint64, reci
 	if err != nil {
 		panic(err)
 	}
-	_, err = stellarClient.InvokeAndProcessHostFunction("mint", mintTokenArgs, contractAddr)
+	_, err = cb.InvokeSignedTx("mint", mintTokenArgs, contractAddr)
 	if err != nil {
 		panic(err)
 	}

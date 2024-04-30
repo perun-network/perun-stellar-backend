@@ -84,19 +84,15 @@ func TestHappyChannel(t *testing.T) {
 		_, err = adjAlice.Subscribe(ctx, next.ID)
 		require.NoError(t, err)
 		require.NoError(t, adjAlice.Withdraw(ctxAliceWithdraw, reqAlice, nil))
-		// ev := subAlice.Next()
-		// if _, ok := ev.(pchannel.ConcludedEvent); ok {
-		// 	fmt.Println("event concluded is here")
-		// }
 
 		perunAddrAlice := adjAlice.GetPerunAddr()
-		stellarChanAlice, err := adjAlice.StellarClient.GetChannelInfo(ctx, perunAddrAlice, next.ID)
+		stellarChanAlice, err := adjAlice.CB.GetChannelInfo(ctx, perunAddrAlice, next.ID)
 		require.True(t, stellarChanAlice.Control.WithdrawnA)
 
 		require.NoError(t, err)
 		require.NoError(t, adjBob.Withdraw(ctx, reqBob, nil))
 		perunAddrBob := adjBob.GetPerunAddr()
-		stellarChanBob, err := adjBob.StellarClient.GetChannelInfo(ctxBobWithdraw, perunAddrBob, next.ID)
+		stellarChanBob, err := adjBob.CB.GetChannelInfo(ctxBobWithdraw, perunAddrBob, next.ID)
 
 		require.NoError(t, err)
 
@@ -156,7 +152,7 @@ func TestChannel_RegisterFinal(t *testing.T) {
 		require.NoError(t, adjAlice.Register(ctxAliceRegister, reqAlice, nil))
 
 		perunAddrAlice := adjAlice.GetPerunAddr()
-		stellarChanAlice, err := adjAlice.StellarClient.GetChannelInfo(ctx, perunAddrAlice, next.ID)
+		stellarChanAlice, err := adjAlice.CB.GetChannelInfo(ctx, perunAddrAlice, next.ID)
 
 		require.True(t, stellarChanAlice.Control.Disputed)
 
