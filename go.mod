@@ -8,7 +8,7 @@ require (
 	github.com/creachadair/jrpc2 v1.1.0
 	github.com/stellar/go-xdr v0.0.0-20231122183749-b53fb00bcac2
 	github.com/stretchr/testify v1.8.4
-	perun.network/go-perun v0.10.6
+	perun.network/go-perun v0.11.0
 	polycry.pt/poly-go v0.0.0-20220301085937-fb9d71b45a37
 )
 
@@ -17,6 +17,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/go-chi/chi v4.1.2+incompatible // indirect
 	github.com/go-errors/errors v1.5.1 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/schema v1.2.0 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/manucorporat/sse v0.0.0-20160126180136-ee05b128a739 // indirect
