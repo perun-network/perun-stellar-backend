@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2024 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import (
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/channel/types"
+	wtypes "perun.network/perun-stellar-backend/wallet/types"
 	"perun.network/perun-stellar-backend/wire"
 )
 
@@ -65,4 +66,9 @@ func EncodeState(state *channel.State) ([]byte, error) {
 		return nil, err
 	}
 	return ws.MarshalBinary()
+}
+
+func (b backend) NewAppID() channel.AppID {
+	addr := &wtypes.Address{}
+	return &AppID{addr}
 }
