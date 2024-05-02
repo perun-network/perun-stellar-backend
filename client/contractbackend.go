@@ -48,6 +48,14 @@ func (tc *TransactorConfig) SetKeyPair(kp *keypair.Full) {
 	tc.keyPair = kp
 }
 
+func (tc *TransactorConfig) SetParticipant(participant *types.Participant) {
+	tc.participant = participant
+}
+
+func (tc *TransactorConfig) SetAccount(account *wallet.Account) {
+	tc.account = account
+}
+
 func NewTransactor(cfg TransactorConfig) *StellarSigner {
 	st := &StellarSigner{}
 	if cfg.keyPair != nil {
