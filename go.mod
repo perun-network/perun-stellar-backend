@@ -1,8 +1,10 @@
 module perun.network/perun-stellar-backend
 
-go 1.21
+go 1.22
 
-require github.com/stellar/go v0.0.0-20231212225359-bc7173e667a6
+toolchain go1.22.0
+
+require github.com/stellar/go v0.0.0-20240426134303-a387ffb88fd5
 
 require (
 	github.com/creachadair/jrpc2 v1.1.0
@@ -26,8 +28,9 @@ require (
 	github.com/segmentio/go-loggly v0.5.1-0.20171222203950-eb91657e62b2 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/stretchr/objx v0.5.1 // indirect
-	golang.org/x/crypto v0.14.0 // indirect
-	golang.org/x/sync v0.4.0 // indirect
-	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/crypto v0.21.0 // indirect
+	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
+	golang.org/x/sync v0.6.0 // indirect
+	golang.org/x/sys v0.18.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
