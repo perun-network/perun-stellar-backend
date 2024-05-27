@@ -28,7 +28,6 @@ type ContractBackend struct {
 
 func NewContractBackend(trConfig *TransactorConfig) *ContractBackend {
 	transactor := NewTransactor(*trConfig)
-
 	return &ContractBackend{
 		tr:      *transactor,
 		chainID: stellarDefaultChainId,
@@ -70,17 +69,24 @@ func (tc *TransactorConfig) SetSender(sender Sender) {
 
 func NewTransactor(cfg TransactorConfig) *StellarSigner {
 	st := &StellarSigner{}
+
+	if cfg.sender != nil {
+		st.sender = cfg.sender
+	} else {
+		st.sender = &TxSender{}
+	}
+
 	if cfg.keyPair != nil {
 		st.keyPair = cfg.keyPair
+		if txSender, ok := st.sender.(*TxSender); ok {
+			txSender.kp = st.keyPair
+		}
 	}
 	if cfg.participant != nil {
 		st.participant = cfg.participant
 	}
 	if cfg.account != nil {
 		st.account = cfg.account
-	}
-	if cfg.sender != nil {
-		st.sender = cfg.sender
 	}
 
 	st.hzClient = NewHorizonClient()
@@ -134,44 +140,6 @@ func (c *ContractBackend) InvokeSignedTx(fname string, callTxArgs xdr.ScVec, con
 
 	hzClient := c.tr.GetHorizonClient()
 
-	invokeHostFunctionOp := BuildContractCallOp(hzAcc, fnameXdr, callTxArgs, contractAddr)
-	preFlightOp, minFee := PreflightHostFunctions(hzClient, &hzAcc, *invokeHostFunctionOp)
-
-	txParams := GetBaseTransactionParamsWithFee(&hzAcc, minFee, &preFlightOp)
-	// txUnsigned, err := txnbuild.NewTransaction(txParams)
-	// if err != nil {
-	// 	return xdr.TransactionMeta{}, err
-	// }
-	txSigned, err := c.tr.createSignedTxFromParams(txParams)
-	// txSigned, err := c.tr.sender.signSendTx(txUnsigned)
-
-	if err != nil {
-		return xdr.TransactionMeta{}, err
-	}
-	tx, err := hzClient.SubmitTransaction(txSigned)
-	if err != nil {
-		return xdr.TransactionMeta{}, err
-	}
-
-	txMeta, err := DecodeTxMeta(tx)
-	if err != nil {
-		return xdr.TransactionMeta{}, ErrCouldNotDecodeTxMeta
-	}
-	_ = txMeta.V3.SorobanMeta.ReturnValue
-
-	return txMeta, nil
-}
-
-func (c *ContractBackend) InvokeSignedTxNew(fname string, callTxArgs xdr.ScVec, contractAddr xdr.ScAddress) (xdr.TransactionMeta, error) {
-	c.cbMutex.Lock()
-	defer c.cbMutex.Unlock()
-	fnameXdr := xdr.ScSymbol(fname)
-	hzAcc, err := c.tr.GetHorizonAccount()
-	if err != nil {
-		return xdr.TransactionMeta{}, err
-	}
-
-	hzClient := c.tr.GetHorizonClient()
 	txSender, ok := c.tr.sender.(*TxSender)
 	if !ok {
 		return xdr.TransactionMeta{}, errors.New("sender is not of type *TxSender")

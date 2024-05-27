@@ -109,7 +109,7 @@ func InitTokenContract(kp *keypair.Full, contractIDAddress xdr.ScAddress) error 
 
 	txMeta, err := cb.InvokeSignedTx("initialize", initArgs, contractIDAddress)
 	if err != nil {
-		return errors.New("error while invoking and processing host function: abort_funding")
+		return errors.New("error while invoking and processing host function: initialize" + err.Error())
 	}
 
 	_, err = event.DecodeEventsPerun(txMeta)
