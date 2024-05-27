@@ -33,7 +33,7 @@ func NewSender(kp *keypair.Full) Sender {
 
 }
 
-func (s *TxSender) signSendTx(txUnsigned txnbuild.Transaction) (xdr.TransactionMeta, error) {
+func (s *TxSender) SignSendTx(txUnsigned txnbuild.Transaction) (xdr.TransactionMeta, error) {
 	tx, err := txUnsigned.Sign(NETWORK_PASSPHRASE, s.kp)
 	if err != nil {
 		return xdr.TransactionMeta{}, err

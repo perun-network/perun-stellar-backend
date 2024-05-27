@@ -16,7 +16,7 @@ import (
 const stellarDefaultChainId = 1
 
 type Sender interface {
-	signSendTx(txnbuild.Transaction) (xdr.TransactionMeta, error)
+	SignSendTx(txnbuild.Transaction) (xdr.TransactionMeta, error)
 }
 
 type ContractBackend struct {
@@ -188,7 +188,7 @@ func (c *ContractBackend) InvokeSignedTxNew(fname string, callTxArgs xdr.ScVec, 
 		return xdr.TransactionMeta{}, err
 	}
 	// txSigned, err := c.tr.createSignedTxFromParams(txParams)
-	txMeta, err := c.tr.sender.signSendTx(*txUnsigned)
+	txMeta, err := c.tr.sender.SignSendTx(*txUnsigned)
 
 	if err != nil {
 		return xdr.TransactionMeta{}, err
