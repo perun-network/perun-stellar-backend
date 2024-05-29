@@ -5,6 +5,8 @@ import (
 	"github.com/stellar/go/clients/horizonclient"
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/protocols/horizon"
+	"github.com/stellar/go/txnbuild"
+
 	"github.com/stellar/go/xdr"
 	"perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/wallet/types"
@@ -12,6 +14,10 @@ import (
 )
 
 const stellarDefaultChainId = 1
+
+type Sender interface {
+	SignSendTx(txnbuild.Transaction) (xdr.TransactionMeta, error)
+}
 
 type ContractBackend struct {
 	Invoker
@@ -22,7 +28,6 @@ type ContractBackend struct {
 
 func NewContractBackend(trConfig *TransactorConfig) *ContractBackend {
 	transactor := NewTransactor(*trConfig)
-
 	return &ContractBackend{
 		tr:      *transactor,
 		chainID: stellarDefaultChainId,
@@ -36,12 +41,14 @@ type StellarSigner struct {
 	participant *types.Participant
 	account     *wallet.Account
 	hzClient    *horizonclient.Client
+	sender      Sender
 }
 
 type TransactorConfig struct {
 	keyPair     *keypair.Full
 	participant *types.Participant
 	account     *wallet.Account
+	sender      Sender
 }
 
 func (tc *TransactorConfig) SetKeyPair(kp *keypair.Full) {
@@ -56,10 +63,24 @@ func (tc *TransactorConfig) SetAccount(account *wallet.Account) {
 	tc.account = account
 }
 
+func (tc *TransactorConfig) SetSender(sender Sender) {
+	tc.sender = sender
+}
+
 func NewTransactor(cfg TransactorConfig) *StellarSigner {
 	st := &StellarSigner{}
+
+	if cfg.sender != nil {
+		st.sender = cfg.sender
+	} else {
+		st.sender = &TxSender{}
+	}
+
 	if cfg.keyPair != nil {
 		st.keyPair = cfg.keyPair
+		if txSender, ok := st.sender.(*TxSender); ok {
+			txSender.kp = st.keyPair
+		}
 	}
 	if cfg.participant != nil {
 		st.participant = cfg.participant
@@ -67,6 +88,7 @@ func NewTransactor(cfg TransactorConfig) *StellarSigner {
 	if cfg.account != nil {
 		st.account = cfg.account
 	}
+
 	st.hzClient = NewHorizonClient()
 
 	return st
@@ -118,24 +140,37 @@ func (c *ContractBackend) InvokeSignedTx(fname string, callTxArgs xdr.ScVec, con
 
 	hzClient := c.tr.GetHorizonClient()
 
+	txSender, ok := c.tr.sender.(*TxSender)
+	if !ok {
+		return xdr.TransactionMeta{}, errors.New("sender is not of type *TxSender")
+	}
+
+	txSender.SetHzClient(hzClient)
+
 	invokeHostFunctionOp := BuildContractCallOp(hzAcc, fnameXdr, callTxArgs, contractAddr)
 	preFlightOp, minFee := PreflightHostFunctions(hzClient, &hzAcc, *invokeHostFunctionOp)
 
 	txParams := GetBaseTransactionParamsWithFee(&hzAcc, minFee, &preFlightOp)
-	txSigned, err := c.tr.createSignedTxFromParams(txParams)
+	txUnsigned, err := txnbuild.NewTransaction(txParams)
 	if err != nil {
 		return xdr.TransactionMeta{}, err
 	}
-	tx, err := hzClient.SubmitTransaction(txSigned)
-	if err != nil {
-		return xdr.TransactionMeta{}, err
-	}
+	// txSigned, err := c.tr.createSignedTxFromParams(txParams)
+	txMeta, err := c.tr.sender.SignSendTx(*txUnsigned)
 
-	txMeta, err := DecodeTxMeta(tx)
 	if err != nil {
-		return xdr.TransactionMeta{}, ErrCouldNotDecodeTxMeta
+		return xdr.TransactionMeta{}, err
 	}
-	_ = txMeta.V3.SorobanMeta.ReturnValue
+	// tx, err := hzClient.SubmitTransaction(txSigned)
+	// if err != nil {
+	// 	return xdr.TransactionMeta{}, err
+	// }
+
+	// txMeta, err := DecodeTxMeta(txSigned)
+	// if err != nil {
+	// 	return xdr.TransactionMeta{}, ErrCouldNotDecodeTxMeta
+	// }
+	// _ = txMeta.V3.SorobanMeta.ReturnValue
 
 	return txMeta, nil
 }
