@@ -15,16 +15,51 @@
 package types
 
 import (
+	"encoding/hex"
 	"errors"
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/xdr"
 	"perun.network/go-perun/channel"
+	"perun.network/go-perun/channel/multi"
 )
 
 const HashLenXdr = 32
 
-type StellarAsset struct {
-	contractID xdr.Hash
+type (
+	StellarAsset struct {
+		contractID xdr.Hash
+		id         ContractLID
+	}
+	ContractLID struct{ *string }
+
+	AssetMapKey string
+)
+
+// MakeContractID makes a ChainID for the given id.
+func MakeContractID(id string) ContractLID {
+	return ContractLID{&id}
+}
+
+// UnmarshalBinary unmarshals the contractID from its binary representation.
+func (id *ContractLID) UnmarshalBinary(data []byte) error {
+	str := hex.EncodeToString(data) // Convert binary data to hex string
+	id.string = &str
+	return nil
+}
+
+// MarshalBinary marshals the contractID into its binary representation.
+func (id ContractLID) MarshalBinary() ([]byte, error) {
+	if id.string == nil {
+		return nil, errors.New("nil ContractID")
+	}
+	return hex.DecodeString(*id.string)
+}
+
+func (id ContractLID) MapKey() multi.LedgerIDMapKey {
+	if id.string == nil {
+		return ""
+	}
+	return multi.LedgerIDMapKey(*id.string)
 }
 
 func (s StellarAsset) ContractID() xdr.Hash {
@@ -46,12 +81,31 @@ func (s *StellarAsset) UnmarshalBinary(data []byte) error {
 	if err != nil {
 		return errors.New("could not unmarshal contract id")
 	}
+	err = s.id.UnmarshalBinary(data)
+	if err != nil {
+		return errors.New("could not unmarshal id")
+	}
 	return nil
 }
 
 func (s StellarAsset) Equal(asset channel.Asset) bool {
 	_, ok := asset.(*StellarAsset)
 	return ok
+}
+
+// MapKey returns the asset's map key representation.
+func (a StellarAsset) MapKey() AssetMapKey {
+	d, err := a.MarshalBinary()
+	if err != nil {
+		panic(err)
+	}
+
+	return AssetMapKey(d)
+}
+
+// LedgerID returns the ledger ID the asset lives on.
+func (a StellarAsset) LedgerID() multi.LedgerID {
+	return &a.id
 }
 
 func (s StellarAsset) MakeScAddress() (xdr.ScAddress, error) {
@@ -70,6 +124,7 @@ func (s *StellarAsset) FromScAddress(address xdr.ScAddress) error {
 	}
 
 	s.contractID = *address.ContractId
+	s.id = MakeContractID(s.contractID.HexString())
 	return nil
 }
 
@@ -79,6 +134,7 @@ func NewStellarAssetFromScAddress(address xdr.ScAddress) (*StellarAsset, error) 
 	if err != nil {
 		return nil, err
 	}
+	s.id = MakeContractID(s.contractID.HexString())
 	return s, nil
 }
 

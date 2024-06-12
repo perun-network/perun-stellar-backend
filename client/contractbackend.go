@@ -1,14 +1,16 @@
 package client
 
 import (
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"github.com/stellar/go/clients/horizonclient"
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/protocols/horizon"
 	"github.com/stellar/go/txnbuild"
-
 	"github.com/stellar/go/xdr"
 	"perun.network/go-perun/wallet"
+	chTypes "perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/wallet/types"
 	"sync"
 )
@@ -17,6 +19,7 @@ const stellarDefaultChainId = 1
 
 type Sender interface {
 	SignSendTx(txnbuild.Transaction) (xdr.TransactionMeta, error)
+	SetHzClient(*horizonclient.Client)
 }
 
 type ContractBackend struct {
@@ -98,6 +101,31 @@ func (cb *ContractBackend) GetTransactor() *StellarSigner {
 	return &cb.tr
 }
 
+func (cb *ContractBackend) GetBalance(cID xdr.ScAddress) (string, error) {
+	tr := cb.GetTransactor()
+	add, err := tr.GetAddress()
+	if err != nil {
+		return "", err
+	}
+	accountId, err := xdr.AddressToAccountId(add)
+	if err != nil {
+		return "", err
+	}
+	scAdd, err := xdr.NewScAddress(xdr.ScAddressTypeScAddressTypeAccount, accountId)
+	if err != nil {
+		return "", err
+	}
+	TokenNameArgs, err := BuildGetTokenBalanceArgs(scAdd)
+	if err != nil {
+		return "", err
+	}
+	tx, err := cb.InvokeSignedTx("balance", TokenNameArgs, cID)
+	if err != nil {
+		return "", err
+	}
+	return tx.V3.SorobanMeta.ReturnValue.String(), nil
+}
+
 func (st *StellarSigner) GetHorizonAccount() (horizon.Account, error) {
 	hzAddress, err := st.GetAddress()
 	if err != nil {
@@ -140,13 +168,7 @@ func (c *ContractBackend) InvokeSignedTx(fname string, callTxArgs xdr.ScVec, con
 
 	hzClient := c.tr.GetHorizonClient()
 
-	txSender, ok := c.tr.sender.(*TxSender)
-	if !ok {
-		return xdr.TransactionMeta{}, errors.New("sender is not of type *TxSender")
-	}
-
-	txSender.SetHzClient(hzClient)
-
+	c.tr.sender.SetHzClient(hzClient)
 	invokeHostFunctionOp := BuildContractCallOp(hzAcc, fnameXdr, callTxArgs, contractAddr)
 	preFlightOp, minFee := PreflightHostFunctions(hzClient, &hzAcc, *invokeHostFunctionOp)
 
@@ -157,7 +179,6 @@ func (c *ContractBackend) InvokeSignedTx(fname string, callTxArgs xdr.ScVec, con
 	}
 	// txSigned, err := c.tr.createSignedTxFromParams(txParams)
 	txMeta, err := c.tr.sender.SignSendTx(*txUnsigned)
-
 	if err != nil {
 		return xdr.TransactionMeta{}, err
 	}
@@ -173,4 +194,28 @@ func (c *ContractBackend) InvokeSignedTx(fname string, callTxArgs xdr.ScVec, con
 	// _ = txMeta.V3.SorobanMeta.ReturnValue
 
 	return txMeta, nil
+}
+
+/*
+ * StringToScAddress converts a string to a xdr.ScAddress.
+ */
+func StringToScAddress(s string) (xdr.ScAddress, error) {
+	hash, err := StringToHash(s)
+	if err != nil {
+		return xdr.ScAddress{}, err
+	}
+	return chTypes.MakeContractAddress(hash)
+}
+
+/*
+ * StringToHash converts a hex string to a xdr.Hash.
+ */
+func StringToHash(s string) (xdr.Hash, error) {
+	bytes, err := hex.DecodeString(s)
+	if err != nil {
+		return xdr.Hash{}, fmt.Errorf("failed to decode hex string: %w", err)
+	}
+	var hash xdr.Hash
+	copy(hash[:], bytes)
+	return hash, nil
 }

@@ -23,6 +23,7 @@ import (
 	"log"
 	pchannel "perun.network/go-perun/channel"
 	pwallet "perun.network/go-perun/wallet"
+	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/event"
 	"perun.network/perun-stellar-backend/wire"
 )
@@ -39,9 +40,10 @@ type keyHolder struct {
 }
 
 func (cb *ContractBackend) Open(ctx context.Context, perunAddr xdr.ScAddress, params *pchannel.Params, state *pchannel.State) error {
-
+	log.Println("Open called")
 	openTxArgs, err := buildOpenTxArgs(*params, *state)
 	if err != nil {
+		log.Println(err)
 		return errors.New("error while building open tx")
 	}
 	txMeta, err := cb.InvokeSignedTx("open", openTxArgs, perunAddr)
@@ -87,9 +89,9 @@ func (cb *ContractBackend) Fund(ctx context.Context, perunAddr xdr.ScAddress, as
 
 	fundTxArgs, err := buildChanIdxTxArgs(chanID, fudnerIdx)
 	if err != nil {
+		log.Println("error while building fund tx")
 		return errors.New("error while building fund tx")
 	}
-
 	txMeta, err := cb.InvokeSignedTx("fund", fundTxArgs, perunAddr)
 	if err != nil {
 		return err
@@ -221,19 +223,35 @@ func (cb *ContractBackend) Dispute(ctx context.Context, perunAddr xdr.ScAddress,
 func (cb *ContractBackend) Withdraw(ctx context.Context, perunAddr xdr.ScAddress, req pchannel.AdjudicatorReq) error {
 	chanID, partyIdx := req.Tx.State.ID, req.Idx
 	withdrawerIdx := partyIdx == 1
+	log.Println("Withdraw called: ", req.Idx)
 	if partyIdx > 1 {
 		return errors.New("invalid party index for withdrawal")
 	}
 
 	withdrawTxArgs, err := buildChanIdxTxArgs(chanID, withdrawerIdx)
 	if err != nil {
-		return errors.New("error building fund tx")
+		return errors.New("error building withdraw tx")
 	}
+	log.Println("withdrawing: ", withdrawerIdx, withdrawTxArgs)
 	txMeta, err := cb.InvokeSignedTx("withdraw", withdrawTxArgs, perunAddr)
 	if err != nil {
 		return errors.New("error in host function: withdraw")
 	}
-
+	tr := cb.GetTransactor()
+	clientAddress, err := tr.GetAddress()
+	if err != nil {
+		log.Println("Error while getting client address: ", err)
+	}
+	tokenAddr := req.Tx.State.Assets[0].(*types.StellarAsset)
+	cAdd, err := types.MakeContractAddress(tokenAddr.ContractID())
+	if err != nil {
+		return err
+	}
+	bal, err := cb.GetBalance(cAdd)
+	if err != nil {
+		log.Println("Error while getting balance: ", err)
+	}
+	log.Println("Balance: ", bal, " after withdrawing: ", clientAddress)
 	evs, err := event.DecodeEventsPerun(txMeta)
 	if err != nil {
 		return err
@@ -256,7 +274,7 @@ func (cb *ContractBackend) Withdraw(ctx context.Context, perunAddr xdr.ScAddress
 }
 
 func (cb *ContractBackend) GetChannelInfo(ctx context.Context, perunAddr xdr.ScAddress, chanId pchannel.ID) (wire.Channel, error) {
-
+	log.Println("GetChannelInfo called")
 	getchTxArgs, err := buildChanIdTxArgs(chanId)
 	if err != nil {
 		return wire.Channel{}, errors.New("error while building get_channel tx")
@@ -271,6 +289,7 @@ func (cb *ContractBackend) GetChannelInfo(ctx context.Context, perunAddr xdr.ScA
 
 	err = getChan.FromScVal(retVal)
 	if err != nil {
+		log.Println("Return value: ", retVal)
 		return wire.Channel{}, errors.New("error while decoding return value")
 	}
 	return getChan, nil

@@ -16,6 +16,7 @@ package channel
 
 import (
 	"crypto/sha256"
+	"log"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/channel/types"
@@ -37,7 +38,9 @@ func (b backend) CalcID(params *channel.Params) channel.ID {
 	if err != nil {
 		panic(err)
 	}
-	return sha256.Sum256(bytes)
+	id := sha256.Sum256(bytes)
+	log.Println("CalcID called:", id)
+	return id
 }
 
 func (b backend) Sign(account wallet.Account, state *channel.State) (wallet.Sig, error) {

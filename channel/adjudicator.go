@@ -73,15 +73,19 @@ func (a *Adjudicator) Subscribe(ctx context.Context, cid pchannel.ID) (pchannel.
 func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq, smap pchannel.StateMap) error {
 
 	if req.Tx.State.IsFinal {
-		log.Println("Withdraw called")
+		log.Println("Channel is finalized: ", req.Idx)
+		log.Println("Withdraw called: ", req.Idx)
 
 		if err := a.Close(ctx, req.Tx.State, req.Tx.Sigs); err != nil {
+			log.Println("Close failed", err, req.Idx)
 			chanControl, errChanState := a.CB.GetChannelInfo(ctx, a.perunAddr, req.Tx.State.ID)
 			if errChanState != nil {
+				log.Println("Error while getting channel info: ", req.Idx)
 				return errChanState
 			}
 
 			if chanControl.Control.Closed {
+				log.Println("Channel is already closed: ", req.Idx)
 				return a.withdraw(ctx, req)
 			}
 			return err
@@ -93,12 +97,14 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 		err := a.ForceClose(ctx, req.Tx.State, req.Tx.Sigs)
 		log.Println("ForceClose called")
 		if errors.Is(err, ErrChannelAlreadyClosed) {
+			log.Println("Channel is already closed, force close")
 			return a.withdraw(ctx, req)
 		}
 		if err != nil {
 			return err
 		}
 
+		log.Println("Channel is not finalized, force close")
 		err = a.withdraw(ctx, req)
 		if err != nil {
 			return err

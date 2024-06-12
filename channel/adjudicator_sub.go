@@ -29,7 +29,7 @@ import (
 
 const (
 	DefaultBufferSize                  = 1024
-	DefaultSubscriptionPollingInterval = time.Duration(5) * time.Second
+	DefaultSubscriptionPollingInterval = time.Duration(15) * time.Second
 )
 
 type AdjEventSub struct {
@@ -95,6 +95,7 @@ polling:
 			finish(nil)
 			return
 		case <-time.After(s.pollInterval):
+			log.Println("Polling for contract events...", s.cid)
 			newChanInfo, err := s.cb.GetChannelInfo(ctx, s.perunAddr, s.cid)
 			newChanControl = newChanInfo.Control
 
@@ -114,7 +115,9 @@ polling:
 			} else {
 				s.log.Log().Debug("Contract event detected, evaluating...")
 				s.log.Log().Debugf("Found contract event: %v", adjEvent)
+				adjEvent.SetID(s.cid)
 				s.events <- adjEvent
+				return
 			}
 		}
 	}

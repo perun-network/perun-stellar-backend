@@ -20,6 +20,7 @@ import (
 	"github.com/stellar/go/xdr"
 	"log"
 	pchannel "perun.network/go-perun/channel"
+	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/wallet"
 	"perun.network/perun-stellar-backend/wire"
@@ -56,19 +57,20 @@ func (f *Funder) GetAssetAddr() xdr.ScAddress {
 }
 
 func (f *Funder) Fund(ctx context.Context, req pchannel.FundingReq) error {
-	log.Println("Fund called")
+	log.Println("Funding called")
 
 	if req.Idx != 0 && req.Idx != 1 {
 		return errors.New("req.Idx must be 0 or 1")
 	}
 
 	if req.Idx == pchannel.Index(0) {
+		log.Println("open channel")
 		err := f.openChannel(ctx, req)
 		if err != nil {
 			return err
 		}
 	}
-
+	log.Println("fund party")
 	return f.fundParty(ctx, req)
 }
 func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
@@ -78,6 +80,7 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 	log.Printf("%s: Funding channel...\n", party)
 
 	for i := 0; i < f.maxIters; i++ {
+		log.Println("funding loop, iteration: ", i)
 		select {
 		case <-ctx.Done():
 			timeoutErr := makeTimeoutErr([]pchannel.Index{req.Idx}, 0)
@@ -99,21 +102,40 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 
 			log.Printf("%s: Found opened channel!\n", party)
 			if chanState.Control.FundedA && chanState.Control.FundedB {
+				log.Println("Funding flags not set")
 				return nil
 			}
 
+			t := req.State.Assets[0].(*types.StellarAsset)
+			cAdd, err := types.MakeContractAddress(t.ContractID())
+			if err != nil {
+				return err
+			}
+
 			if req.Idx == pchannel.Index(0) && !chanState.Control.FundedA {
+				log.Println("Funding party A")
 				err := f.FundChannel(ctx, req.State, false)
 				if err != nil {
 					return err
 				}
+				bal, err := f.cb.GetBalance(cAdd)
+				if err != nil {
+					log.Println("Error while getting balance: ", err)
+				}
+				log.Println("Balance A: ", bal, " after funding amount: ", req.State.Balances)
 				continue
 			}
 			if req.Idx == pchannel.Index(1) && !chanState.Control.FundedB {
+				log.Println("Funding party B")
 				err := f.FundChannel(ctx, req.State, true)
 				if err != nil {
 					return err
 				}
+				bal, err := f.cb.GetBalance(cAdd)
+				if err != nil {
+					log.Println("Error while getting balance: ", err)
+				}
+				log.Println("Balance B: ", bal, " after funding amount: ", req.State.Balances)
 				continue
 			}
 		}
@@ -124,19 +146,22 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 func (f *Funder) openChannel(ctx context.Context, req pchannel.FundingReq) error {
 	err := f.cb.Open(ctx, f.perunAddr, req.Params, req.State)
 	if err != nil {
+		log.Println(err)
 		return errors.New("error while opening channel in party A")
 	}
 	return nil
 }
 
 func (f *Funder) FundChannel(ctx context.Context, state *pchannel.State, funderIdx bool) error {
-
+	log.Println("making balances")
 	balsStellar, err := wire.MakeBalances(state.Allocation)
 	if err != nil {
 		return errors.New("error while making balances")
 	}
 
+	log.Println("checking asset address")
 	if !balsStellar.Token.Equals(f.assetAddr) {
+		log.Println("wrong token")
 		return errors.New("asset address is not equal to the address stored in the state")
 	}
 
