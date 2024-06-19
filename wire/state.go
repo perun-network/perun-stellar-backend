@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2024 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"fmt"
 	xdr3 "github.com/stellar/go-xdr/xdr3"
 	"github.com/stellar/go/xdr"
+	"math/big"
 	"perun.network/go-perun/channel"
 	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/wire/scval"
@@ -200,21 +201,58 @@ func ToState(stellarState State) (channel.State, error) {
 		return channel.State{}, err
 	}
 
-	BalA, err := ToBigInt(stellarState.Balances.BalA)
-	if err != nil {
-		return channel.State{}, err
+	var balsABigInt []*big.Int
+	var balsBBigInt []*big.Int
+	// for _, _ = range stellarState.Balances.Tokens { //iterate for asset
+
+	balsA := stellarState.Balances.BalA
+	for _, scVal := range balsA { // iterate for balance within asset
+		valA := scVal.MustI128()
+		balAPerun, err := ToBigInt(valA)
+		if err != nil {
+			return channel.State{}, err
+		}
+		balsABigInt = append(balsABigInt, balAPerun)
+
+		// for _, scVec := range balsAVec {
+
+		// 	valA := scVec.MustI128()
+
+		// 	balAPerun, err := ToBigInt(valA)
+		// 	if err != nil {
+		// 		return channel.State{}, err
+		// 	}
+		// 	balsABigInt = append(balsABigInt, balAPerun)
+		// }
+
 	}
-	BalB, err := ToBigInt(stellarState.Balances.BalB)
+	balsB := stellarState.Balances.BalB
+	for _, scVal := range balsB { // iterate for balance within asset
+		// balsBVec := *scVal.MustVec()
+		valB := scVal.MustI128()
+		balBPerun, err := ToBigInt(valB)
+		if err != nil {
+			return channel.State{}, err
+		}
+		balsBBigInt = append(balsBBigInt, balBPerun)
+		// for _, scVec := range balsBVec {
+		// 	valB := scVec.MustI128()
+		// 	balBPerun, err := ToBigInt(valB)
+		// 	if err != nil {
+		// 		return channel.State{}, err
+		// 	}
+		// 	balsBBigInt = append(balsBBigInt, balBPerun)
+		// }
+	}
+
+	// }
+
+	Assets, err := convertAssets(stellarState.Balances.Tokens)
 	if err != nil {
 		return channel.State{}, err
 	}
 
-	Assets, err := convertAsset(stellarState.Balances.Token)
-	if err != nil {
-		return channel.State{}, err
-	}
-
-	Alloc, err := makeAllocation(Assets, BalA, BalB)
+	Alloc, err := makeAllocationMulti(Assets, balsABigInt, balsBBigInt)
 	if err != nil {
 		return channel.State{}, err
 	}
@@ -240,4 +278,33 @@ func convertAsset(contractID xdr.ScAddress) (channel.Asset, error) {
 		return nil, err
 	}
 	return stellarAsset, nil
+}
+
+func convertAssets(contractIDs xdr.ScVec) ([]channel.Asset, error) {
+
+	var assets []channel.Asset
+
+	for _, val := range contractIDs {
+		contractID, ok := val.GetAddress()
+		if !ok {
+			return nil, errors.New("could not turn value into address")
+		}
+		if contractID.Type != xdr.ScAddressTypeScAddressTypeContract {
+			return nil, errors.New("invalid address type")
+		}
+		asset, err := convertAsset(contractID)
+		if err != nil {
+			return nil, err
+		}
+		// return asset, nil
+
+		assets = append(assets, asset)
+
+	}
+
+	// stellarAsset, err := types.NewStellarAssetFromScAddress(contractID)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	return assets, nil
 }
