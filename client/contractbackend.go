@@ -170,9 +170,9 @@ func (c *ContractBackend) InvokeSignedTx(fname string, callTxArgs xdr.ScVec, con
 
 	c.tr.sender.SetHzClient(hzClient)
 	invokeHostFunctionOp := BuildContractCallOp(hzAcc, fnameXdr, callTxArgs, contractAddr)
-	preFlightOp, minFee := PreflightHostFunctions(hzClient, &hzAcc, *invokeHostFunctionOp)
+	preFlightOp, _ := PreflightHostFunctions(hzClient, &hzAcc, *invokeHostFunctionOp)
+	txParams := GetBaseTransactionParamsWithFee(&hzAcc, int64(500000), &preFlightOp)
 
-	txParams := GetBaseTransactionParamsWithFee(&hzAcc, minFee, &preFlightOp)
 	txUnsigned, err := txnbuild.NewTransaction(txParams)
 	if err != nil {
 		return xdr.TransactionMeta{}, err

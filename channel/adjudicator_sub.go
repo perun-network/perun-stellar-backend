@@ -117,7 +117,10 @@ polling:
 				s.log.Log().Debugf("Found contract event: %v", adjEvent)
 				adjEvent.SetID(s.cid)
 				s.events <- adjEvent
-				return
+				etype, _ := adjEvent.GetType()
+				if etype == event.EventTypeWithdrawn {
+					return
+				}
 			}
 		}
 	}
