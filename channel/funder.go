@@ -33,16 +33,16 @@ const DefaultPollingInterval = time.Duration(6) * time.Second
 type Funder struct {
 	cb              *client.ContractBackend
 	perunAddr       xdr.ScAddress
-	assetAddr       xdr.ScAddress
+	assetAddrs      xdr.ScVec
 	maxIters        int
 	pollingInterval time.Duration
 }
 
-func NewFunder(acc *wallet.Account, contractBackend *client.ContractBackend, perunAddr xdr.ScAddress, assetAddr xdr.ScAddress) *Funder {
+func NewFunder(acc *wallet.Account, contractBackend *client.ContractBackend, perunAddr xdr.ScAddress, assetAddrs xdr.ScVec) *Funder {
 	return &Funder{
 		cb:              contractBackend,
 		perunAddr:       perunAddr,
-		assetAddr:       assetAddr,
+		assetAddrs:      assetAddrs,
 		maxIters:        MaxIterationsUntilAbort,
 		pollingInterval: DefaultPollingInterval,
 	}
@@ -52,12 +52,17 @@ func (f *Funder) GetPerunAddr() xdr.ScAddress {
 	return f.perunAddr
 }
 
-func (f *Funder) GetAssetAddr() xdr.ScAddress {
-	return f.assetAddr
+func (f *Funder) GetAssetAddrs() []xdr.ScAddress {
+	var addrs []xdr.ScAddress
+	for _, addrScVal := range f.assetAddrs {
+		addr := addrScVal.MustAddress()
+		addrs = append(addrs, addr)
+	}
+	return addrs
 }
 
 func (f *Funder) Fund(ctx context.Context, req pchannel.FundingReq) error {
-	log.Println("Funding called")
+	log.Println("Fund called")
 
 	if req.Idx != 0 && req.Idx != 1 {
 		return errors.New("req.Idx must be 0 or 1")
@@ -102,7 +107,6 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 
 			log.Printf("%s: Found opened channel!\n", party)
 			if chanState.Control.FundedA && chanState.Control.FundedB {
-				log.Println("Funding flags not set")
 				return nil
 			}
 
@@ -153,19 +157,17 @@ func (f *Funder) openChannel(ctx context.Context, req pchannel.FundingReq) error
 }
 
 func (f *Funder) FundChannel(ctx context.Context, state *pchannel.State, funderIdx bool) error {
-	log.Println("making balances")
+
 	balsStellar, err := wire.MakeBalances(state.Allocation)
 	if err != nil {
 		return errors.New("error while making balances")
 	}
 
-	log.Println("checking asset address")
-	if !balsStellar.Token.Equals(f.assetAddr) {
-		log.Println("wrong token")
+	if !balsStellar.Tokens.Equals(&f.assetAddrs) {
 		return errors.New("asset address is not equal to the address stored in the state")
 	}
 
-	return f.cb.Fund(ctx, f.perunAddr, f.assetAddr, state.ID, funderIdx)
+	return f.cb.Fund(ctx, f.perunAddr, state.ID, funderIdx)
 }
 
 func (f *Funder) AbortChannel(ctx context.Context, state *pchannel.State) error {

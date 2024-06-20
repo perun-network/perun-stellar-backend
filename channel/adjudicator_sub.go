@@ -38,7 +38,7 @@ type AdjEventSub struct {
 	chanControl       wire.Control
 	cid               pchannel.ID
 	perunAddr         xdr.ScAddress
-	assetAddr         xdr.ScAddress
+	assetAddrs        []xdr.ScAddress
 	events            chan event.PerunEvent
 	subErrors         chan error
 	err               error
@@ -48,7 +48,7 @@ type AdjEventSub struct {
 	log               log.Embedding
 }
 
-func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, cb *client.ContractBackend, perunAddr xdr.ScAddress, assetAddr xdr.ScAddress, challengeDuration *time.Duration) (pchannel.AdjudicatorSubscription, error) {
+func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, cb *client.ContractBackend, perunAddr xdr.ScAddress, assetAddrs []xdr.ScAddress, challengeDuration *time.Duration) (pchannel.AdjudicatorSubscription, error) {
 
 	sub := &AdjEventSub{
 		challengeDuration: challengeDuration,
@@ -56,7 +56,7 @@ func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, cb *client.Contract
 		chanControl:       wire.Control{},
 		cid:               cid,
 		perunAddr:         perunAddr,
-		assetAddr:         assetAddr,
+		assetAddrs:        assetAddrs,
 		events:            make(chan event.PerunEvent, DefaultBufferSize),
 		subErrors:         make(chan error, 1),
 		pollInterval:      DefaultSubscriptionPollingInterval,

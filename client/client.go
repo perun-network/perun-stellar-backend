@@ -85,9 +85,9 @@ func (cb *ContractBackend) Abort(ctx context.Context, perunAddr xdr.ScAddress, s
 	return nil
 }
 
-func (cb *ContractBackend) Fund(ctx context.Context, perunAddr xdr.ScAddress, assetAddr xdr.ScAddress, chanID pchannel.ID, fudnerIdx bool) error {
+func (cb *ContractBackend) Fund(ctx context.Context, perunAddr xdr.ScAddress, chanID pchannel.ID, funderIdx bool) error {
 
-	fundTxArgs, err := buildChanIdxTxArgs(chanID, fudnerIdx)
+	fundTxArgs, err := buildChanIdxTxArgs(chanID, funderIdx)
 	if err != nil {
 		log.Println("error while building fund tx")
 		return errors.New("error while building fund tx")

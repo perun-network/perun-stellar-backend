@@ -29,28 +29,28 @@ import (
 var MaxBalance = new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 127), big.NewInt(1))
 
 type Balances struct {
-	BalA  xdr.Int128Parts
-	BalB  xdr.Int128Parts
-	Token xdr.ScAddress
+	BalA   xdr.ScVec //{xdr.Int128Parts, xdr.Int128Parts}
+	BalB   xdr.ScVec //{xdr.Int128Parts, xdr.Int128Parts}
+	Tokens xdr.ScVec // multiasset xdr.ScAddress -> xdr.ScVec{xdr.ScAddress1, xdr.ScAddress2}
 }
 
 const (
-	SymbolBalancesBalA  xdr.ScSymbol = "bal_a"
-	SymbolBalancesBalB  xdr.ScSymbol = "bal_b"
-	SymbolBalancesToken xdr.ScSymbol = "token"
+	SymbolBalancesBalA   xdr.ScSymbol = "bal_a"
+	SymbolBalancesBalB   xdr.ScSymbol = "bal_b"
+	SymbolBalancesTokens xdr.ScSymbol = "tokens"
 )
 
 func (b Balances) ToScVal() (xdr.ScVal, error) {
 	var err error
-	balA, err := scval.WrapInt128Parts(b.BalA)
+	balA, err := scval.WrapVec(b.BalA)
 	if err != nil {
 		return xdr.ScVal{}, err
 	}
-	balB, err := scval.WrapInt128Parts(b.BalB)
+	balB, err := scval.WrapVec(b.BalB)
 	if err != nil {
 		return xdr.ScVal{}, err
 	}
-	token, err := scval.WrapScAddress(b.Token)
+	tokens, err := scval.WrapVec(b.Tokens)
 	if err != nil {
 		return xdr.ScVal{}, err
 	}
@@ -58,9 +58,9 @@ func (b Balances) ToScVal() (xdr.ScVal, error) {
 		[]xdr.ScSymbol{
 			SymbolBalancesBalA,
 			SymbolBalancesBalB,
-			SymbolBalancesToken,
+			SymbolBalancesTokens,
 		},
-		[]xdr.ScVal{balA, balB, token},
+		[]xdr.ScVal{balA, balB, tokens},
 	)
 	if err != nil {
 		return xdr.ScVal{}, err
@@ -80,29 +80,34 @@ func (b *Balances) FromScVal(v xdr.ScVal) error {
 	if err != nil {
 		return err
 	}
-	balA, ok := balAVal.GetI128()
+
+	balA, ok := balAVal.GetVec()
 	if !ok {
-		return errors.New("expected i128")
+		return errors.New("expected vec of i128")
 	}
+
 	balBVal, err := GetMapValue(scval.MustWrapScSymbol(SymbolBalancesBalB), *m)
 	if err != nil {
 		return err
 	}
-	balB, ok := balBVal.GetI128()
+
+	balB, ok := balBVal.GetVec()
 	if !ok {
-		return errors.New("expected i128")
+		return errors.New("expected vec of i128")
 	}
-	tokenVal, err := GetMapValue(scval.MustWrapScSymbol(SymbolBalancesToken), *m)
+
+	tokenVal, err := GetMapValue(scval.MustWrapScSymbol(SymbolBalancesTokens), *m)
 	if err != nil {
 		return err
 	}
-	token, ok := tokenVal.GetAddress()
+	tokens, ok := tokenVal.GetVec()
 	if !ok {
-		return errors.New("expected address")
+		return errors.New("expected vec of addresses")
 	}
-	b.BalA = balA
-	b.BalB = balB
-	b.Token = token
+
+	b.BalA = *balA
+	b.BalB = *balB
+	b.Tokens = *tokens
 	return nil
 }
 
@@ -148,67 +153,126 @@ func MakeBalances(alloc channel.Allocation) (Balances, error) {
 	if err := alloc.Valid(); err != nil {
 		return Balances{}, err
 	}
-	// single asset
-	if len(alloc.Assets) != 1 {
-		return Balances{}, errors.New("expected exactly one asset")
-	}
 
 	// No sub-channels
 	if len(alloc.Locked) != 0 {
 		return Balances{}, errors.New("expected no locked funds")
 	}
-	asset := alloc.Assets[0]
-	sa, err := types.ToStellarAsset(asset)
-	if err != nil {
-		return Balances{}, err
-	}
-	token, err := sa.MakeScAddress()
-	if err != nil {
-		return Balances{}, err
+	assets := alloc.Assets
+	var stAssets []channel.Asset
+
+	var tokens xdr.ScVec
+	for i, ast := range assets {
+		_, ok := ast.(*types.StellarAsset)
+		if !ok {
+			return Balances{}, errors.New("expected stellar asset")
+		}
+		sa, err := types.ToStellarAsset(assets[i])
+		if err != nil {
+			return Balances{}, err
+		}
+		token, err := sa.MakeScAddress()
+		if err != nil {
+			return Balances{}, err
+		}
+
+		tokenVal := scval.MustWrapScAddress(token)
+
+		tokens = append(tokens, tokenVal)
+		stAssets = append(stAssets, sa)
+
 	}
 
 	if alloc.NumParts() != 2 {
 		return Balances{}, errors.New("expected exactly two parts")
 	}
 
-	balA := alloc.Balance(0, asset)
-	xdrBalA, err := MakeInt128Parts(balA)
-	if err != nil {
-		return Balances{}, err
-	}
+	bals := channel.NewAllocation(2, stAssets...) //alloc.Balance(0, assets)
 
-	balB := alloc.Balance(1, asset)
-	xdrBalB, err := MakeInt128Parts(balB)
-	if err != nil {
-		return Balances{}, err
+	var balPartVec []xdr.ScVec
+
+	var balAVecScVal xdr.ScVec
+
+	var balScVal xdr.ScVal
+
+	for _, balsPart := range bals.Balances {
+		balAVecScVal = xdr.ScVec{}
+
+		for _, val := range balsPart {
+			xdrBalA, err := MakeInt128Parts(val)
+			if err != nil {
+				return Balances{}, err
+			}
+
+			balScVal, err = scval.WrapInt128Parts(xdrBalA)
+			if err != nil {
+				return Balances{}, err
+			}
+
+			balAVecScVal = append(balAVecScVal, balScVal)
+		}
+
+		balPartVec = append(balPartVec, balAVecScVal)
+
 	}
 
 	return Balances{
-		BalA:  xdrBalA,
-		BalB:  xdrBalB,
-		Token: token,
+		BalA:   balPartVec[0],
+		BalB:   balPartVec[1],
+		Tokens: tokens,
 	}, nil
 }
 
 func ToAllocation(b Balances) (*channel.Allocation, error) {
-	asset, err := types.NewStellarAssetFromScAddress(b.Token)
-	if err != nil {
-		return nil, err
-	}
-	alloc := channel.NewAllocation(2, asset)
 
-	balA, err := ToBigInt(b.BalA)
-	if err != nil {
-		return nil, err
-	}
-	alloc.SetBalance(0, asset, balA)
+	var balsPart xdr.ScVal
 
-	balB, err := ToBigInt(b.BalB)
-	if err != nil {
-		return nil, err
+	var stAssets []channel.Asset
+
+	var alloc *channel.Allocation
+
+	// iterate for asset addresses inside allocation
+
+	for i, val := range b.Tokens {
+
+		balsPart = b.BalA[i]
+		token, ok := val.GetAddress()
+		if !ok {
+			return nil, errors.New("expected address")
+		}
+
+		stAsset, err := types.NewStellarAssetFromScAddress(token)
+		if err != nil {
+			return nil, err
+		}
+
+		stAssets = append(stAssets, stAsset)
+
 	}
-	alloc.SetBalance(1, asset, balB)
-	if err = alloc.Valid(); err != nil {
+
+	alloc = channel.NewAllocation(2, stAssets...)
+
+	for i, _ := range b.Tokens {
+		balsPartVec := *balsPart.MustVec()
+
+		for _, val := range balsPartVec {
+			bal, ok := val.GetI128()
+			if !ok {
+				return nil, errors.New("expected i128")
+			}
+
+			balInt, err := ToBigInt(bal)
+			if err != nil {
+				return nil, err
+			}
+
+			alloc.SetBalance(channel.Index(i), stAssets[i], balInt)
+
+		}
+
+	}
+
+	if err := alloc.Valid(); err != nil {
 		return nil, err
 	}
 	return alloc, nil
@@ -244,6 +308,36 @@ func makeAllocation(asset channel.Asset, balA, balB *big.Int) (*channel.Allocati
 	alloc := channel.NewAllocation(2, asset)
 	alloc.SetBalance(0, asset, balA)
 	alloc.SetBalance(1, asset, balB)
+	alloc.Locked = make([]channel.SubAlloc, 0)
+
+	if err := alloc.Valid(); err != nil {
+		return nil, err
+	}
+
+	return alloc, nil
+}
+
+func makeAllocationMulti(assets []channel.Asset, balsA, balsB []*big.Int) (*channel.Allocation, error) {
+
+	if len(balsA) != len(balsB) {
+		return nil, errors.New("expected equal number of balances")
+	}
+
+	if len(assets) != len(balsA) {
+		return nil, errors.New("expected equal number of assets and balances")
+	}
+
+	numParts := 2
+
+	alloc := channel.NewAllocation(numParts, assets...)
+
+	for i, _ := range assets {
+		alloc.SetBalance(channel.Index(0), assets[i], balsA[i])
+	}
+	for i, _ := range assets {
+		alloc.SetBalance(channel.Index(1), assets[i], balsB[i])
+	}
+
 	alloc.Locked = make([]channel.SubAlloc, 0)
 
 	if err := alloc.Valid(); err != nil {

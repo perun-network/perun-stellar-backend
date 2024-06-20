@@ -34,6 +34,7 @@ import (
 	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/wallet"
+	"perun.network/perun-stellar-backend/wire/scval"
 	pkgtest "polycry.pt/poly-go/test"
 	"runtime"
 	"testing"
@@ -49,14 +50,14 @@ const (
 )
 
 type Setup struct {
-	t       *testing.T
-	accs    []*wallet.Account
-	ws      []*wallet.EphemeralWallet
-	cbs     []*client.ContractBackend
-	Rng     *mathrand.Rand
-	funders []*channel.Funder
-	adjs    []*channel.Adjudicator
-	assetID pchannel.Asset
+	t        *testing.T
+	accs     []*wallet.Account
+	ws       []*wallet.EphemeralWallet
+	cbs      []*client.ContractBackend
+	Rng      *mathrand.Rand
+	funders  []*channel.Funder
+	adjs     []*channel.Adjudicator
+	assetIDs []pchannel.Asset
 }
 
 func (s *Setup) GetStellarClients() []*client.ContractBackend {
@@ -71,8 +72,8 @@ func (s *Setup) GetAdjudicators() []*channel.Adjudicator {
 	return s.adjs
 }
 
-func (s *Setup) GetTokenAsset() pchannel.Asset {
-	return s.assetID
+func (s *Setup) GetTokenAsset() []pchannel.Asset {
+	return s.assetIDs
 }
 
 func (s *Setup) GetAccounts() []*wallet.Account {
@@ -103,26 +104,40 @@ func getDataFilePath(filename string) (string, error) {
 
 func NewTestSetup(t *testing.T) *Setup {
 
-	accs, kpsToFund, ws := MakeRandPerunAccsWallets(4)
+	accs, kpsToFund, ws := MakeRandPerunAccsWallets(5)
 	require.NoError(t, CreateFundStellarAccounts(kpsToFund, initLumensBalance))
 
-	depTokenKp := kpsToFund[2]
-	depPerunKp := kpsToFund[3]
+	depTokenOneKp := kpsToFund[2]
+	depTokenTwoKp := kpsToFund[3]
+
+	depTokenKps := []*keypair.Full{depTokenOneKp, depTokenTwoKp}
+
+	depPerunKp := kpsToFund[4]
 
 	relPathPerun, err := getDataFilePath(PerunContractPath)
 	require.NoError(t, err)
 	relPathAsset, err := getDataFilePath(StellarAssetContractPath)
 	require.NoError(t, err)
 
-	tokenAddress, _ := Deploy(t, depTokenKp, relPathAsset)
+	tokenAddressOne, _ := Deploy(t, depTokenOneKp, relPathAsset)
+	tokenAddressTwo, _ := Deploy(t, depTokenTwoKp, relPathAsset)
+
+	tokenAddresses := []xdr.ScAddress{tokenAddressOne, tokenAddressTwo}
+
 	perunAddress, _ := Deploy(t, depPerunKp, relPathPerun)
 
-	require.NoError(t, InitTokenContract(depTokenKp, tokenAddress))
+	require.NoError(t, InitTokenContract(depTokenOneKp, tokenAddressOne))
+	require.NoError(t, InitTokenContract(depTokenTwoKp, tokenAddressTwo))
 
-	SetupAccountsAndContracts(t, depTokenKp, kpsToFund[:2], tokenAddress, initTokenBalance)
+	SetupAccountsAndContracts(t, depTokenKps, kpsToFund[:2], tokenAddresses, initTokenBalance)
 
-	assetContractID, err := types.NewStellarAssetFromScAddress(tokenAddress)
-	require.NoError(t, err)
+	var assetContractIDs []pchannel.Asset
+
+	for _, tokenAddress := range tokenAddresses {
+		assetContractID, err := types.NewStellarAssetFromScAddress(tokenAddress)
+		require.NoError(t, err)
+		assetContractIDs = append(assetContractIDs, assetContractID)
+	}
 
 	cbs := NewContractBackendsFromKeys(kpsToFund[:2])
 
@@ -136,34 +151,43 @@ func NewTestSetup(t *testing.T) *Setup {
 	channelCBs := []*client.ContractBackend{aliceCB, bobCB}
 	channelWallets := []*wallet.EphemeralWallet{aliceWallet, bobWallet}
 
-	funders, adjs := CreateFundersAndAdjudicators(channelAccs, cbs, perunAddress, tokenAddress)
+	funders, adjs := CreateFundersAndAdjudicators(channelAccs, cbs, perunAddress, tokenAddresses)
 
 	setup := Setup{
-		t:       t,
-		accs:    channelAccs,
-		ws:      channelWallets,
-		cbs:     channelCBs,
-		funders: funders,
-		adjs:    adjs,
-		assetID: assetContractID,
+		t:        t,
+		accs:     channelAccs,
+		ws:       channelWallets,
+		cbs:      channelCBs,
+		funders:  funders,
+		adjs:     adjs,
+		assetIDs: assetContractIDs,
 	}
 
 	return &setup
 }
 
-func SetupAccountsAndContracts(t *testing.T, deployerKp *keypair.Full, kps []*keypair.Full, tokenAddress xdr.ScAddress, tokenBalance uint64) {
-	for _, kp := range kps {
-		addr, err := types.MakeAccountAddress(kp)
-		require.NoError(t, err)
-		require.NoError(t, MintToken(deployerKp, tokenAddress, tokenBalance, addr))
+func SetupAccountsAndContracts(t *testing.T, deployerKps []*keypair.Full, kps []*keypair.Full, tokenAddresses []xdr.ScAddress, tokenBalance uint64) {
+
+	require.Equal(t, len(deployerKps), len(tokenAddresses))
+
+	for i, _ := range deployerKps {
+		for _, kp := range kps {
+			addr, err := types.MakeAccountAddress(kp)
+			require.NoError(t, err)
+			require.NoError(t, MintToken(deployerKps[i], tokenAddresses[i], tokenBalance, addr))
+
+		}
 	}
 }
-func CreateFundersAndAdjudicators(accs []*wallet.Account, cbs []*client.ContractBackend, perunAddress, tokenAddress xdr.ScAddress) ([]*channel.Funder, []*channel.Adjudicator) {
+func CreateFundersAndAdjudicators(accs []*wallet.Account, cbs []*client.ContractBackend, perunAddress xdr.ScAddress, tokenScAddresses []xdr.ScAddress) ([]*channel.Funder, []*channel.Adjudicator) {
 	funders := make([]*channel.Funder, len(accs))
 	adjs := make([]*channel.Adjudicator, len(accs))
+
+	tokenVecAddresses := scval.MakeScVecFromScAddresses(tokenScAddresses)
+
 	for i, acc := range accs {
-		funders[i] = channel.NewFunder(acc, cbs[i], perunAddress, tokenAddress)
-		adjs[i] = channel.NewAdjudicator(acc, cbs[i], perunAddress, tokenAddress)
+		funders[i] = channel.NewFunder(acc, cbs[i], perunAddress, tokenVecAddresses)
+		adjs[i] = channel.NewAdjudicator(acc, cbs[i], perunAddress, tokenVecAddresses)
 	}
 	return funders, adjs
 }
@@ -301,14 +325,15 @@ func CreateFundStellarAccounts(pairs []*keypair.Full, initialBalance string) err
 	return nil
 }
 
-func NewParamsWithAddressStateWithAsset(t *testing.T, partsAddr []pwallet.Address, asset pchannel.Asset) (*pchannel.Params, *pchannel.State) {
+func NewParamsWithAddressStateWithAsset(t *testing.T, partsAddr []pwallet.Address, assets []pchannel.Asset) (*pchannel.Params, *pchannel.State) {
 
 	rng := pkgtest.Prng(t)
 
 	numParts := 2
 
 	return ptest.NewRandomParamsAndState(rng, ptest.WithNumLocked(0).Append(
-		ptest.WithAssets(asset),
+		ptest.WithAssets(assets...),
+		ptest.WithNumAssets(len(assets)),
 		ptest.WithVersion(0),
 		ptest.WithNumParts(numParts),
 		ptest.WithParts(partsAddr...),
