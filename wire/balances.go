@@ -153,13 +153,14 @@ func MakeBalances(alloc channel.Allocation) (Balances, error) {
 	if err := alloc.Valid(); err != nil {
 		return Balances{}, err
 	}
-
+	parts := []channel.Index{0, 1}
+	numParts := len(parts)
 	// No sub-channels
 	if len(alloc.Locked) != 0 {
 		return Balances{}, errors.New("expected no locked funds")
 	}
 	assets := alloc.Assets
-	var stAssets []channel.Asset
+	// var stAssets []channel.Asset
 
 	var tokens xdr.ScVec
 	for i, ast := range assets {
@@ -179,7 +180,6 @@ func MakeBalances(alloc channel.Allocation) (Balances, error) {
 		tokenVal := scval.MustWrapScAddress(token)
 
 		tokens = append(tokens, tokenVal)
-		stAssets = append(stAssets, sa)
 
 	}
 
@@ -187,7 +187,13 @@ func MakeBalances(alloc channel.Allocation) (Balances, error) {
 		return Balances{}, errors.New("expected exactly two parts")
 	}
 
-	bals := channel.NewAllocation(2, stAssets...) //alloc.Balance(0, assets)
+	bals := make(channel.Balances, len(parts))
+	for i := range numParts {
+		bals[i] = make([]channel.Bal, len(assets))
+		for j := range assets {
+			bals[i][j] = alloc.Balance(parts[i], assets[j])
+		}
+	}
 
 	var balPartVec []xdr.ScVec
 
@@ -195,7 +201,7 @@ func MakeBalances(alloc channel.Allocation) (Balances, error) {
 
 	var balScVal xdr.ScVal
 
-	for _, balsPart := range bals.Balances {
+	for _, balsPart := range bals {
 		balAVecScVal = xdr.ScVec{}
 
 		for _, val := range balsPart {

@@ -51,12 +51,12 @@ func runHappyPerun(t *testing.T) {
 		panic(err)
 	}
 
-	alicePerun.OpenChannel(bobPerun.WireAddress(), 1000)
+	alicePerun.OpenChannel(bobPerun.WireAddress(), []float64{1000, 1000})
 	aliceChannel := alicePerun.Channel
 	bobChannel := bobPerun.AcceptedChannel()
 
-	aliceChannel.SendPayment(10)
-	bobChannel.SendPayment(50)
+	aliceChannel.SendPayment(10, 0)
+	bobChannel.SendPayment(50, 1)
 
 	aliceChannel.Settle()
 	bobChannel.Settle()

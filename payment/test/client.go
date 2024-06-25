@@ -19,7 +19,7 @@ import (
 type PaymentClient struct {
 	perunClient *pclient.Client
 	account     *wallet.Account
-	currency    pchannel.Asset
+	currencies  []pchannel.Asset
 	channels    chan *PaymentChannel
 	Channel     *PaymentChannel
 	wAddr       wire.Address
@@ -29,7 +29,7 @@ type PaymentClient struct {
 func SetupPaymentClient(
 	w *wallet.EphemeralWallet,
 	acc *wallet.Account,
-	stellarTokenID pchannel.Asset,
+	stellarTokenIDs []pchannel.Asset,
 	bus *wire.LocalBus,
 	funder *channel.Funder,
 	adj *channel.Adjudicator,
@@ -49,7 +49,7 @@ func SetupPaymentClient(
 	c := &PaymentClient{
 		perunClient: perunClient,
 		account:     acc,
-		currency:    stellarTokenID,
+		currencies:  stellarTokenIDs,
 		channels:    make(chan *PaymentChannel, 1),
 		wAddr:       wireAddr,
 		balance:     big.NewInt(0),
@@ -69,7 +69,7 @@ func (c *PaymentClient) startWatching(ch *pclient.Channel) {
 	}()
 }
 
-func (c *PaymentClient) OpenChannel(peer wire.Address, amount float64) { //*PaymentChannel
+func (c *PaymentClient) OpenChannel(peer wire.Address, amounts []float64) {
 	// We define the channel participants. The proposer has always index 0. Here
 	// we use the on-chain addresses as off-chain addresses, but we could also
 	// use different ones.
@@ -77,14 +77,18 @@ func (c *PaymentClient) OpenChannel(peer wire.Address, amount float64) { //*Paym
 	participants := []wire.Address{c.WireAddress(), peer}
 
 	// We create an initial allocation which defines the starting balances.
-	initBal := big.NewInt(int64(amount))
+	initBals0 := big.NewInt(int64(amounts[0]))
+	initBals1 := big.NewInt(int64(amounts[1]))
 
-	initAlloc := pchannel.NewAllocation(2, c.currency)
-	initAlloc.SetAssetBalances(c.currency, []pchannel.Bal{
-		initBal, // Our initial balance.
-		initBal, // Peer's initial balance.
+	initAlloc := pchannel.NewAllocation(2, c.currencies...)
+	initAlloc.SetAssetBalances(c.currencies[0], []pchannel.Bal{
+		initBals0, // Our initial balance for asset 0.
+		initBals1, // Peer's initial balance for asset 0.
 	})
-
+	initAlloc.SetAssetBalances(c.currencies[1], []pchannel.Bal{
+		initBals1, // Our initial balance for asset 1.
+		initBals0, // Peer's initial balance for asset 1.
+	})
 	// Prepare the channel proposal by defining the channel parameters.
 	challengeDuration := uint64(10) // On-chain challenge duration in seconds.
 	proposal, err := pclient.NewLedgerChannelProposal(
@@ -105,7 +109,7 @@ func (c *PaymentClient) OpenChannel(peer wire.Address, amount float64) { //*Paym
 
 	// Start the on-chain event watcher. It automatically handles disputes.
 	c.startWatching(ch)
-	c.Channel = newPaymentChannel(ch, c.currency)
+	c.Channel = newPaymentChannel(ch, c.currencies)
 
 }
 
