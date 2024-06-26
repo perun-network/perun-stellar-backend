@@ -42,7 +42,7 @@ import (
 )
 
 const (
-	PerunContractPath        = "testdata/perun_soroban_contract.wasm"
+	PerunContractPath        = "testdata/perun_soroban_multi_contract.wasm"
 	StellarAssetContractPath = "testdata/perun_soroban_token.wasm"
 	initLumensBalance        = "10000000"
 	initTokenBalance         = uint64(2000000)
@@ -119,12 +119,12 @@ func NewTestSetup(t *testing.T) *Setup {
 	relPathAsset, err := getDataFilePath(StellarAssetContractPath)
 	require.NoError(t, err)
 
+	perunAddress, _ := Deploy(t, depPerunKp, relPathPerun)
+
 	tokenAddressOne, _ := Deploy(t, depTokenOneKp, relPathAsset)
 	tokenAddressTwo, _ := Deploy(t, depTokenTwoKp, relPathAsset)
 
 	tokenAddresses := []xdr.ScAddress{tokenAddressOne, tokenAddressTwo}
-
-	perunAddress, _ := Deploy(t, depPerunKp, relPathPerun)
 
 	require.NoError(t, InitTokenContract(depTokenOneKp, tokenAddressOne))
 	require.NoError(t, InitTokenContract(depTokenTwoKp, tokenAddressTwo))
@@ -340,7 +340,6 @@ func NewParamsWithAddressStateWithAsset(t *testing.T, partsAddr []pwallet.Addres
 		ptest.WithIsFinal(false),
 		ptest.WithLedgerChannel(true),
 		ptest.WithVirtualChannel(false),
-		ptest.WithNumAssets(1),
 		ptest.WithoutApp(),
 		ptest.WithBalancesInRange(big.NewInt(0).Mul(big.NewInt(1), big.NewInt(100_000)), big.NewInt(0).Mul(big.NewInt(1), big.NewInt(100_000))),
 	))

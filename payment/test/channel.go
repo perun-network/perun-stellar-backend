@@ -8,8 +8,8 @@ import (
 )
 
 type PaymentChannel struct {
-	ch       *client.Channel
-	currency channel.Asset
+	ch         *client.Channel
+	currencies []channel.Asset
 }
 
 func (c *PaymentChannel) GetChannel() *client.Channel {
@@ -23,22 +23,22 @@ func (c *PaymentChannel) GetChannelState() *channel.State {
 	return c.ch.State()
 }
 
-func newPaymentChannel(ch *client.Channel, currency channel.Asset) *PaymentChannel {
+func newPaymentChannel(ch *client.Channel, currencies []channel.Asset) *PaymentChannel {
 	return &PaymentChannel{
-		ch:       ch,
-		currency: currency,
+		ch:         ch,
+		currencies: currencies,
 	}
 }
 
 // SendPayment sends a payment to the channel peer.
-func (c PaymentChannel) SendPayment(amount int64) {
+func (c PaymentChannel) SendPayment(amount int64, assetIdx int) {
 	// Transfer the given amount from us to peer.
 	// Use UpdateBy to update the channel state.
 	err := c.ch.Update(context.TODO(), func(state *channel.State) {
 		icp := big.NewInt(amount)
 		actor := c.ch.Idx()
 		peer := 1 - actor
-		state.Allocation.TransferBalance(actor, peer, c.currency, icp)
+		state.Allocation.TransferBalance(actor, peer, c.currencies[assetIdx], icp)
 	})
 	if err != nil {
 		panic(err)

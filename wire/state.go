@@ -165,6 +165,7 @@ func StateFromScVal(v xdr.ScVal) (State, error) {
 
 func MakeState(state channel.State) (State, error) {
 	// TODO: Put these checks into a compatibility layer
+
 	if err := state.Valid(); err != nil {
 		return State{}, err
 	}
@@ -203,7 +204,6 @@ func ToState(stellarState State) (channel.State, error) {
 
 	var balsABigInt []*big.Int
 	var balsBBigInt []*big.Int
-	// for _, _ = range stellarState.Balances.Tokens { //iterate for asset
 
 	balsA := stellarState.Balances.BalA
 	for _, scVal := range balsA { // iterate for balance within asset
@@ -214,38 +214,17 @@ func ToState(stellarState State) (channel.State, error) {
 		}
 		balsABigInt = append(balsABigInt, balAPerun)
 
-		// for _, scVec := range balsAVec {
-
-		// 	valA := scVec.MustI128()
-
-		// 	balAPerun, err := ToBigInt(valA)
-		// 	if err != nil {
-		// 		return channel.State{}, err
-		// 	}
-		// 	balsABigInt = append(balsABigInt, balAPerun)
-		// }
-
 	}
 	balsB := stellarState.Balances.BalB
 	for _, scVal := range balsB { // iterate for balance within asset
-		// balsBVec := *scVal.MustVec()
 		valB := scVal.MustI128()
 		balBPerun, err := ToBigInt(valB)
 		if err != nil {
 			return channel.State{}, err
 		}
 		balsBBigInt = append(balsBBigInt, balBPerun)
-		// for _, scVec := range balsBVec {
-		// 	valB := scVec.MustI128()
-		// 	balBPerun, err := ToBigInt(valB)
-		// 	if err != nil {
-		// 		return channel.State{}, err
-		// 	}
-		// 	balsBBigInt = append(balsBBigInt, balBPerun)
-		// }
-	}
 
-	// }
+	}
 
 	Assets, err := convertAssets(stellarState.Balances.Tokens)
 	if err != nil {
@@ -302,9 +281,5 @@ func convertAssets(contractIDs xdr.ScVec) ([]channel.Asset, error) {
 
 	}
 
-	// stellarAsset, err := types.NewStellarAssetFromScAddress(contractID)
-	// if err != nil {
-	// 	return nil, err
-	// }
 	return assets, nil
 }
