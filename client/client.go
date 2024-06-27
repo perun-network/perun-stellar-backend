@@ -124,7 +124,7 @@ func (cb *ContractBackend) Fund(ctx context.Context, perunAddr xdr.ScAddress, ch
 
 func (cb *ContractBackend) Close(ctx context.Context, perunAddr xdr.ScAddress, state *pchannel.State, sigs []pwallet.Sig) error {
 
-	log.Println("Close called")
+	log.Println("Close called by ContractBackend")
 	closeTxArgs, err := buildSignedStateTxArgs(*state, sigs)
 	if err != nil {
 		return errors.New("error while building fund tx")
@@ -219,6 +219,8 @@ func (cb *ContractBackend) Dispute(ctx context.Context, perunAddr xdr.ScAddress,
 	return nil
 }
 func (cb *ContractBackend) Withdraw(ctx context.Context, perunAddr xdr.ScAddress, req pchannel.AdjudicatorReq) error {
+	log.Println("Withdraw called by ContractBackend")
+
 	chanID, partyIdx := req.Tx.State.ID, req.Idx
 	withdrawerIdx := partyIdx == 1
 	if partyIdx > 1 {

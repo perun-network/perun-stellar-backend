@@ -69,26 +69,17 @@ func (c *PaymentClient) startWatching(ch *pclient.Channel) {
 	}()
 }
 
-func (c *PaymentClient) OpenChannel(peer wire.Address, amounts []float64) {
+func (c *PaymentClient) OpenChannel(peer wire.Address, balances pchannel.Balances) {
 	// We define the channel participants. The proposer has always index 0. Here
 	// we use the on-chain addresses as off-chain addresses, but we could also
 	// use different ones.
 
 	participants := []wire.Address{c.WireAddress(), peer}
 
-	// We create an initial allocation which defines the starting balances.
-	initBals0 := big.NewInt(int64(amounts[0]))
-	initBals1 := big.NewInt(int64(amounts[1]))
-
 	initAlloc := pchannel.NewAllocation(2, c.currencies...)
-	initAlloc.SetAssetBalances(c.currencies[0], []pchannel.Bal{
-		initBals0, // Our initial balance for asset 0.
-		initBals1, // Peer's initial balance for asset 0.
-	})
-	initAlloc.SetAssetBalances(c.currencies[1], []pchannel.Bal{
-		initBals1, // Our initial balance for asset 1.
-		initBals0, // Peer's initial balance for asset 1.
-	})
+	initAlloc.Balances = balances
+
+	fmt.Println("InitAlloc: ", initAlloc)
 	// Prepare the channel proposal by defining the channel parameters.
 	challengeDuration := uint64(10) // On-chain challenge duration in seconds.
 	proposal, err := pclient.NewLedgerChannelProposal(
@@ -110,7 +101,6 @@ func (c *PaymentClient) OpenChannel(peer wire.Address, amounts []float64) {
 	// Start the on-chain event watcher. It automatically handles disputes.
 	c.startWatching(ch)
 	c.Channel = newPaymentChannel(ch, c.currencies)
-
 }
 
 func (p *PaymentClient) WireAddress() wire.Address {
