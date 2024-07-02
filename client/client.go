@@ -276,5 +276,29 @@ func (cb *ContractBackend) GetChannelInfo(ctx context.Context, perunAddr xdr.ScA
 		return wire.Channel{}, errors.New("error while decoding return value")
 	}
 	return getChan, nil
+}
 
+func (cb *ContractBackend) GetBalanceUser(cID xdr.ScAddress) (string, error) {
+	tr := cb.GetTransactor()
+	addr, err := tr.GetAddress()
+	if err != nil {
+		return "", err
+	}
+	accountId, err := xdr.AddressToAccountId(addr)
+	if err != nil {
+		return "", err
+	}
+	scAddr, err := xdr.NewScAddress(xdr.ScAddressTypeScAddressTypeAccount, accountId)
+	if err != nil {
+		return "", err
+	}
+	TokenNameArgs, err := BuildGetTokenBalanceArgs(scAddr)
+	if err != nil {
+		return "", err
+	}
+	tx, err := cb.InvokeSignedTx("balance", TokenNameArgs, cID)
+	if err != nil {
+		return "", err
+	}
+	return tx.V3.SorobanMeta.ReturnValue.String(), nil
 }

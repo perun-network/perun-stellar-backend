@@ -55,7 +55,7 @@ func runHappyPerun(t *testing.T) {
 
 	balances := channel.Balances{
 		{big.NewInt(1000), big.NewInt(0)},
-		{big.NewInt(0), big.NewInt(1000)},
+		{big.NewInt(0), big.NewInt(2000)},
 	}
 
 	alicePerun.OpenChannel(bobPerun.WireAddress(), balances)

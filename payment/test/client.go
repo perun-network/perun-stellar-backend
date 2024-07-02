@@ -79,7 +79,6 @@ func (c *PaymentClient) OpenChannel(peer wire.Address, balances pchannel.Balance
 	initAlloc := pchannel.NewAllocation(2, c.currencies...)
 	initAlloc.Balances = balances
 
-	fmt.Println("InitAlloc: ", initAlloc)
 	// Prepare the channel proposal by defining the channel parameters.
 	challengeDuration := uint64(10) // On-chain challenge duration in seconds.
 	proposal, err := pclient.NewLedgerChannelProposal(
