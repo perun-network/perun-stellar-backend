@@ -126,7 +126,7 @@ func (cb *ContractBackend) Fund(ctx context.Context, perunAddr xdr.ScAddress, ch
 
 func (cb *ContractBackend) Close(ctx context.Context, perunAddr xdr.ScAddress, state *pchannel.State, sigs []pwallet.Sig) error {
 
-	log.Println("Close called")
+	log.Println("Close called by ContractBackend")
 	closeTxArgs, err := buildSignedStateTxArgs(*state, sigs)
 	if err != nil {
 		return errors.New("error while building fund tx")
@@ -221,6 +221,8 @@ func (cb *ContractBackend) Dispute(ctx context.Context, perunAddr xdr.ScAddress,
 	return nil
 }
 func (cb *ContractBackend) Withdraw(ctx context.Context, perunAddr xdr.ScAddress, req pchannel.AdjudicatorReq) error {
+	log.Println("Withdraw called by ContractBackend")
+
 	chanID, partyIdx := req.Tx.State.ID, req.Idx
 	withdrawerIdx := partyIdx == 1
 	log.Println("Withdraw called: ", req.Idx)
@@ -303,5 +305,29 @@ func (cb *ContractBackend) GetChannelInfo(ctx context.Context, perunAddr xdr.ScA
 		return wire.Channel{}, errors.New("error while decoding return value")
 	}
 	return getChan, nil
+}
 
+func (cb *ContractBackend) GetBalanceUser(cID xdr.ScAddress) (string, error) {
+	tr := cb.GetTransactor()
+	addr, err := tr.GetAddress()
+	if err != nil {
+		return "", err
+	}
+	accountId, err := xdr.AddressToAccountId(addr)
+	if err != nil {
+		return "", err
+	}
+	scAddr, err := xdr.NewScAddress(xdr.ScAddressTypeScAddressTypeAccount, accountId)
+	if err != nil {
+		return "", err
+	}
+	TokenNameArgs, err := BuildGetTokenBalanceArgs(scAddr)
+	if err != nil {
+		return "", err
+	}
+	tx, err := cb.InvokeSignedTx("balance", TokenNameArgs, cID)
+	if err != nil {
+		return "", err
+	}
+	return tx.V3.SorobanMeta.ReturnValue.String(), nil
 }

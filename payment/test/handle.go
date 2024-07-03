@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
-
+	"math/big"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
+	"time"
 )
 
 // HandleProposal is the callback for incoming channel proposals.
@@ -34,7 +34,7 @@ func (c *PaymentClient) HandleProposal(p client.ChannelProposal, r *client.Propo
 
 		if err := channel.AssertAssetsEqual(lcp.InitBals.Assets, pAssets); err != nil {
 			return nil, fmt.Errorf("Invalid assets: %v\n", err)
-		} else if lcp.FundingAgreement[assetIdx][clientIdx].Cmp(lcp.FundingAgreement[assetIdx][peerIdx]) != 0 {
+		} else if lcp.FundingAgreement[assetIdx][peerIdx].Cmp(big.NewInt(0)) != 0 { //lcp.FundingAgreement[assetIdx][clientIdx].Cmp(lcp.FundingAgreement[assetIdx][peerIdx]) != 0
 			return nil, fmt.Errorf("Invalid funding balance")
 		}
 		return lcp, nil

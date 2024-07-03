@@ -79,8 +79,7 @@ func (a *Adjudicator) Subscribe(ctx context.Context, cid pchannel.ID) (pchannel.
 func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq, smap pchannel.StateMap) error {
 
 	if req.Tx.State.IsFinal {
-		log.Println("Channel is finalized: ", req.Idx)
-		log.Println("Withdraw called: ", req.Idx)
+		log.Println("Withdraw called by Adjudicator")
 
 		if err := a.Close(ctx, req.Tx.State, req.Tx.Sigs); err != nil {
 			log.Println("Close failed", err, req.Idx)
@@ -126,7 +125,7 @@ func (a *Adjudicator) withdraw(ctx context.Context, req pchannel.AdjudicatorReq)
 
 func (a *Adjudicator) Close(ctx context.Context, state *pchannel.State, sigs []pwallet.Sig) error {
 
-	log.Println("Close called")
+	log.Println("Close called by Adjudicator")
 	perunAddr := a.GetPerunAddr()
 
 	return a.CB.Close(ctx, perunAddr, state, sigs)

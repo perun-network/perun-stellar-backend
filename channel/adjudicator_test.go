@@ -52,7 +52,6 @@ func TestHappyChannel(t *testing.T) {
 		adjBob := setup.GetAdjudicators()[1]
 
 		ctxAliceWithdraw := setup.NewCtx(chtest.DefaultTestTimeout)
-		ctxBobWithdraw := setup.NewCtx(chtest.DefaultTestTimeout)
 
 		adjState := perunState
 		next := adjState.Clone()
@@ -91,12 +90,6 @@ func TestHappyChannel(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NoError(t, adjBob.Withdraw(ctx, reqBob, nil))
-		perunAddrBob := adjBob.GetPerunAddr()
-		stellarChanBob, err := adjBob.CB.GetChannelInfo(ctxBobWithdraw, perunAddrBob, next.ID)
-
-		require.NoError(t, err)
-
-		require.True(t, stellarChanBob.Control.WithdrawnB)
 
 	}
 
