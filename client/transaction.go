@@ -8,6 +8,7 @@ import (
 	"github.com/stellar/go/protocols/horizon"
 	"github.com/stellar/go/txnbuild"
 	"github.com/stellar/go/xdr"
+	"perun.network/perun-stellar-backend/wire"
 	"strconv"
 	"time"
 )
@@ -94,6 +95,43 @@ func PreflightHostFunctions(hzClient *horizonclient.Client,
 	function.Auth = funAuth
 
 	return function, result.MinResourceFee
+}
+
+func PreflightHostFunctionsResult(hzClient *horizonclient.Client,
+	sourceAccount txnbuild.Account, function txnbuild.InvokeHostFunction,
+) (wire.Channel, txnbuild.InvokeHostFunction, int64) {
+	result, transactionData := simulateTransaction(hzClient, sourceAccount, &function)
+
+	function.Ext = xdr.TransactionExt{
+		V:           1,
+		SorobanData: &transactionData,
+	}
+	var getChan wire.Channel
+
+	if len(result.Results) != 1 {
+		panic("expected one result")
+	}
+
+	var decodedXdr xdr.ScVal
+	err := xdr.SafeUnmarshalBase64(result.Results[0].XDR, &decodedXdr)
+	if err != nil {
+		panic(err)
+	}
+
+	decChanInfo := decodedXdr
+
+	if decChanInfo.Type != xdr.ScValTypeScvMap {
+		return getChan, function, result.MinResourceFee
+
+	}
+
+	err = getChan.FromScVal(decChanInfo)
+	if err != nil {
+
+		panic(err)
+	}
+
+	return getChan, function, result.MinResourceFee
 }
 
 func simulateTransaction(hzClient *horizonclient.Client,

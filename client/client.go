@@ -89,9 +89,9 @@ func (cb *ContractBackend) Fund(ctx context.Context, perunAddr xdr.ScAddress, ch
 
 	fundTxArgs, err := buildChanIdxTxArgs(chanID, funderIdx)
 	if err != nil {
-		log.Println("error while building fund tx")
 		return errors.New("error while building fund tx")
 	}
+
 	txMeta, err := cb.InvokeSignedTx("fund", fundTxArgs, perunAddr)
 	if err != nil {
 		return err
@@ -225,45 +225,19 @@ func (cb *ContractBackend) Withdraw(ctx context.Context, perunAddr xdr.ScAddress
 
 	chanID, partyIdx := req.Tx.State.ID, req.Idx
 	withdrawerIdx := partyIdx == 1
-	log.Println("Withdraw called: ", req.Idx)
 	if partyIdx > 1 {
 		return errors.New("invalid party index for withdrawal")
 	}
 
 	withdrawTxArgs, err := buildChanIdxTxArgs(chanID, withdrawerIdx)
 	if err != nil {
-		return errors.New("error building withdraw tx")
+		return errors.New("error building fund tx")
 	}
-	log.Println("withdrawing: ", withdrawerIdx, withdrawTxArgs)
 	txMeta, err := cb.InvokeSignedTx("withdraw", withdrawTxArgs, perunAddr)
 	if err != nil {
 		return errors.New("error in host function: withdraw")
 	}
-	tr := cb.GetTransactor()
-	clientAddress, err := tr.GetAddress()
-	if err != nil {
-		log.Println("Error while getting client address: ", err)
-	}
-	tokenAddr0 := req.Tx.State.Assets[0].(*types.StellarAsset)
-	cAdd0, err := types.MakeContractAddress(tokenAddr0.ContractID())
-	if err != nil {
-		return err
-	}
-	bal0, err := cb.GetBalance(cAdd0)
-	if err != nil {
-		log.Println("Error while getting balance: ", err)
-	}
-	tokenAddr1 := req.Tx.State.Assets[1].(*types.StellarAsset)
-	log.Println("Asset1: ", tokenAddr1, "Asset2: ", tokenAddr0)
-	cAdd1, err := types.MakeContractAddress(tokenAddr1.ContractID())
-	if err != nil {
-		return err
-	}
-	bal1, err := cb.GetBalance(cAdd1)
-	if err != nil {
-		log.Println("Error while getting balance: ", err)
-	}
-	log.Println("Balance: ", bal0, bal1, " after withdrawing: ", clientAddress, req.Tx.State.Assets)
+
 	evs, err := event.DecodeEventsPerun(txMeta)
 	if err != nil {
 		return err
@@ -286,25 +260,17 @@ func (cb *ContractBackend) Withdraw(ctx context.Context, perunAddr xdr.ScAddress
 }
 
 func (cb *ContractBackend) GetChannelInfo(ctx context.Context, perunAddr xdr.ScAddress, chanId pchannel.ID) (wire.Channel, error) {
-	log.Println("GetChannelInfo called")
+
 	getchTxArgs, err := buildChanIdTxArgs(chanId)
 	if err != nil {
 		return wire.Channel{}, errors.New("error while building get_channel tx")
 	}
-	txMeta, err := cb.InvokeSignedTx("get_channel", getchTxArgs, perunAddr)
+	chanInfo, err := cb.InvokeUnsignedTx("get_channel", getchTxArgs, perunAddr)
 	if err != nil {
 		return wire.Channel{}, errors.New("error while processing and submitting get_channel tx")
 	}
 
-	retVal := txMeta.V3.SorobanMeta.ReturnValue
-	var getChan wire.Channel
-
-	err = getChan.FromScVal(retVal)
-	if err != nil {
-		log.Println("Return value: ", retVal)
-		return wire.Channel{}, errors.New("error while decoding return value")
-	}
-	return getChan, nil
+	return chanInfo, nil
 }
 
 func (cb *ContractBackend) GetBalanceUser(cID xdr.ScAddress) (string, error) {
