@@ -10,6 +10,7 @@ import (
 	"github.com/stellar/go/xdr"
 	"perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/wallet/types"
+	"perun.network/perun-stellar-backend/wire"
 	"sync"
 )
 
@@ -127,6 +128,30 @@ func (st *StellarSigner) GetAddress() (string, error) {
 
 func (st *StellarSigner) GetHorizonClient() *horizonclient.Client {
 	return st.hzClient
+}
+
+func (c *ContractBackend) InvokeUnsignedTx(fname string, callTxArgs xdr.ScVec, contractAddr xdr.ScAddress) (wire.Channel, error) { //xdr.TransactionMeta, error
+	c.cbMutex.Lock()
+	defer c.cbMutex.Unlock()
+	fnameXdr := xdr.ScSymbol(fname)
+	hzAcc, err := c.tr.GetHorizonAccount()
+	if err != nil {
+		return wire.Channel{}, err
+	}
+
+	hzClient := c.tr.GetHorizonClient()
+
+	txSender, ok := c.tr.sender.(*TxSender)
+	if !ok {
+		return wire.Channel{}, errors.New("sender is not of type *TxSender")
+	}
+
+	txSender.SetHzClient(hzClient)
+
+	invokeHostFunctionOp := BuildContractCallOp(hzAcc, fnameXdr, callTxArgs, contractAddr)
+	chanInfo, _, _ := PreflightHostFunctionsResult(hzClient, &hzAcc, *invokeHostFunctionOp)
+
+	return chanInfo, nil
 }
 
 func (c *ContractBackend) InvokeSignedTx(fname string, callTxArgs xdr.ScVec, contractAddr xdr.ScAddress) (xdr.TransactionMeta, error) {

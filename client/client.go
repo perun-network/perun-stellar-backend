@@ -263,19 +263,12 @@ func (cb *ContractBackend) GetChannelInfo(ctx context.Context, perunAddr xdr.ScA
 	if err != nil {
 		return wire.Channel{}, errors.New("error while building get_channel tx")
 	}
-	txMeta, err := cb.InvokeSignedTx("get_channel", getchTxArgs, perunAddr)
+	chanInfo, err := cb.InvokeUnsignedTx("get_channel", getchTxArgs, perunAddr)
 	if err != nil {
 		return wire.Channel{}, errors.New("error while processing and submitting get_channel tx")
 	}
 
-	retVal := txMeta.V3.SorobanMeta.ReturnValue
-	var getChan wire.Channel
-
-	err = getChan.FromScVal(retVal)
-	if err != nil {
-		return wire.Channel{}, errors.New("error while decoding return value")
-	}
-	return getChan, nil
+	return chanInfo, nil
 }
 
 func (cb *ContractBackend) GetBalanceUser(cID xdr.ScAddress) (string, error) {
