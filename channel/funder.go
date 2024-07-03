@@ -17,6 +17,7 @@ package channel
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/stellar/go/xdr"
 	"log"
 	pchannel "perun.network/go-perun/channel"
@@ -110,23 +111,44 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 				return nil
 			}
 
-			t := req.State.Assets[0].(*types.StellarAsset)
-			cAdd, err := types.MakeContractAddress(t.ContractID())
-			if err != nil {
-				return err
-			}
-
 			if req.Idx == pchannel.Index(0) && !chanState.Control.FundedA {
 				log.Println("Funding party A")
 				err := f.FundChannel(ctx, req.State, false)
 				if err != nil {
 					return err
 				}
-				bal, err := f.cb.GetBalance(cAdd)
+				t0, ok := req.State.Assets[0].(*types.StellarAsset)
+				if !ok {
+					return fmt.Errorf("expected StellarAsset at index 0, got %T", req.State.Assets[0])
+				}
+				cAdd0, err := types.MakeContractAddress(t0.ContractID())
+				if err != nil {
+					return err
+				}
+				var bal0 string
+				for {
+					bal0, err = f.cb.GetBalance(cAdd0)
+					if err != nil {
+						log.Println("Error while getting balance: ", err)
+					}
+					if bal0 != "" {
+						break
+					}
+					time.Sleep(1 * time.Second) // Wait for a second before retrying
+				}
+				t1, ok := req.State.Assets[1].(*types.StellarAsset)
+				if !ok {
+					return fmt.Errorf("expected StellarAsset at index 1, got %T", req.State.Assets[1])
+				}
+				cAdd1, err := types.MakeContractAddress(t1.ContractID())
+				if err != nil {
+					return err
+				}
+				bal1, err := f.cb.GetBalance(cAdd1)
 				if err != nil {
 					log.Println("Error while getting balance: ", err)
 				}
-				log.Println("Balance A: ", bal, " after funding amount: ", req.State.Balances)
+				log.Println("Balance A: ", bal0, bal1, " after funding amount: ", req.State.Balances, req.State.Assets)
 				continue
 			}
 			if req.Idx == pchannel.Index(1) && !chanState.Control.FundedB {
@@ -135,11 +157,31 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 				if err != nil {
 					return err
 				}
-				bal, err := f.cb.GetBalance(cAdd)
+				t0, ok := req.State.Assets[0].(*types.StellarAsset)
+				if !ok {
+					return fmt.Errorf("expected StellarAsset at index 0, got %T", req.State.Assets[0])
+				}
+				cAdd0, err := types.MakeContractAddress(t0.ContractID())
+				if err != nil {
+					return err
+				}
+				bal0, err := f.cb.GetBalance(cAdd0)
 				if err != nil {
 					log.Println("Error while getting balance: ", err)
 				}
-				log.Println("Balance B: ", bal, " after funding amount: ", req.State.Balances)
+				t1, ok := req.State.Assets[1].(*types.StellarAsset)
+				if !ok {
+					return fmt.Errorf("expected StellarAsset at index 1, got %T", req.State.Assets[1])
+				}
+				cAdd1, err := types.MakeContractAddress(t1.ContractID())
+				if err != nil {
+					return err
+				}
+				bal1, err := f.cb.GetBalance(cAdd1)
+				if err != nil {
+					log.Println("Error while getting balance: ", err)
+				}
+				log.Println("Balance B: ", bal0, bal1, " after funding amount: ", req.State.Balances, req.State.Assets)
 				continue
 			}
 		}
@@ -159,11 +201,13 @@ func (f *Funder) openChannel(ctx context.Context, req pchannel.FundingReq) error
 func (f *Funder) FundChannel(ctx context.Context, state *pchannel.State, funderIdx bool) error {
 
 	balsStellar, err := wire.MakeBalances(state.Allocation)
+	log.Println("Funding channel with balances: ", balsStellar)
 	if err != nil {
 		return errors.New("error while making balances")
 	}
 
 	if !balsStellar.Tokens.Equals(&f.assetAddrs) {
+		log.Println(balsStellar.Tokens, f.assetAddrs)
 		return errors.New("asset address is not equal to the address stored in the state")
 	}
 

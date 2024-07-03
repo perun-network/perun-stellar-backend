@@ -313,7 +313,6 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 				return nil, err
 			}
 			pState, err := wire.ToState(fundEventchanStellar.State)
-			log.Println("Funding State: ", pState)
 			if err != nil {
 				return nil, err
 			}
@@ -321,7 +320,7 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 				channel: fundEventchanStellar,
 				idv:     pState.ID,
 			}
-			log.Println("Funding Event: ", fundEvent)
+			log.Println("Funding Event received")
 			evs = append(evs, &fundEvent)
 		case EventTypeClosed:
 			closedEventchanStellar, err := GetChannelFromEvents(ev.Body.V0.Data)
@@ -329,7 +328,6 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 				return nil, err
 			}
 			pState, err := wire.ToState(closedEventchanStellar.State)
-			log.Println("Close State: ", pState)
 			if err != nil {
 				return nil, err
 			}
@@ -337,7 +335,7 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 				channel: closedEventchanStellar,
 				idv:     pState.ID,
 			}
-			log.Println("Close Event: ", closeEvent)
+			log.Println("Close Event received")
 			evs = append(evs, &closeEvent)
 		case EventTypeWithdrawn:
 			withdrawnEventchanStellar, err := GetChannelFromEvents(ev.Body.V0.Data)
@@ -348,12 +346,11 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 			if err != nil {
 				return nil, err
 			}
-			log.Println("Withdrawn State: ", pState)
+			log.Println("Withdrawn Event received")
 			withdrawnEvent := WithdrawnEvent{
 				channel: withdrawnEventchanStellar,
 				idv:     pState.ID,
 			}
-			log.Println("Withdrawn Event: ", withdrawnEvent)
 			evs = append(evs, &withdrawnEvent)
 
 		case EventTypeDisputed:
@@ -361,15 +358,14 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 			if err != nil {
 				return nil, err
 			}
-			pState, err := wire.ToState(disputedEventchanStellar.State)
+			_, err = wire.ToState(disputedEventchanStellar.State)
 			if err != nil {
 				return nil, err
 			}
-			log.Println("Disputed State: ", pState)
 			disputedEvent := DisputedEvent{
 				channel: disputedEventchanStellar,
 			}
-			log.Println("Disputed Event: ", disputedEvent)
+			log.Println("Disputed Event received")
 			evs = append(evs, &disputedEvent)
 
 		}

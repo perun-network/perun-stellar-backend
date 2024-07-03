@@ -67,7 +67,7 @@ func (s StellarAsset) ContractID() xdr.Hash {
 }
 
 func NewStellarAsset(contractID xdr.Hash) *StellarAsset {
-	return &StellarAsset{contractID: contractID}
+	return &StellarAsset{contractID: contractID, id: MakeContractID("0")}
 }
 
 func (s StellarAsset) MarshalBinary() (data []byte, err error) {
@@ -134,7 +134,7 @@ func NewStellarAssetFromScAddress(address xdr.ScAddress) (*StellarAsset, error) 
 	if err != nil {
 		return nil, err
 	}
-	s.id = MakeContractID(s.contractID.HexString())
+	s.id = MakeContractID("0")
 	return s, nil
 }
 

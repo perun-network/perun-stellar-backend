@@ -40,7 +40,7 @@ type keyHolder struct {
 }
 
 func (cb *ContractBackend) Open(ctx context.Context, perunAddr xdr.ScAddress, params *pchannel.Params, state *pchannel.State) error {
-	log.Println("Open called")
+	log.Println("Open called: ", params, state)
 	openTxArgs, err := buildOpenTxArgs(*params, *state)
 	if err != nil {
 		log.Println(err)
@@ -242,16 +242,26 @@ func (cb *ContractBackend) Withdraw(ctx context.Context, perunAddr xdr.ScAddress
 	if err != nil {
 		log.Println("Error while getting client address: ", err)
 	}
-	tokenAddr := req.Tx.State.Assets[0].(*types.StellarAsset)
-	cAdd, err := types.MakeContractAddress(tokenAddr.ContractID())
+	tokenAddr0 := req.Tx.State.Assets[0].(*types.StellarAsset)
+	cAdd0, err := types.MakeContractAddress(tokenAddr0.ContractID())
 	if err != nil {
 		return err
 	}
-	bal, err := cb.GetBalance(cAdd)
+	bal0, err := cb.GetBalance(cAdd0)
 	if err != nil {
 		log.Println("Error while getting balance: ", err)
 	}
-	log.Println("Balance: ", bal, " after withdrawing: ", clientAddress)
+	tokenAddr1 := req.Tx.State.Assets[1].(*types.StellarAsset)
+	log.Println("Asset1: ", tokenAddr1, "Asset2: ", tokenAddr0)
+	cAdd1, err := types.MakeContractAddress(tokenAddr1.ContractID())
+	if err != nil {
+		return err
+	}
+	bal1, err := cb.GetBalance(cAdd1)
+	if err != nil {
+		log.Println("Error while getting balance: ", err)
+	}
+	log.Println("Balance: ", bal0, bal1, " after withdrawing: ", clientAddress, req.Tx.State.Assets)
 	evs, err := event.DecodeEventsPerun(txMeta)
 	if err != nil {
 		return err
