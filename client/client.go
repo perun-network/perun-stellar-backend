@@ -23,7 +23,6 @@ import (
 	"log"
 	pchannel "perun.network/go-perun/channel"
 	pwallet "perun.network/go-perun/wallet"
-	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/event"
 	"perun.network/perun-stellar-backend/wire"
 )
@@ -265,8 +264,9 @@ func (cb *ContractBackend) GetChannelInfo(ctx context.Context, perunAddr xdr.ScA
 	if err != nil {
 		return wire.Channel{}, errors.New("error while building get_channel tx")
 	}
-	chanInfo, err := cb.InvokeUnsignedTx("get_channel", getchTxArgs, perunAddr)
+	chanInfo, _, err := cb.InvokeUnsignedTx("get_channel", getchTxArgs, perunAddr)
 	if err != nil {
+		log.Println(err)
 		return wire.Channel{}, errors.New("error while processing and submitting get_channel tx")
 	}
 

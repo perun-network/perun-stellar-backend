@@ -120,11 +120,11 @@ func (cb *ContractBackend) GetBalance(cID xdr.ScAddress) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	tx, err := cb.InvokeSignedTx("balance", TokenNameArgs, cID)
+	_, bal, err := cb.InvokeUnsignedTx("balance", TokenNameArgs, cID)
 	if err != nil {
 		return "", err
 	}
-	return tx.V3.SorobanMeta.ReturnValue.String(), nil
+	return bal, nil
 }
 
 func (st *StellarSigner) GetHorizonAccount() (horizon.Account, error) {
@@ -158,28 +158,24 @@ func (st *StellarSigner) GetHorizonClient() *horizonclient.Client {
 	return st.hzClient
 }
 
-func (c *ContractBackend) InvokeUnsignedTx(fname string, callTxArgs xdr.ScVec, contractAddr xdr.ScAddress) (wire.Channel, error) { //xdr.TransactionMeta, error
+func (c *ContractBackend) InvokeUnsignedTx(fname string, callTxArgs xdr.ScVec, contractAddr xdr.ScAddress) (wire.Channel, string, error) { //xdr.TransactionMeta, error
 	c.cbMutex.Lock()
 	defer c.cbMutex.Unlock()
 	fnameXdr := xdr.ScSymbol(fname)
 	hzAcc, err := c.tr.GetHorizonAccount()
 	if err != nil {
-		return wire.Channel{}, err
+		return wire.Channel{}, "", err
 	}
 
 	hzClient := c.tr.GetHorizonClient()
 
-	txSender, ok := c.tr.sender.(*TxSender)
-	if !ok {
-		return wire.Channel{}, errors.New("sender is not of type *TxSender")
-	}
-
-	txSender.SetHzClient(hzClient)
+	c.tr.sender.SetHzClient(hzClient)
+	chanInf := fname == "get_channel"
 
 	invokeHostFunctionOp := BuildContractCallOp(hzAcc, fnameXdr, callTxArgs, contractAddr)
-	chanInfo, _, _ := PreflightHostFunctionsResult(hzClient, &hzAcc, *invokeHostFunctionOp)
+	chanInfo, bal, _, _ := PreflightHostFunctionsResult(hzClient, &hzAcc, *invokeHostFunctionOp, chanInf)
 
-	return chanInfo, nil
+	return chanInfo, bal, nil
 }
 
 func (c *ContractBackend) InvokeSignedTx(fname string, callTxArgs xdr.ScVec, contractAddr xdr.ScAddress) (xdr.TransactionMeta, error) {
@@ -195,9 +191,9 @@ func (c *ContractBackend) InvokeSignedTx(fname string, callTxArgs xdr.ScVec, con
 
 	c.tr.sender.SetHzClient(hzClient)
 	invokeHostFunctionOp := BuildContractCallOp(hzAcc, fnameXdr, callTxArgs, contractAddr)
-	preFlightOp, _ := PreflightHostFunctions(hzClient, &hzAcc, *invokeHostFunctionOp)
-	minFeeCustom := int64(500000)
-	txParams := GetBaseTransactionParamsWithFee(&hzAcc, minFeeCustom, &preFlightOp)
+	preFlightOp, minFee := PreflightHostFunctions(hzClient, &hzAcc, *invokeHostFunctionOp)
+	minFeeCustom := int64(100)
+	txParams := GetBaseTransactionParamsWithFee(&hzAcc, minFee+minFeeCustom, &preFlightOp)
 	txUnsigned, err := txnbuild.NewTransaction(txParams)
 	if err != nil {
 		return xdr.TransactionMeta{}, err

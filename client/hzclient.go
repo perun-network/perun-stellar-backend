@@ -5,8 +5,8 @@ import (
 	"github.com/stellar/go/keypair"
 )
 
-const HorizonURL = "http://localhost:8000"
-const NETWORK_PASSPHRASE = "Standalone Network ; February 2017"
+const HorizonURL = "https://horizon-testnet.stellar.org"
+const NETWORK_PASSPHRASE = "Test SDF Network ; September 2015"
 
 func NewHorizonClient() *horizonclient.Client {
 	return &horizonclient.Client{HorizonURL: HorizonURL}

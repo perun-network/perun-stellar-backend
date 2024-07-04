@@ -199,18 +199,17 @@ func (f *Funder) openChannel(ctx context.Context, req pchannel.FundingReq) error
 }
 
 func (f *Funder) FundChannel(ctx context.Context, state *pchannel.State, funderIdx bool) error {
-
 	balsStellar, err := wire.MakeBalances(state.Allocation)
 	log.Println("Funding channel with balances: ", balsStellar)
 	if err != nil {
 		return errors.New("error while making balances")
 	}
 
-	if !balsStellar.Tokens.Equals(&f.assetAddrs) {
+	if !containsAllAssets(balsStellar.Tokens, f.assetAddrs) {
 		log.Println(balsStellar.Tokens, f.assetAddrs)
 		return errors.New("asset address is not equal to the address stored in the state")
 	}
-
+	log.Println(f.perunAddr, state.ID, funderIdx)
 	return f.cb.Fund(ctx, f.perunAddr, state.ID, funderIdx)
 }
 
@@ -237,4 +236,26 @@ func makeTimeoutErr(remains []pchannel.Index, assetIdx int) error {
 			TimedOutPeers: indices,
 		}},
 	)
+}
+
+// Function to check if all assets in state.Allocation are present in f.assetAddrs
+func containsAllAssets(stateAssets xdr.ScVec, fAssets xdr.ScVec) bool {
+	fAssetSet := assetSliceToSet(fAssets)
+
+	for _, asset := range stateAssets {
+		if _, found := fAssetSet[asset.String()]; !found {
+			return false
+		}
+	}
+
+	return true
+}
+
+// Helper function to convert a slice of xdr.Asset to a set (map for fast lookup)
+func assetSliceToSet(assets xdr.ScVec) map[string]struct{} {
+	assetSet := make(map[string]struct{})
+	for _, asset := range assets {
+		assetSet[asset.String()] = struct{}{}
+	}
+	return assetSet
 }
