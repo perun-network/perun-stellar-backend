@@ -133,8 +133,7 @@ func PreflightHostFunctionsResult(hzClient *horizonclient.Client,
 		decChanInfo := decodedXdr
 
 		if decChanInfo.Type != xdr.ScValTypeScvMap {
-			return getChan, "", function, result.MinResourceFee, nil
-
+			return getChan, "", function, result.MinResourceFee, errors.New("Invalid channel info type")
 		}
 
 		err = getChan.FromScVal(decChanInfo)
