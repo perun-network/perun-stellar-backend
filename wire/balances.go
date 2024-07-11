@@ -172,7 +172,10 @@ func MakeBalances(alloc channel.Allocation) (Balances, error) {
 			return Balances{}, err
 		}
 
-		tokenVal := scval.MustWrapScAddress(token)
+		tokenVal, err := scval.MustWrapScAddress(token)
+		if err != nil {
+			return Balances{}, err
+		}
 
 		tokens = append(tokens, tokenVal)
 	}

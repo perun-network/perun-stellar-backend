@@ -201,12 +201,12 @@ func MakeParams(params channel.Params) (Params, error) {
 	}, nil
 }
 
-func MustMakeParams(params channel.Params) Params {
+func MustMakeParams(params channel.Params) (Params, error) {
 	p, err := MakeParams(params)
 	if err != nil {
-		panic(err)
+		return Params{}, err
 	}
-	return p
+	return p, nil
 }
 
 func ToParams(params Params) (channel.Params, error) {

@@ -173,7 +173,10 @@ func (c *ContractBackend) InvokeUnsignedTx(fname string, callTxArgs xdr.ScVec, c
 	chanInf := fname == "get_channel"
 
 	invokeHostFunctionOp := BuildContractCallOp(hzAcc, fnameXdr, callTxArgs, contractAddr)
-	chanInfo, bal, _, _ := PreflightHostFunctionsResult(hzClient, &hzAcc, *invokeHostFunctionOp, chanInf)
+	chanInfo, bal, _, _, err := PreflightHostFunctionsResult(hzClient, &hzAcc, *invokeHostFunctionOp, chanInf)
+	if err != nil {
+		return wire.Channel{}, "", err
+	}
 
 	return chanInfo, bal, nil
 }
@@ -191,7 +194,10 @@ func (c *ContractBackend) InvokeSignedTx(fname string, callTxArgs xdr.ScVec, con
 
 	c.tr.sender.SetHzClient(hzClient)
 	invokeHostFunctionOp := BuildContractCallOp(hzAcc, fnameXdr, callTxArgs, contractAddr)
-	preFlightOp, minFee := PreflightHostFunctions(hzClient, &hzAcc, *invokeHostFunctionOp)
+	preFlightOp, minFee, err := PreflightHostFunctions(hzClient, &hzAcc, *invokeHostFunctionOp)
+	if err != nil {
+		return xdr.TransactionMeta{}, err
+	}
 	minFeeCustom := int64(100)
 	txParams := GetBaseTransactionParamsWithFee(&hzAcc, minFee+minFeeCustom, &preFlightOp)
 	txUnsigned, err := txnbuild.NewTransaction(txParams)

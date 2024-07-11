@@ -119,6 +119,7 @@ polling:
 				s.events <- adjEvent
 				etype, _ := adjEvent.GetType()
 				if etype == event.EventTypeWithdrawn {
+					log.Println("Withdrawn event detected, closing subscription")
 					return
 				}
 			}

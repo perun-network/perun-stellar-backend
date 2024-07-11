@@ -33,10 +33,15 @@ func init() {
 }
 
 func (b backend) CalcID(params *channel.Params) channel.ID {
-	wp := wire.MustMakeParams(*params)
+	wp, err := wire.MustMakeParams(*params)
+	if err != nil {
+		log.Println("CalcID called with invalid params:", err)
+		return channel.ID{}
+	}
 	bytes, err := wp.MarshalBinary()
 	if err != nil {
-		panic(err)
+		log.Println("CalcID called with invalid params:", err)
+		return channel.ID{}
 	}
 	id := sha256.Sum256(bytes)
 	log.Println("CalcID called:", id)

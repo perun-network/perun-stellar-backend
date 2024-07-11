@@ -19,6 +19,7 @@ import (
 	"errors"
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/xdr"
+	"log"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/channel/multi"
 )
@@ -97,7 +98,8 @@ func (s StellarAsset) Equal(asset channel.Asset) bool {
 func (a StellarAsset) MapKey() AssetMapKey {
 	d, err := a.MarshalBinary()
 	if err != nil {
-		panic(err)
+		log.Fatalf("could not marshal asset: %v", err)
+		return ""
 	}
 
 	return AssetMapKey(d)

@@ -195,6 +195,8 @@ func (f *Funder) openChannel(ctx context.Context, req pchannel.FundingReq) error
 		log.Println(err)
 		return errors.New("error while opening channel in party A")
 	}
+	ch, err := f.cb.GetChannelInfo(ctx, f.perunAddr, req.State.ID)
+	log.Println("Channel: ", ch)
 	return nil
 }
 
