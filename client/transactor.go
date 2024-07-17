@@ -5,7 +5,6 @@ import (
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/txnbuild"
 	"github.com/stellar/go/xdr"
-	"log"
 )
 
 func CreateSignedTransactionWithParams(signers []*keypair.Full, txParams txnbuild.TransactionParams,
@@ -35,13 +34,6 @@ func NewSender(kp *keypair.Full) Sender {
 }
 
 func (s *TxSender) SignSendTx(txUnsigned txnbuild.Transaction) (xdr.TransactionMeta, error) {
-	accReq := horizonclient.AccountRequest{AccountID: s.kp.Address()}
-	acc, err := s.hzClient.AccountDetail(accReq)
-	if err != nil {
-		return xdr.TransactionMeta{}, err
-	}
-	bals := acc.Balances
-	log.Println("Balances: ", bals)
 	tx, err := txUnsigned.Sign(NETWORK_PASSPHRASE, s.kp)
 	if err != nil {
 		return xdr.TransactionMeta{}, err
@@ -57,13 +49,7 @@ func (s *TxSender) SignSendTx(txUnsigned txnbuild.Transaction) (xdr.TransactionM
 		return xdr.TransactionMeta{}, ErrCouldNotDecodeTxMeta
 	}
 	_ = txMeta.V3.SorobanMeta.ReturnValue
-	accReq = horizonclient.AccountRequest{AccountID: s.kp.Address()}
-	acc, err = s.hzClient.AccountDetail(accReq)
-	if err != nil {
-		return xdr.TransactionMeta{}, err
-	}
-	bals = acc.Balances
-	log.Println("Balances: ", bals)
+
 	return txMeta, nil
 
 }

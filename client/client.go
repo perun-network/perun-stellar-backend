@@ -252,7 +252,7 @@ func (cb *ContractBackend) Withdraw(ctx context.Context, perunAddr xdr.ScAddress
 		log.Println("Error while getting balance: ", err)
 	}
 	tokenAddr1 := req.Tx.State.Assets[1].(*types.StellarAsset)
-	log.Println("Asset1: ", tokenAddr1, "Asset2: ", tokenAddr0)
+
 	cAdd1, err := types.MakeContractAddress(tokenAddr1.ContractID())
 	if err != nil {
 		return err

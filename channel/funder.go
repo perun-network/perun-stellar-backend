@@ -151,7 +151,7 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 				log.Println("Balance A: ", bal0, bal1, " after funding amount: ", req.State.Balances, req.State.Assets)
 				continue
 			}
-			if req.Idx == pchannel.Index(1) && !chanState.Control.FundedB {
+			if req.Idx == pchannel.Index(1) && !chanState.Control.FundedB && chanState.Control.FundedA {
 				log.Println("Funding party B")
 				err := f.FundChannel(ctx, req.State, true)
 				if err != nil {
@@ -195,8 +195,7 @@ func (f *Funder) openChannel(ctx context.Context, req pchannel.FundingReq) error
 		log.Println(err)
 		return errors.New("error while opening channel in party A")
 	}
-	ch, err := f.cb.GetChannelInfo(ctx, f.perunAddr, req.State.ID)
-	log.Println("Channel: ", ch)
+	_, err = f.cb.GetChannelInfo(ctx, f.perunAddr, req.State.ID)
 	return nil
 }
 
@@ -208,10 +207,8 @@ func (f *Funder) FundChannel(ctx context.Context, state *pchannel.State, funderI
 	}
 
 	if !containsAllAssets(balsStellar.Tokens, f.assetAddrs) {
-		log.Println(balsStellar.Tokens, f.assetAddrs)
 		return errors.New("asset address is not equal to the address stored in the state")
 	}
-	log.Println(f.perunAddr, state.ID, funderIdx)
 	return f.cb.Fund(ctx, f.perunAddr, state.ID, funderIdx)
 }
 

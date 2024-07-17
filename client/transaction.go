@@ -9,7 +9,6 @@ import (
 	"github.com/stellar/go/protocols/horizon"
 	"github.com/stellar/go/txnbuild"
 	"github.com/stellar/go/xdr"
-	"log"
 	"math/big"
 	"perun.network/perun-stellar-backend/wire"
 	"time"
@@ -128,7 +127,6 @@ func PreflightHostFunctionsResult(hzClient *horizonclient.Client,
 	if err != nil {
 		return wire.Channel{}, "", function, result.MinResourceFee, err
 	}
-	log.Println("RESULT: ", decodedXdr)
 	if chInfo {
 		decChanInfo := decodedXdr
 

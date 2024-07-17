@@ -44,7 +44,6 @@ func (b backend) CalcID(params *channel.Params) channel.ID {
 		return channel.ID{}
 	}
 	id := sha256.Sum256(bytes)
-	log.Println("CalcID called:", id)
 	return id
 }
 
