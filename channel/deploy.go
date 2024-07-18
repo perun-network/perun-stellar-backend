@@ -21,7 +21,7 @@ import (
 	"os"
 )
 
-const PerunContractPath = "../testdata/perun_soroban_contract.wasm"
+const PerunContractPath = "../testdata/perun_soroban_multi_contract.wasm"
 
 func AssembleInstallContractCodeOp(sourceAccount string, wasmFileName string) *txnbuild.InvokeHostFunction {
 	// Assemble the InvokeHostFunction UploadContractWasm operation:

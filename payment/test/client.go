@@ -19,7 +19,7 @@ import (
 type PaymentClient struct {
 	perunClient *pclient.Client
 	account     *wallet.Account
-	currency    pchannel.Asset
+	currencies  []pchannel.Asset
 	channels    chan *PaymentChannel
 	Channel     *PaymentChannel
 	wAddr       wire.Address
@@ -29,7 +29,7 @@ type PaymentClient struct {
 func SetupPaymentClient(
 	w *wallet.EphemeralWallet,
 	acc *wallet.Account,
-	stellarTokenID pchannel.Asset,
+	stellarTokenIDs []pchannel.Asset,
 	bus *wire.LocalBus,
 	funder *channel.Funder,
 	adj *channel.Adjudicator,
@@ -49,7 +49,7 @@ func SetupPaymentClient(
 	c := &PaymentClient{
 		perunClient: perunClient,
 		account:     acc,
-		currency:    stellarTokenID,
+		currencies:  stellarTokenIDs,
 		channels:    make(chan *PaymentChannel, 1),
 		wAddr:       wireAddr,
 		balance:     big.NewInt(0),
@@ -69,21 +69,15 @@ func (c *PaymentClient) startWatching(ch *pclient.Channel) {
 	}()
 }
 
-func (c *PaymentClient) OpenChannel(peer wire.Address, amount float64) { //*PaymentChannel
+func (c *PaymentClient) OpenChannel(peer wire.Address, balances pchannel.Balances) {
 	// We define the channel participants. The proposer has always index 0. Here
 	// we use the on-chain addresses as off-chain addresses, but we could also
 	// use different ones.
 
 	participants := []wire.Address{c.WireAddress(), peer}
 
-	// We create an initial allocation which defines the starting balances.
-	initBal := big.NewInt(int64(amount))
-
-	initAlloc := pchannel.NewAllocation(2, c.currency)
-	initAlloc.SetAssetBalances(c.currency, []pchannel.Bal{
-		initBal, // Our initial balance.
-		initBal, // Peer's initial balance.
-	})
+	initAlloc := pchannel.NewAllocation(2, c.currencies...)
+	initAlloc.Balances = balances
 
 	// Prepare the channel proposal by defining the channel parameters.
 	challengeDuration := uint64(10) // On-chain challenge duration in seconds.
@@ -105,8 +99,7 @@ func (c *PaymentClient) OpenChannel(peer wire.Address, amount float64) { //*Paym
 
 	// Start the on-chain event watcher. It automatically handles disputes.
 	c.startWatching(ch)
-	c.Channel = newPaymentChannel(ch, c.currency)
-
+	c.Channel = newPaymentChannel(ch, c.currencies)
 }
 
 func (p *PaymentClient) WireAddress() wire.Address {

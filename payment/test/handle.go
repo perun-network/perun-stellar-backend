@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
-
+	"math/big"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
+	"time"
 )
 
 // HandleProposal is the callback for incoming channel proposals.
@@ -26,9 +26,15 @@ func (c *PaymentClient) HandleProposal(p client.ChannelProposal, r *client.Propo
 
 		// Check that the channel has the expected assets and funding balances.
 		const assetIdx, clientIdx, peerIdx = 0, 0, 1
-		if err := channel.AssertAssetsEqual(lcp.InitBals.Assets, []channel.Asset{c.currency}); err != nil {
+
+		pAssets := make([]channel.Asset, len(c.currencies))
+		for i, asset := range c.currencies {
+			pAssets[i] = channel.Asset(asset)
+		}
+
+		if err := channel.AssertAssetsEqual(lcp.InitBals.Assets, pAssets); err != nil {
 			return nil, fmt.Errorf("Invalid assets: %v\n", err)
-		} else if lcp.FundingAgreement[assetIdx][clientIdx].Cmp(lcp.FundingAgreement[assetIdx][peerIdx]) != 0 {
+		} else if lcp.FundingAgreement[assetIdx][peerIdx].Cmp(big.NewInt(0)) != 0 { //lcp.FundingAgreement[assetIdx][clientIdx].Cmp(lcp.FundingAgreement[assetIdx][peerIdx]) != 0
 			return nil, fmt.Errorf("Invalid funding balance")
 		}
 		return lcp, nil
@@ -56,7 +62,7 @@ func (c *PaymentClient) HandleProposal(p client.ChannelProposal, r *client.Propo
 	c.startWatching(ch)
 
 	// Store channel.
-	c.channels <- newPaymentChannel(ch, c.currency)
+	c.channels <- newPaymentChannel(ch, c.currencies)
 
 }
 
@@ -70,11 +76,19 @@ func (c *PaymentClient) HandleUpdate(cur *channel.State, next client.ChannelUpda
 		}
 
 		receiverIdx := 1 - next.ActorIdx // This works because we are in a two-party channel.
-		curBal := cur.Allocation.Balance(receiverIdx, c.currency)
-		nextBal := next.State.Allocation.Balance(receiverIdx, c.currency)
-		if nextBal.Cmp(curBal) < 0 {
-			return fmt.Errorf("Invalid balance: %v", nextBal)
+		// curBal0 := cur.Allocation.Balance(receiverIdx, c.currencies[0])
+		// nextBal0 := next.State.Allocation.Balance(receiverIdx, c.currencies[0])
+		// if nextBal0.Cmp(curBal0) < 0 {
+		// 	return fmt.Errorf("Invalid balance: %v", nextBal0)
+		// }
+		for _, currency := range c.currencies {
+			curBal := cur.Allocation.Balance(receiverIdx, currency)
+			nextBal := next.State.Allocation.Balance(receiverIdx, currency)
+			if nextBal.Cmp(curBal) < 0 {
+				return fmt.Errorf("Invalid balance for asset %v: %v", currency, nextBal)
+			}
 		}
+
 		return nil
 	}()
 	if err != nil {

@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2024 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,6 +20,10 @@ func WrapScAddress(address xdr.ScAddress) (xdr.ScVal, error) {
 	return xdr.NewScVal(xdr.ScValTypeScvAddress, address)
 }
 
+func WrapScAddresses(address []xdr.ScAddress) (xdr.ScVal, error) {
+	return xdr.NewScVal(xdr.ScValTypeScvAddress, address)
+}
+
 func MustWrapScAddress(address xdr.ScAddress) xdr.ScVal {
 	v, err := WrapScAddress(address)
 	if err != nil {
@@ -28,8 +32,27 @@ func MustWrapScAddress(address xdr.ScAddress) xdr.ScVal {
 	return v
 }
 
+func MakeScVecFromScAddresses(addresses []xdr.ScAddress) xdr.ScVec {
+
+	var xdrAddresses xdr.ScVec
+
+	for _, val := range addresses {
+		xdrAddrVal, err := WrapScAddress(val)
+		if err != nil {
+			panic("could not wrap address")
+		}
+		xdrAddresses = append(xdrAddresses, xdrAddrVal)
+	}
+
+	return xdrAddresses
+}
+
 func WrapInt128Parts(parts xdr.Int128Parts) (xdr.ScVal, error) {
 	return xdr.NewScVal(xdr.ScValTypeScvI128, parts)
+}
+
+func WrapVec(scVec xdr.ScVec) (xdr.ScVal, error) {
+	return xdr.NewScVal(xdr.ScValTypeScvVec, &scVec)
 }
 
 func MustWrapInt128Parts(parts xdr.Int128Parts) xdr.ScVal {

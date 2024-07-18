@@ -36,20 +36,20 @@ type Adjudicator struct {
 	log               log.Embedding
 	CB                *client.ContractBackend
 	acc               *wallet.Account
-	assetAddr         xdr.ScAddress
+	assetAddrs        xdr.ScVec //xdr.ScAddress
 	perunAddr         xdr.ScAddress
 	maxIters          int
 	pollingInterval   time.Duration
 }
 
 // NewAdjudicator returns a new Adjudicator.
-func NewAdjudicator(acc *wallet.Account, cb *client.ContractBackend, perunID xdr.ScAddress, assetID xdr.ScAddress) *Adjudicator {
+func NewAdjudicator(acc *wallet.Account, cb *client.ContractBackend, perunID xdr.ScAddress, assetIDs xdr.ScVec) *Adjudicator {
 	return &Adjudicator{
 		challengeDuration: &DefaultChallengeDuration,
 		CB:                cb,
 		acc:               acc,
 		perunAddr:         perunID,
-		assetAddr:         assetID,
+		assetAddrs:        assetIDs,
 		maxIters:          MaxIterationsUntilAbort,
 		pollingInterval:   DefaultPollingInterval,
 		log:               log.MakeEmbedding(log.Default()),
@@ -60,20 +60,26 @@ func (a *Adjudicator) GetPerunAddr() xdr.ScAddress {
 	return a.perunAddr
 }
 
-func (a *Adjudicator) GetAssetAddr() xdr.ScAddress {
-	return a.assetAddr
+func (a *Adjudicator) GetAssetAddrs() []xdr.ScAddress {
+	var addrs []xdr.ScAddress
+	for _, addrScVal := range a.assetAddrs {
+		addr := addrScVal.MustAddress()
+		addrs = append(addrs, addr)
+	}
+
+	return addrs
 }
 
 func (a *Adjudicator) Subscribe(ctx context.Context, cid pchannel.ID) (pchannel.AdjudicatorSubscription, error) {
 	perunAddr := a.GetPerunAddr()
-	assetAddr := a.GetAssetAddr()
-	return NewAdjudicatorSub(ctx, cid, a.CB, perunAddr, assetAddr, a.challengeDuration)
+	assetAddrs := a.GetAssetAddrs()
+	return NewAdjudicatorSub(ctx, cid, a.CB, perunAddr, assetAddrs, a.challengeDuration)
 }
 
 func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq, smap pchannel.StateMap) error {
 
 	if req.Tx.State.IsFinal {
-		log.Println("Withdraw called")
+		log.Println("Withdraw called by Adjudicator")
 
 		if err := a.Close(ctx, req.Tx.State, req.Tx.Sigs); err != nil {
 			chanControl, errChanState := a.CB.GetChannelInfo(ctx, a.perunAddr, req.Tx.State.ID)
@@ -108,13 +114,15 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 }
 
 func (a *Adjudicator) withdraw(ctx context.Context, req pchannel.AdjudicatorReq) error {
+	log.Println("withdraw called by Adjudicator")
+
 	perunAddress := a.GetPerunAddr()
 	return a.CB.Withdraw(ctx, perunAddress, req)
 }
 
 func (a *Adjudicator) Close(ctx context.Context, state *pchannel.State, sigs []pwallet.Sig) error {
 
-	log.Println("Close called")
+	log.Println("Close called by Adjudicator")
 	perunAddr := a.GetPerunAddr()
 
 	return a.CB.Close(ctx, perunAddr, state, sigs)

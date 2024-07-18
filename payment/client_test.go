@@ -18,6 +18,8 @@ package payment_test
 
 import (
 	"log"
+	"math/big"
+	"perun.network/go-perun/channel"
 	"perun.network/go-perun/wire"
 	chtest "perun.network/perun-stellar-backend/channel/test"
 	paytest "perun.network/perun-stellar-backend/payment/test"
@@ -51,12 +53,16 @@ func runHappyPerun(t *testing.T) {
 		panic(err)
 	}
 
-	alicePerun.OpenChannel(bobPerun.WireAddress(), 1000)
+	balances := channel.Balances{
+		{big.NewInt(1000), big.NewInt(0)},
+		{big.NewInt(0), big.NewInt(2000)},
+	}
+
+	alicePerun.OpenChannel(bobPerun.WireAddress(), balances)
 	aliceChannel := alicePerun.Channel
 	bobChannel := bobPerun.AcceptedChannel()
 
-	aliceChannel.SendPayment(10)
-	bobChannel.SendPayment(50)
+	aliceChannel.PerformSwap()
 
 	aliceChannel.Settle()
 	bobChannel.Settle()

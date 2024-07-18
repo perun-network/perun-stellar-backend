@@ -43,12 +43,12 @@ func TestFunding_Happy(t *testing.T) {
 
 func TestFunding_TimeoutNotFunded(t *testing.T) {
 	setup := chtest.NewTestSetup(t)
-	stellarAsset := setup.GetTokenAsset()
+	stellarAssets := setup.GetTokenAsset()
 	accs := setup.GetAccounts()
 	addrAlice := accs[0].Address()
 	addrBob := accs[1].Address()
 	addrList := []pwallet.Address{addrAlice, addrBob}
-	perunParams, perunState := chtest.NewParamsWithAddressStateWithAsset(t, addrList, stellarAsset)
+	perunParams, perunState := chtest.NewParamsWithAddressStateWithAsset(t, addrList, stellarAssets)
 	freqAlice := pchannel.NewFundingReq(perunParams, perunState, 0, perunState.Balances)
 	freqBob := pchannel.NewFundingReq(perunParams, perunState, 1, perunState.Balances)
 	freqs := []*pchannel.FundingReq{freqAlice, freqBob}

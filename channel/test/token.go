@@ -183,8 +183,10 @@ func Deploy(t *testing.T, kp *keypair.Full, contractPath string) (xdr.ScAddress,
 	require.NoError(t, err)
 
 	installContractOpInstall := channel.AssembleInstallContractCodeOp(kp.Address(), contractPath)
-	preFlightOp, minFeeInstall := client.PreflightHostFunctions(hzClient, &deployerAcc, *installContractOpInstall)
-	txParamsInstall := client.GetBaseTransactionParamsWithFee(&deployerAcc, int64(minFeeInstall), &preFlightOp)
+	preFlightOp, _ := client.PreflightHostFunctions(hzClient, &deployerAcc, *installContractOpInstall)
+
+	minFeeInstallCustom := 500000
+	txParamsInstall := client.GetBaseTransactionParamsWithFee(&deployerAcc, int64(minFeeInstallCustom), &preFlightOp)
 	txSignedInstall, err := client.CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParamsInstall)
 	require.NoError(t, err)
 
@@ -193,8 +195,8 @@ func Deploy(t *testing.T, kp *keypair.Full, contractPath string) (xdr.ScAddress,
 	require.NoError(t, err)
 
 	createContractOp := channel.AssembleCreateContractOp(kp.Address(), contractPath, "a1", client.NETWORK_PASSPHRASE)
-	preFlightOpCreate, minFeeCreate := client.PreflightHostFunctions(hzClient, &deployerAcc, *createContractOp)
-	txParamsCreate := client.GetBaseTransactionParamsWithFee(&deployerAcc, int64(minFeeCreate), &preFlightOpCreate)
+	preFlightOpCreate, _ := client.PreflightHostFunctions(hzClient, &deployerAcc, *createContractOp)
+	txParamsCreate := client.GetBaseTransactionParamsWithFee(&deployerAcc, int64(minFeeInstallCustom), &preFlightOpCreate)
 	txSignedCreate, err := client.CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParamsCreate)
 
 	require.NoError(t, err)
