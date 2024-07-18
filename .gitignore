@@ -13,3 +13,10 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+
+settings.json
+launch.json
+
+# temp files related to the blockchain setup
+*.soroban/
+*.soroban-perun-dapp
