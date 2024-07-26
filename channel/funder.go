@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-const MaxIterationsUntilAbort = 20
+const MaxIterationsUntilAbort = 30
 const DefaultPollingInterval = time.Duration(6) * time.Second
 
 type Funder struct {
