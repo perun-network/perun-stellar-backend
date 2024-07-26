@@ -49,6 +49,7 @@ func (s *TxSender) SignSendTx(txUnsigned txnbuild.Transaction) (xdr.TransactionM
 		return xdr.TransactionMeta{}, ErrCouldNotDecodeTxMeta
 	}
 	_ = txMeta.V3.SorobanMeta.ReturnValue
+
 	return txMeta, nil
 
 }

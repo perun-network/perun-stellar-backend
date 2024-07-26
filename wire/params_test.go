@@ -67,7 +67,8 @@ func TestParamsConversion(t *testing.T) {
 }
 
 func checkPerunParamsEquality(t *testing.T, first, last channel.Params, numParts int) {
-	require.Equal(t, first.ID(), schannel.Backend.CalcID(&last))
+	id, _ := schannel.Backend.CalcID(&last)
+	require.Equal(t, first.ID(), id)
 
 	for i := 0; i < numParts; i++ {
 		require.True(t, last.Parts[i].Equal(first.Parts[i]))

@@ -2,18 +2,22 @@ package client
 
 import (
 	"context"
+	"errors"
 	"github.com/creachadair/jrpc2"
 	"github.com/creachadair/jrpc2/jhttp"
 	"github.com/stellar/go/clients/horizonclient"
 	"github.com/stellar/go/protocols/horizon"
 	"github.com/stellar/go/txnbuild"
 	"github.com/stellar/go/xdr"
+	"math/big"
 	"perun.network/perun-stellar-backend/wire"
-	"strconv"
 	"time"
 )
 
-const sorobanRPCPort = 8000
+const (
+	sorobanRPCLink = "http://localhost:8000/soroban/rpc"
+	sorobanTestnet = "https://soroban-testnet.stellar.org"
+)
 
 func (st *StellarSigner) createSignedTxFromParams(txParams txnbuild.TransactionParams) (*txnbuild.Transaction, error) {
 
@@ -69,8 +73,11 @@ type RPCSimulateHostFunctionResult struct {
 
 func PreflightHostFunctions(hzClient *horizonclient.Client,
 	sourceAccount txnbuild.Account, function txnbuild.InvokeHostFunction,
-) (txnbuild.InvokeHostFunction, int64) {
-	result, transactionData := simulateTransaction(hzClient, sourceAccount, &function)
+) (txnbuild.InvokeHostFunction, int64, error) {
+	result, transactionData, err := simulateTransaction(hzClient, sourceAccount, &function)
+	if err != nil {
+		return txnbuild.InvokeHostFunction{}, 0, err
+	}
 
 	function.Ext = xdr.TransactionExt{
 		V:           1,
@@ -81,26 +88,29 @@ func PreflightHostFunctions(hzClient *horizonclient.Client,
 		var decodedRes xdr.ScVal
 		err := xdr.SafeUnmarshalBase64(res.XDR, &decodedRes)
 		if err != nil {
-			panic(err)
+			return txnbuild.InvokeHostFunction{}, 0, err
 		}
 		for _, authBase64 := range res.Auth {
 			var authEntry xdr.SorobanAuthorizationEntry
 			err = xdr.SafeUnmarshalBase64(authBase64, &authEntry)
 			if err != nil {
-				panic(err)
+				return txnbuild.InvokeHostFunction{}, 0, err
 			}
 			funAuth = append(funAuth, authEntry)
 		}
 	}
 	function.Auth = funAuth
 
-	return function, result.MinResourceFee
+	return function, result.MinResourceFee, nil
 }
 
 func PreflightHostFunctionsResult(hzClient *horizonclient.Client,
-	sourceAccount txnbuild.Account, function txnbuild.InvokeHostFunction,
-) (wire.Channel, txnbuild.InvokeHostFunction, int64) {
-	result, transactionData := simulateTransaction(hzClient, sourceAccount, &function)
+	sourceAccount txnbuild.Account, function txnbuild.InvokeHostFunction, chInfo bool,
+) (wire.Channel, string, txnbuild.InvokeHostFunction, int64, error) {
+	result, transactionData, err := simulateTransaction(hzClient, sourceAccount, &function)
+	if err != nil {
+		return wire.Channel{}, "", txnbuild.InvokeHostFunction{}, 0, err
+	}
 
 	function.Ext = xdr.TransactionExt{
 		V:           1,
@@ -109,84 +119,95 @@ func PreflightHostFunctionsResult(hzClient *horizonclient.Client,
 	var getChan wire.Channel
 
 	if len(result.Results) != 1 {
-		panic("expected one result")
+		return wire.Channel{}, "", function, result.MinResourceFee, errors.New("Invalid number of results")
 	}
 
 	var decodedXdr xdr.ScVal
-	err := xdr.SafeUnmarshalBase64(result.Results[0].XDR, &decodedXdr)
+	err = xdr.SafeUnmarshalBase64(result.Results[0].XDR, &decodedXdr)
 	if err != nil {
-		panic(err)
+		return wire.Channel{}, "", function, result.MinResourceFee, err
+	}
+	if chInfo {
+		decChanInfo := decodedXdr
+
+		if decChanInfo.Type != xdr.ScValTypeScvMap {
+			return getChan, "", function, result.MinResourceFee, errors.New("Invalid channel info type")
+		}
+
+		err = getChan.FromScVal(decChanInfo)
+		if err != nil {
+			return getChan, "", function, result.MinResourceFee, err
+		}
+
+		return getChan, "", function, result.MinResourceFee, nil
+	} else {
+		i128 := decodedXdr.MustI128()
+		hi := big.NewInt(int64(i128.Hi))
+		lo := big.NewInt(int64(i128.Lo))
+
+		// Combine hi and lo into a single big.Int
+		combined := hi.Lsh(hi, 64).Or(hi, lo)
+		return wire.Channel{}, combined.String(), function, result.MinResourceFee, nil
 	}
 
-	decChanInfo := decodedXdr
-
-	if decChanInfo.Type != xdr.ScValTypeScvMap {
-		return getChan, function, result.MinResourceFee
-
-	}
-
-	err = getChan.FromScVal(decChanInfo)
-	if err != nil {
-
-		panic(err)
-	}
-
-	return getChan, function, result.MinResourceFee
 }
 
 func simulateTransaction(hzClient *horizonclient.Client,
 	sourceAccount txnbuild.Account, op txnbuild.Operation,
-) (RPCSimulateTxResponse, xdr.SorobanTransactionData) {
+) (RPCSimulateTxResponse, xdr.SorobanTransactionData, error) {
 	// Before preflighting, make sure soroban-rpc is in sync with Horizon
 	root, err := hzClient.Root()
 	if err != nil {
-		panic(err)
+		return RPCSimulateTxResponse{}, xdr.SorobanTransactionData{}, err
 	}
-	syncWithSorobanRPC(uint32(root.HorizonSequence))
+	err = syncWithSorobanRPC(uint32(root.HorizonSequence))
+	if err != nil {
+		return RPCSimulateTxResponse{}, xdr.SorobanTransactionData{}, err
+	}
 
-	ch := jhttp.NewChannel("http://localhost:"+strconv.Itoa(sorobanRPCPort)+"/soroban/rpc", nil)
+	ch := jhttp.NewChannel(sorobanTestnet, nil)
 	sorobanRPCClient := jrpc2.NewClient(ch, nil)
 	txParams := GetBaseTransactionParamsWithFee(sourceAccount, txnbuild.MinBaseFee, op)
 	txParams.IncrementSequenceNum = false
 	tx, err := txnbuild.NewTransaction(txParams)
 	if err != nil {
-		panic(err)
+		return RPCSimulateTxResponse{}, xdr.SorobanTransactionData{}, err
 	}
 	base64, err := tx.Base64()
 	if err != nil {
-		panic(err)
+		return RPCSimulateTxResponse{}, xdr.SorobanTransactionData{}, err
 	}
 	result := RPCSimulateTxResponse{}
 	err = sorobanRPCClient.CallResult(context.Background(), "simulateTransaction", struct {
 		Transaction string `json:"transaction"`
 	}{base64}, &result)
 	if err != nil {
-		panic(err)
+		return RPCSimulateTxResponse{}, xdr.SorobanTransactionData{}, err
 	}
 	var transactionData xdr.SorobanTransactionData
 	err = xdr.SafeUnmarshalBase64(result.TransactionData, &transactionData)
 	if err != nil {
-		panic(err)
+		return RPCSimulateTxResponse{}, xdr.SorobanTransactionData{}, err
 	}
-	return result, transactionData
+	return result, transactionData, nil
 }
-func syncWithSorobanRPC(ledgerToWaitFor uint32) {
+func syncWithSorobanRPC(ledgerToWaitFor uint32) error {
 	for j := 0; j < 20; j++ {
 		result := struct {
 			Sequence uint32 `json:"sequence"`
 		}{}
-		ch := jhttp.NewChannel("http://localhost:"+strconv.Itoa(sorobanRPCPort)+"/soroban/rpc", nil)
+		ch := jhttp.NewChannel(sorobanTestnet, nil)
 		sorobanRPCClient := jrpc2.NewClient(ch, nil)
 		err := sorobanRPCClient.CallResult(context.Background(), "getLatestLedger", nil, &result)
 		if err != nil {
-			panic(err)
+			return err
 		}
 		if result.Sequence >= ledgerToWaitFor {
-			return
+			return nil
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	panic("Time out waiting for soroban-rpc to sync")
+	return errors.New("Time out waiting for soroban-rpc to sync")
 }
 
 func GetBaseTransactionParamsWithFee(source txnbuild.Account, fee int64, ops ...txnbuild.Operation) txnbuild.TransactionParams {

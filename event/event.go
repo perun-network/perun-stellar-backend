@@ -17,6 +17,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/stellar/go/xdr"
+	"log"
 	pchannel "perun.network/go-perun/channel"
 	"perun.network/perun-stellar-backend/wire"
 )
@@ -70,6 +71,7 @@ type (
 		Version() Version
 		GetType() (EventType, error)
 		Timeout() pchannel.Timeout
+		SetID(id pchannel.ID)
 	}
 
 	OpenEvent struct {
@@ -134,6 +136,10 @@ func (e *OpenEvent) Timeout() pchannel.Timeout {
 	return e.timeout
 }
 
+func (e *OpenEvent) SetID(id pchannel.ID) {
+	e.idv = id
+}
+
 func (e *WithdrawnEvent) GetChannel() wire.Channel {
 	return e.channel
 }
@@ -153,12 +159,17 @@ func (e *WithdrawnEvent) GetType() (EventType, error) {
 func (e *WithdrawnEvent) ID() pchannel.ID {
 	return e.idv
 }
+
 func (e *WithdrawnEvent) Version() Version {
 	return e.versionV
 }
 
 func (e *WithdrawnEvent) Timeout() pchannel.Timeout {
 	return e.timeout
+}
+
+func (e *WithdrawnEvent) SetID(id pchannel.ID) {
+	e.idv = id
 }
 
 func (e *CloseEvent) GetChannel() wire.Channel {
@@ -178,6 +189,10 @@ func (e *CloseEvent) Version() Version {
 
 func (e *CloseEvent) Timeout() pchannel.Timeout {
 	return e.timeout
+}
+
+func (e *CloseEvent) SetID(id pchannel.ID) {
+	e.idv = id
 }
 
 func (e *FundEvent) GetChannel() wire.Channel {
@@ -207,6 +222,10 @@ func (e *FundEvent) Timeout() pchannel.Timeout {
 	return e.timeout
 }
 
+func (e *FundEvent) SetID(id pchannel.ID) {
+	e.idv = id
+}
+
 func (e *DisputedEvent) ID() pchannel.ID {
 	return e.idv
 }
@@ -225,6 +244,10 @@ func (e *DisputedEvent) Timeout() pchannel.Timeout {
 
 func (e *DisputedEvent) GetType() (EventType, error) {
 	return EventTypeDisputed, nil
+}
+
+func (e *DisputedEvent) SetID(id pchannel.ID) {
+	e.idv = id
 }
 
 func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
@@ -289,28 +312,44 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 			if err != nil {
 				return nil, err
 			}
-
+			pState, err := wire.ToState(fundEventchanStellar.State)
+			if err != nil {
+				return nil, err
+			}
 			fundEvent := FundEvent{
 				channel: fundEventchanStellar,
+				idv:     pState.ID,
 			}
+			log.Println("Funding Event received")
 			evs = append(evs, &fundEvent)
 		case EventTypeClosed:
 			closedEventchanStellar, err := GetChannelFromEvents(ev.Body.V0.Data)
 			if err != nil {
 				return nil, err
 			}
-
+			pState, err := wire.ToState(closedEventchanStellar.State)
+			if err != nil {
+				return nil, err
+			}
 			closeEvent := CloseEvent{
 				channel: closedEventchanStellar,
+				idv:     pState.ID,
 			}
+			log.Println("Close Event received")
 			evs = append(evs, &closeEvent)
 		case EventTypeWithdrawn:
 			withdrawnEventchanStellar, err := GetChannelFromEvents(ev.Body.V0.Data)
 			if err != nil {
 				return nil, err
 			}
+			pState, err := wire.ToState(withdrawnEventchanStellar.State)
+			if err != nil {
+				return nil, err
+			}
+			log.Println("Withdrawn Event received")
 			withdrawnEvent := WithdrawnEvent{
 				channel: withdrawnEventchanStellar,
+				idv:     pState.ID,
 			}
 			evs = append(evs, &withdrawnEvent)
 
@@ -319,9 +358,14 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 			if err != nil {
 				return nil, err
 			}
+			_, err = wire.ToState(disputedEventchanStellar.State)
+			if err != nil {
+				return nil, err
+			}
 			disputedEvent := DisputedEvent{
 				channel: disputedEventchanStellar,
 			}
+			log.Println("Disputed Event received")
 			evs = append(evs, &disputedEvent)
 
 		}

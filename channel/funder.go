@@ -17,16 +17,18 @@ package channel
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/stellar/go/xdr"
 	"log"
 	pchannel "perun.network/go-perun/channel"
+	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/wallet"
 	"perun.network/perun-stellar-backend/wire"
 	"time"
 )
 
-const MaxIterationsUntilAbort = 20
+const MaxIterationsUntilAbort = 30
 const DefaultPollingInterval = time.Duration(6) * time.Second
 
 type Funder struct {
@@ -68,12 +70,13 @@ func (f *Funder) Fund(ctx context.Context, req pchannel.FundingReq) error {
 	}
 
 	if req.Idx == pchannel.Index(0) {
+		log.Println("open channel")
 		err := f.openChannel(ctx, req)
 		if err != nil {
 			return err
 		}
 	}
-
+	log.Println("fund party")
 	return f.fundParty(ctx, req)
 }
 func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
@@ -83,6 +86,7 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 	log.Printf("%s: Funding channel...\n", party)
 
 	for i := 0; i < f.maxIters; i++ {
+		log.Println("funding loop, iteration: ", i)
 		select {
 		case <-ctx.Done():
 			timeoutErr := makeTimeoutErr([]pchannel.Index{req.Idx}, 0)
@@ -108,17 +112,76 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 			}
 
 			if req.Idx == pchannel.Index(0) && !chanState.Control.FundedA {
+				log.Println("Funding party A")
 				err := f.FundChannel(ctx, req.State, false)
 				if err != nil {
 					return err
 				}
+				t0, ok := req.State.Assets[0].(*types.StellarAsset)
+				if !ok {
+					return fmt.Errorf("expected StellarAsset at index 0, got %T", req.State.Assets[0])
+				}
+				cAdd0, err := types.MakeContractAddress(t0.ContractID())
+				if err != nil {
+					return err
+				}
+				var bal0 string
+				for {
+					bal0, err = f.cb.GetBalance(cAdd0)
+					if err != nil {
+						log.Println("Error while getting balance: ", err)
+					}
+					if bal0 != "" {
+						break
+					}
+					time.Sleep(1 * time.Second) // Wait for a second before retrying
+				}
+				t1, ok := req.State.Assets[1].(*types.StellarAsset)
+				if !ok {
+					return fmt.Errorf("expected StellarAsset at index 1, got %T", req.State.Assets[1])
+				}
+				cAdd1, err := types.MakeContractAddress(t1.ContractID())
+				if err != nil {
+					return err
+				}
+				bal1, err := f.cb.GetBalance(cAdd1)
+				if err != nil {
+					log.Println("Error while getting balance: ", err)
+				}
+				log.Println("Balance A: ", bal0, bal1, " after funding amount: ", req.State.Balances, req.State.Assets)
 				continue
 			}
-			if req.Idx == pchannel.Index(1) && !chanState.Control.FundedB {
+			if req.Idx == pchannel.Index(1) && !chanState.Control.FundedB && chanState.Control.FundedA {
+				log.Println("Funding party B")
 				err := f.FundChannel(ctx, req.State, true)
 				if err != nil {
 					return err
 				}
+				t0, ok := req.State.Assets[0].(*types.StellarAsset)
+				if !ok {
+					return fmt.Errorf("expected StellarAsset at index 0, got %T", req.State.Assets[0])
+				}
+				cAdd0, err := types.MakeContractAddress(t0.ContractID())
+				if err != nil {
+					return err
+				}
+				bal0, err := f.cb.GetBalance(cAdd0)
+				if err != nil {
+					log.Println("Error while getting balance: ", err)
+				}
+				t1, ok := req.State.Assets[1].(*types.StellarAsset)
+				if !ok {
+					return fmt.Errorf("expected StellarAsset at index 1, got %T", req.State.Assets[1])
+				}
+				cAdd1, err := types.MakeContractAddress(t1.ContractID())
+				if err != nil {
+					return err
+				}
+				bal1, err := f.cb.GetBalance(cAdd1)
+				if err != nil {
+					log.Println("Error while getting balance: ", err)
+				}
+				log.Println("Balance B: ", bal0, bal1, " after funding amount: ", req.State.Balances, req.State.Assets)
 				continue
 			}
 		}
@@ -129,22 +192,23 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 func (f *Funder) openChannel(ctx context.Context, req pchannel.FundingReq) error {
 	err := f.cb.Open(ctx, f.perunAddr, req.Params, req.State)
 	if err != nil {
+		log.Println(err)
 		return errors.New("error while opening channel in party A")
 	}
+	_, err = f.cb.GetChannelInfo(ctx, f.perunAddr, req.State.ID)
 	return nil
 }
 
 func (f *Funder) FundChannel(ctx context.Context, state *pchannel.State, funderIdx bool) error {
-
 	balsStellar, err := wire.MakeBalances(state.Allocation)
+	log.Println("Funding channel with balances: ", balsStellar)
 	if err != nil {
 		return errors.New("error while making balances")
 	}
 
-	if !balsStellar.Tokens.Equals(&f.assetAddrs) {
+	if !containsAllAssets(balsStellar.Tokens, f.assetAddrs) {
 		return errors.New("asset address is not equal to the address stored in the state")
 	}
-
 	return f.cb.Fund(ctx, f.perunAddr, state.ID, funderIdx)
 }
 
@@ -171,4 +235,26 @@ func makeTimeoutErr(remains []pchannel.Index, assetIdx int) error {
 			TimedOutPeers: indices,
 		}},
 	)
+}
+
+// Function to check if all assets in state.Allocation are present in f.assetAddrs
+func containsAllAssets(stateAssets xdr.ScVec, fAssets xdr.ScVec) bool {
+	fAssetSet := assetSliceToSet(fAssets)
+
+	for _, asset := range stateAssets {
+		if _, found := fAssetSet[asset.String()]; !found {
+			return false
+		}
+	}
+
+	return true
+}
+
+// Helper function to convert a slice of xdr.Asset to a set (map for fast lookup)
+func assetSliceToSet(assets xdr.ScVec) map[string]struct{} {
+	assetSet := make(map[string]struct{})
+	for _, asset := range assets {
+		assetSet[asset.String()] = struct{}{}
+	}
+	return assetSet
 }

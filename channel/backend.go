@@ -16,6 +16,7 @@ package channel
 
 import (
 	"crypto/sha256"
+	"log"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/channel/types"
@@ -32,12 +33,18 @@ func init() {
 }
 
 func (b backend) CalcID(params *channel.Params) channel.ID {
-	wp := wire.MustMakeParams(*params)
+	wp, err := wire.MustMakeParams(*params)
+	if err != nil {
+		log.Println("CalcID called with invalid params:", err)
+		return channel.ID{}
+	}
 	bytes, err := wp.MarshalBinary()
 	if err != nil {
-		panic(err)
+		log.Println("CalcID called with invalid params:", err)
+		return channel.ID{}
 	}
-	return sha256.Sum256(bytes)
+	id := sha256.Sum256(bytes)
+	return id
 }
 
 func (b backend) Sign(account wallet.Account, state *channel.State) (wallet.Sig, error) {

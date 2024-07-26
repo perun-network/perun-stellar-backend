@@ -82,12 +82,15 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 		log.Println("Withdraw called by Adjudicator")
 
 		if err := a.Close(ctx, req.Tx.State, req.Tx.Sigs); err != nil {
+			log.Println("Close failed", err, req.Idx)
 			chanControl, errChanState := a.CB.GetChannelInfo(ctx, a.perunAddr, req.Tx.State.ID)
 			if errChanState != nil {
+				log.Println("Error while getting channel info: ", req.Idx)
 				return errChanState
 			}
 
 			if chanControl.Control.Closed {
+				log.Println("Channel is already closed: ", req.Idx)
 				return a.withdraw(ctx, req)
 			}
 			return err
@@ -99,12 +102,14 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 		err := a.ForceClose(ctx, req.Tx.State, req.Tx.Sigs)
 		log.Println("ForceClose called")
 		if errors.Is(err, ErrChannelAlreadyClosed) {
+			log.Println("Channel is already closed, force close")
 			return a.withdraw(ctx, req)
 		}
 		if err != nil {
 			return err
 		}
 
+		log.Println("Channel is not finalized, force close")
 		err = a.withdraw(ctx, req)
 		if err != nil {
 			return err
@@ -114,8 +119,6 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 }
 
 func (a *Adjudicator) withdraw(ctx context.Context, req pchannel.AdjudicatorReq) error {
-	log.Println("withdraw called by Adjudicator")
-
 	perunAddress := a.GetPerunAddr()
 	return a.CB.Withdraw(ctx, perunAddress, req)
 }

@@ -24,12 +24,12 @@ func WrapScAddresses(address []xdr.ScAddress) (xdr.ScVal, error) {
 	return xdr.NewScVal(xdr.ScValTypeScvAddress, address)
 }
 
-func MustWrapScAddress(address xdr.ScAddress) xdr.ScVal {
+func MustWrapScAddress(address xdr.ScAddress) (xdr.ScVal, error) {
 	v, err := WrapScAddress(address)
 	if err != nil {
-		panic(err)
+		return xdr.ScVal{}, err
 	}
-	return v
+	return v, nil
 }
 
 func MakeScVecFromScAddresses(addresses []xdr.ScAddress) xdr.ScVec {
@@ -91,24 +91,24 @@ func WrapScString(str xdr.ScString) (xdr.ScVal, error) {
 	return xdr.NewScVal(xdr.ScValTypeScvString, str)
 }
 
-func MustWrapScString(str xdr.ScString) xdr.ScVal {
+func MustWrapScString(str xdr.ScString) (xdr.ScVal, error) {
 	v, err := WrapScString(str)
 	if err != nil {
-		panic(err)
+		return xdr.ScVal{}, err
 	}
-	return v
+	return v, nil
 }
 
 func WrapScBytes(b xdr.ScBytes) (xdr.ScVal, error) {
 	return xdr.NewScVal(xdr.ScValTypeScvBytes, b)
 }
 
-func MustWrapScBytes(b xdr.ScBytes) xdr.ScVal {
+func MustWrapScBytes(b xdr.ScBytes) (xdr.ScVal, error) {
 	v, err := WrapScBytes(b)
 	if err != nil {
-		panic(err)
+		return xdr.ScVal{}, err
 	}
-	return v
+	return v, nil
 }
 
 func WrapUint64(i xdr.Uint64) (xdr.ScVal, error) {
