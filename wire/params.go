@@ -176,7 +176,7 @@ func MakeParams(params channel.Params) (Params, error) {
 		return Params{}, errors.New("expected exactly two participants")
 	}
 
-	participantA, err := types.ToParticipant(params.Parts[0])
+	participantA, err := types.ToParticipant(params.Parts[StellarBackendID][0])
 	if err != nil {
 		return Params{}, err
 	}
@@ -184,7 +184,7 @@ func MakeParams(params channel.Params) (Params, error) {
 	if err != nil {
 		return Params{}, err
 	}
-	participantB, err := types.ToParticipant(params.Parts[1])
+	participantB, err := types.ToParticipant(params.Parts[StellarBackendID][1])
 	if err != nil {
 		return Params{}, err
 	}
@@ -220,7 +220,10 @@ func ToParams(params Params) (channel.Params, error) {
 	}
 
 	challengeDuration := uint64(params.ChallengeDuration)
-	parts := []wallet.Address{&participantA, &participantB}
+	parts := []map[int]wallet.Address{
+		{StellarBackendID: &participantA},
+		{StellarBackendID: &participantB},
+	}
 	app := channel.NoApp()
 	nonce := ToNonce(params.Nonce)
 	ledgerChannel := true

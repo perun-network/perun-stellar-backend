@@ -16,6 +16,7 @@ package channel
 
 import (
 	"crypto/sha256"
+	"errors"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/channel/types"
@@ -23,25 +24,35 @@ import (
 	"perun.network/perun-stellar-backend/wire"
 )
 
+const EthBackendID = 1
+const StellarBackendID = 2
+
 type backend struct{}
 
 var Backend = backend{}
 
 func init() {
-	channel.SetBackend(Backend)
+	channel.SetBackend(Backend, StellarBackendID)
 }
 
-func (b backend) CalcID(params *channel.Params) channel.ID {
+func (b backend) CalcID(params *channel.Params) (channel.ID, error) {
 	wp := wire.MustMakeParams(*params)
 	bytes, err := wp.MarshalBinary()
 	if err != nil {
-		panic(err)
+		return channel.ID{}, err
 	}
-	return sha256.Sum256(bytes)
+	return sha256.Sum256(bytes), nil
 }
 
 func (b backend) Sign(account wallet.Account, state *channel.State) (wallet.Sig, error) {
-	bytes, err := EncodeState(state)
+
+	if err := checkBackends(state.Allocation.Backends); err != nil {
+		return nil, errors.New("invalid backends in state allocation: " + err.Error())
+	}
+
+	ethState := ToEthState(state)
+
+	bytes, err := EncodeEthState(&ethState)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +60,9 @@ func (b backend) Sign(account wallet.Account, state *channel.State) (wallet.Sig,
 }
 
 func (b backend) Verify(addr wallet.Address, state *channel.State, sig wallet.Sig) (bool, error) {
-	bytes, err := EncodeState(state)
+	ethState := ToEthState(state)
+	bytes, err := EncodeEthState(&ethState)
+
 	if err != nil {
 		return false, err
 	}
@@ -61,6 +74,12 @@ func (b backend) NewAsset() channel.Asset {
 }
 
 func EncodeState(state *channel.State) ([]byte, error) {
+	// check if state also has different backends stored in allocation
+
+	if err := checkBackends(state.Allocation.Backends); err != nil {
+		return nil, errors.New("invalid backends in state allocation: " + err.Error())
+	}
+
 	ws, err := wire.MakeState(*state)
 	if err != nil {
 		return nil, err
@@ -68,7 +87,32 @@ func EncodeState(state *channel.State) ([]byte, error) {
 	return ws.MarshalBinary()
 }
 
-func (b backend) NewAppID() channel.AppID {
+func (b backend) NewAppID() (channel.AppID, error) {
 	addr := &wtypes.Address{}
-	return &AppID{addr}
+	return &AppID{addr}, nil
+}
+
+func checkBackends(backends []int) error {
+	if len(backends) == 0 {
+		return errors.New("backends slice is empty")
+	}
+
+	hasStellarBackend := false
+	seenBackends := make(map[int]bool)
+
+	for _, backend := range backends {
+		if backend == StellarBackendID {
+			hasStellarBackend = true
+		}
+		if seenBackends[backend] {
+			return errors.Join(errors.New("duplicate backend ID found"), errors.New(string(rune(backend))))
+		}
+		seenBackends[backend] = true
+	}
+
+	if !hasStellarBackend {
+		return errors.New("StellarBackendID not found in backends")
+	}
+
+	return nil
 }

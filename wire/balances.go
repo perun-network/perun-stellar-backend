@@ -26,6 +26,8 @@ import (
 	"perun.network/perun-stellar-backend/wire/scval"
 )
 
+const StellarBackendID = 2
+
 var MaxBalance = new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 127), big.NewInt(1))
 
 type Balances struct {
@@ -224,61 +226,6 @@ func MakeBalances(alloc channel.Allocation) (Balances, error) {
 	}, nil
 }
 
-func ToAllocation(b Balances) (*channel.Allocation, error) {
-
-	var balsPart xdr.ScVal
-
-	var stAssets []channel.Asset
-
-	var alloc *channel.Allocation
-
-	// iterate for asset addresses inside allocation
-
-	for i, val := range b.Tokens {
-
-		balsPart = b.BalA[i]
-		token, ok := val.GetAddress()
-		if !ok {
-			return nil, errors.New("expected address")
-		}
-
-		stAsset, err := types.NewStellarAssetFromScAddress(token)
-		if err != nil {
-			return nil, err
-		}
-
-		stAssets = append(stAssets, stAsset)
-
-	}
-
-	alloc = channel.NewAllocation(2, stAssets...)
-
-	for i, _ := range b.Tokens {
-		balsPartVec := *balsPart.MustVec()
-
-		for _, val := range balsPartVec {
-			bal, ok := val.GetI128()
-			if !ok {
-				return nil, errors.New("expected i128")
-			}
-
-			balInt, err := ToBigInt(bal)
-			if err != nil {
-				return nil, err
-			}
-
-			alloc.SetBalance(channel.Index(i), stAssets[i], balInt)
-
-		}
-
-	}
-
-	if err := alloc.Valid(); err != nil {
-		return nil, err
-	}
-	return alloc, nil
-}
-
 // MakeInt128Parts converts a big.Int to xdr.Int128Parts.
 // It returns an error if the big.Int is negative or too large.
 func MakeInt128Parts(i *big.Int) (xdr.Int128Parts, error) {
@@ -305,19 +252,6 @@ func ToBigInt(i xdr.Int128Parts) (*big.Int, error) {
 	return new(big.Int).SetBytes(b), nil
 }
 
-func makeAllocation(asset channel.Asset, balA, balB *big.Int) (*channel.Allocation, error) {
-	alloc := channel.NewAllocation(2, asset)
-	alloc.SetBalance(0, asset, balA)
-	alloc.SetBalance(1, asset, balB)
-	alloc.Locked = make([]channel.SubAlloc, 0)
-
-	if err := alloc.Valid(); err != nil {
-		return nil, err
-	}
-
-	return alloc, nil
-}
-
 func makeAllocationMulti(assets []channel.Asset, balsA, balsB []*big.Int) (*channel.Allocation, error) {
 
 	if len(balsA) != len(balsB) {
@@ -330,7 +264,9 @@ func makeAllocationMulti(assets []channel.Asset, balsA, balsB []*big.Int) (*chan
 
 	numParts := 2
 
-	alloc := channel.NewAllocation(numParts, assets...)
+	backendIDs := make([]int, StellarBackendID)
+
+	alloc := channel.NewAllocation(numParts, backendIDs, assets...)
 
 	for i, _ := range assets {
 		alloc.Balances[i] = []*big.Int{balsA[i], balsB[i]}

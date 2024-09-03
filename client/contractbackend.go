@@ -130,7 +130,7 @@ func (st *StellarSigner) GetHorizonClient() *horizonclient.Client {
 	return st.hzClient
 }
 
-func (c *ContractBackend) InvokeUnsignedTx(fname string, callTxArgs xdr.ScVec, contractAddr xdr.ScAddress) (wire.Channel, error) { //xdr.TransactionMeta, error
+func (c *ContractBackend) InvokeUnsignedTx(fname string, callTxArgs xdr.ScVec, contractAddr xdr.ScAddress) (wire.Channel, error) {
 	c.cbMutex.Lock()
 	defer c.cbMutex.Unlock()
 	fnameXdr := xdr.ScSymbol(fname)

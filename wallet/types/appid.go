@@ -42,3 +42,7 @@ func (a *Address) UnmarshalBinary(data []byte) error {
 func (a *Address) String() string {
 	return (*keypair.FromAddress)(a).Address()
 }
+
+func (a *Address) BackendID() int {
+	return StellarBackendID
+}

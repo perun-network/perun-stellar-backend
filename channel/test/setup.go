@@ -330,13 +330,17 @@ func NewParamsWithAddressStateWithAsset(t *testing.T, partsAddr []pwallet.Addres
 	rng := pkgtest.Prng(t)
 
 	numParts := 2
-
+	partsMapSlice := make([]map[int]pwallet.Address, len(partsAddr))
+	for i, addr := range partsAddr {
+		// Each element of the slice is a map with a single key-value pair
+		partsMapSlice[i] = map[int]pwallet.Address{i: addr}
+	}
 	return ptest.NewRandomParamsAndState(rng, ptest.WithNumLocked(0).Append(
 		ptest.WithAssets(assets...),
 		ptest.WithNumAssets(len(assets)),
 		ptest.WithVersion(0),
 		ptest.WithNumParts(numParts),
-		ptest.WithParts(partsAddr...),
+		ptest.WithParts(partsMapSlice),
 		ptest.WithIsFinal(false),
 		ptest.WithLedgerChannel(true),
 		ptest.WithVirtualChannel(false),

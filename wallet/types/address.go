@@ -23,6 +23,8 @@ import (
 	"perun.network/go-perun/wallet"
 )
 
+const StellarBackendID = 2
+
 // Participant is the backend's version of the on-chain participant in the Perun smart contract on stellar.
 type Participant struct {
 	// Address is the stellar ParticipantAddress of the participant.
@@ -82,6 +84,10 @@ func (p Participant) AddressString() string {
 
 func (p Participant) PublicKeyString() string {
 	return hex.EncodeToString(p.PublicKey)
+}
+
+func (p Participant) BackendID() int {
+	return StellarBackendID
 }
 
 func ZeroAddress() (*Participant, error) {

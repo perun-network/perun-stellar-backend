@@ -1,6 +1,3 @@
-//go:build integration
-// +build integration
-
 // Copyright 2024 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,6 +20,25 @@ import (
 	chtest "perun.network/perun-stellar-backend/channel/test"
 	"testing"
 )
+
+func TestCrossChainFunding_Happy(t *testing.T) {
+	setup := chtest.NewTestSetup(t)
+	stellarAsset := setup.GetTokenAsset()
+	accs := setup.GetAccounts()
+	addrAlice := accs[0].Address()
+	addrBob := accs[1].Address()
+	// here need ethereum address and stellar address
+	addrList := []pwallet.Address{addrAlice, addrBob}
+
+	perunParams, perunState := chtest.NewParamsWithAddressStateWithAsset(t, addrList, stellarAsset)
+	freqAlice := pchannel.NewFundingReq(perunParams, perunState, 0, perunState.Balances)
+	freqBob := pchannel.NewFundingReq(perunParams, perunState, 1, perunState.Balances)
+	freqs := []*pchannel.FundingReq{freqAlice, freqBob}
+	funders := setup.GetFunders()
+	ctx := setup.NewCtx(chtest.DefaultTestTimeout)
+	err := chtest.FundAll(ctx, funders, freqs)
+	require.NoError(t, err)
+}
 
 func TestFunding_Happy(t *testing.T) {
 	setup := chtest.NewTestSetup(t)
