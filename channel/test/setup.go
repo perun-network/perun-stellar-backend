@@ -102,7 +102,13 @@ func getDataFilePath(filename string) (string, error) {
 	return fp, nil
 }
 
-func NewTestSetup(t *testing.T) *Setup {
+func NewTestSetup(t *testing.T, options ...bool) *Setup {
+
+	oneWithdrawer := false
+
+	if len(options) > 0 {
+		oneWithdrawer = options[0]
+	}
 
 	accs, kpsToFund, ws := MakeRandPerunAccsWallets(5)
 	require.NoError(t, CreateFundStellarAccounts(kpsToFund, initLumensBalance))
@@ -151,7 +157,7 @@ func NewTestSetup(t *testing.T) *Setup {
 	channelCBs := []*client.ContractBackend{aliceCB, bobCB}
 	channelWallets := []*wallet.EphemeralWallet{aliceWallet, bobWallet}
 
-	funders, adjs := CreateFundersAndAdjudicators(channelAccs, cbs, perunAddress, tokenAddresses)
+	funders, adjs := CreateFundersAndAdjudicators(channelAccs, cbs, perunAddress, tokenAddresses, oneWithdrawer)
 
 	setup := Setup{
 		t:        t,
@@ -179,7 +185,7 @@ func SetupAccountsAndContracts(t *testing.T, deployerKps []*keypair.Full, kps []
 		}
 	}
 }
-func CreateFundersAndAdjudicators(accs []*wallet.Account, cbs []*client.ContractBackend, perunAddress xdr.ScAddress, tokenScAddresses []xdr.ScAddress) ([]*channel.Funder, []*channel.Adjudicator) {
+func CreateFundersAndAdjudicators(accs []*wallet.Account, cbs []*client.ContractBackend, perunAddress xdr.ScAddress, tokenScAddresses []xdr.ScAddress, oneWithdrawer bool) ([]*channel.Funder, []*channel.Adjudicator) {
 	funders := make([]*channel.Funder, len(accs))
 	adjs := make([]*channel.Adjudicator, len(accs))
 
@@ -187,7 +193,7 @@ func CreateFundersAndAdjudicators(accs []*wallet.Account, cbs []*client.Contract
 
 	for i, acc := range accs {
 		funders[i] = channel.NewFunder(acc, cbs[i], perunAddress, tokenVecAddresses)
-		adjs[i] = channel.NewAdjudicator(acc, cbs[i], perunAddress, tokenVecAddresses)
+		adjs[i] = channel.NewAdjudicator(acc, cbs[i], perunAddress, tokenVecAddresses, oneWithdrawer)
 	}
 	return funders, adjs
 }

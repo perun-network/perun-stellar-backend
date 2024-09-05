@@ -218,16 +218,12 @@ func (cb *ContractBackend) Dispute(ctx context.Context, perunAddr xdr.ScAddress,
 
 	return nil
 }
-func (cb *ContractBackend) Withdraw(ctx context.Context, perunAddr xdr.ScAddress, req pchannel.AdjudicatorReq) error {
+func (cb *ContractBackend) Withdraw(ctx context.Context, perunAddr xdr.ScAddress, req pchannel.AdjudicatorReq, withdrawerIdx bool, oneWithdrawer bool) error {
 	log.Println("Withdraw called by ContractBackend")
 
-	chanID, partyIdx := req.Tx.State.ID, req.Idx
-	withdrawerIdx := partyIdx == 1
-	if partyIdx > 1 {
-		return errors.New("invalid party index for withdrawal")
-	}
+	chanID := req.Tx.State.ID
 
-	withdrawTxArgs, err := buildChanIdxTxArgs(chanID, withdrawerIdx)
+	withdrawTxArgs, err := buildWithdrawTxArgs(chanID, withdrawerIdx, oneWithdrawer)
 	if err != nil {
 		return errors.New("error building fund tx")
 	}

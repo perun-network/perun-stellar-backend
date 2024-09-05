@@ -36,14 +36,16 @@ type Adjudicator struct {
 	log               log.Embedding
 	CB                *client.ContractBackend
 	acc               *wallet.Account
-	assetAddrs        xdr.ScVec //xdr.ScAddress
+	assetAddrs        xdr.ScVec
 	perunAddr         xdr.ScAddress
 	maxIters          int
 	pollingInterval   time.Duration
+	oneWithdrawer     bool
 }
 
 // NewAdjudicator returns a new Adjudicator.
-func NewAdjudicator(acc *wallet.Account, cb *client.ContractBackend, perunID xdr.ScAddress, assetIDs xdr.ScVec) *Adjudicator {
+func NewAdjudicator(acc *wallet.Account, cb *client.ContractBackend, perunID xdr.ScAddress, assetIDs xdr.ScVec, oneWithdrawer bool) *Adjudicator {
+
 	return &Adjudicator{
 		challengeDuration: &DefaultChallengeDuration,
 		CB:                cb,
@@ -53,6 +55,7 @@ func NewAdjudicator(acc *wallet.Account, cb *client.ContractBackend, perunID xdr
 		maxIters:          MaxIterationsUntilAbort,
 		pollingInterval:   DefaultPollingInterval,
 		log:               log.MakeEmbedding(log.Default()),
+		oneWithdrawer:     oneWithdrawer,
 	}
 }
 
@@ -77,10 +80,9 @@ func (a *Adjudicator) Subscribe(ctx context.Context, cid pchannel.ID) (pchannel.
 }
 
 func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq, smap pchannel.StateMap) error {
+	log.Println("Withdraw called by Adjudicator")
 
 	if req.Tx.State.IsFinal {
-		log.Println("Withdraw called by Adjudicator")
-
 		if err := a.Close(ctx, req.Tx.State, req.Tx.Sigs); err != nil {
 			chanControl, errChanState := a.CB.GetChannelInfo(ctx, a.perunAddr, req.Tx.State.ID)
 			if errChanState != nil {
@@ -88,36 +90,48 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 			}
 
 			if chanControl.Control.Closed {
-				return a.withdraw(ctx, req)
+				return a.handleWithdrawal(ctx, req)
 			}
 			return err
 		}
+		return a.handleWithdrawal(ctx, req)
+	}
 
-		return a.withdraw(ctx, req)
-
-	} else {
-		err := a.ForceClose(ctx, req.Tx.State, req.Tx.Sigs)
+	if err := a.ForceClose(ctx, req.Tx.State, req.Tx.Sigs); err != nil {
 		log.Println("ForceClose called")
 		if errors.Is(err, ErrChannelAlreadyClosed) {
-			return a.withdraw(ctx, req)
+			return a.handleWithdrawal(ctx, req)
 		}
-		if err != nil {
-			return err
-		}
+		return err
+	}
 
-		err = a.withdraw(ctx, req)
-		if err != nil {
+	return a.handleWithdrawal(ctx, req)
+}
+
+func (a *Adjudicator) handleWithdrawal(ctx context.Context, req pchannel.AdjudicatorReq) error {
+	if a.oneWithdrawer {
+
+		if err := a.withdrawOther(ctx, req); err != nil {
 			return err
 		}
 	}
-	return nil
+	return a.withdraw(ctx, req)
 }
 
 func (a *Adjudicator) withdraw(ctx context.Context, req pchannel.AdjudicatorReq) error {
-	log.Println("withdraw called by Adjudicator")
 
 	perunAddress := a.GetPerunAddr()
-	return a.CB.Withdraw(ctx, perunAddress, req)
+
+	withdrawerIdx := req.Idx == 1
+
+	return a.CB.Withdraw(ctx, perunAddress, req, withdrawerIdx, a.oneWithdrawer)
+}
+
+func (a *Adjudicator) withdrawOther(ctx context.Context, req pchannel.AdjudicatorReq) error {
+
+	perunAddress := a.GetPerunAddr()
+
+	return a.CB.Withdraw(ctx, perunAddress, req, false, true)
 }
 
 func (a *Adjudicator) Close(ctx context.Context, state *pchannel.State, sigs []pwallet.Sig) error {
