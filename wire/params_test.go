@@ -72,7 +72,9 @@ func checkPerunParamsEquality(t *testing.T, first, last channel.Params, numParts
 	require.Equal(t, first.ID(), lastChanID)
 
 	for i := 0; i < numParts; i++ {
-		require.True(t, last.Parts[schannel.StellarBackendID][i].Equal(first.Parts[schannel.StellarBackendID][i]))
+		for backendID := range last.Parts[i] {
+			require.True(t, last.Parts[i][backendID].Equal(first.Parts[i][backendID]))
+		}
 	}
 
 	require.Equal(t, first.ChallengeDuration, last.ChallengeDuration)

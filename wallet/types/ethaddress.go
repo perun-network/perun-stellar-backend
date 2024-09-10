@@ -39,7 +39,7 @@ func (a *EthAddress) bytes() []byte {
 	return (*common.Address)(a).Bytes()
 }
 
-func (a *EthAddress) BackendID() int {
+func (a *EthAddress) BackendID() wallet.BackendID {
 	return EthBackendID
 }
 

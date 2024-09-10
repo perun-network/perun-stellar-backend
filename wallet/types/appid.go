@@ -43,6 +43,6 @@ func (a *Address) String() string {
 	return (*keypair.FromAddress)(a).Address()
 }
 
-func (a *Address) BackendID() int {
+func (a *Address) BackendID() wallet.BackendID {
 	return StellarBackendID
 }

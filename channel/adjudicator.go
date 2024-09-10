@@ -24,6 +24,7 @@ import (
 	pwallet "perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/wallet"
+	wtypes "perun.network/perun-stellar-backend/wallet/types"
 	"time"
 )
 
@@ -82,7 +83,7 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 		log.Println("Withdraw called by Adjudicator")
 
 		if err := a.Close(ctx, req.Tx.State, req.Tx.Sigs); err != nil {
-			chanControl, errChanState := a.CB.GetChannelInfo(ctx, a.perunAddr, req.Tx.State.ID)
+			chanControl, errChanState := a.CB.GetChannelInfo(ctx, a.perunAddr, req.Tx.State.ID[wtypes.StellarBackendID])
 			if errChanState != nil {
 				return errChanState
 			}
@@ -144,7 +145,7 @@ func (a *Adjudicator) Dispute(ctx context.Context, state *pchannel.State, sigs [
 }
 
 func (a *Adjudicator) ForceClose(ctx context.Context, state *pchannel.State, sigs []pwallet.Sig) error {
-	return a.CB.ForceClose(ctx, a.perunAddr, state.ID)
+	return a.CB.ForceClose(ctx, a.perunAddr, state.ID[wtypes.StellarBackendID])
 }
 
 func (a Adjudicator) Progress(ctx context.Context, req pchannel.ProgressReq) error {

@@ -23,6 +23,7 @@ import (
 	"perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/wallet/types"
 	"perun.network/perun-stellar-backend/wire/scval"
+	"strconv"
 )
 
 const NonceLength = 32
@@ -176,7 +177,7 @@ func MakeParams(params channel.Params) (Params, error) {
 		return Params{}, errors.New("expected exactly two participants")
 	}
 
-	participantA, err := types.ToParticipant(params.Parts[StellarBackendID][0])
+	participantA, err := types.ToParticipant(params.Parts[types.StellarBackendID][0])
 	if err != nil {
 		return Params{}, err
 	}
@@ -184,7 +185,7 @@ func MakeParams(params channel.Params) (Params, error) {
 	if err != nil {
 		return Params{}, err
 	}
-	participantB, err := types.ToParticipant(params.Parts[StellarBackendID][1])
+	participantB, err := types.ToParticipant(params.Parts[types.StellarBackendID][1])
 	if err != nil {
 		return Params{}, err
 	}
@@ -199,6 +200,20 @@ func MakeParams(params channel.Params) (Params, error) {
 		Nonce:             nonce,
 		ChallengeDuration: xdr.Uint64(params.ChallengeDuration),
 	}, nil
+}
+
+func MakeChannelId(state *channel.State) (xdr.ScMap, error) {
+	keys := make([]xdr.ScSymbol, 0, len(state.ID))
+	values := make([]xdr.ScVal, 0, len(state.ID))
+
+	for backendID, idArray := range state.ID {
+		key := xdr.ScSymbol(strconv.Itoa(int(backendID)))
+		keys = append(keys, key)
+		val := scval.MustWrapScBytes(idArray[:])
+		values = append(values, val)
+	}
+
+	return MakeSymbolScMap(keys, values)
 }
 
 func MustMakeParams(params channel.Params) Params {
@@ -220,9 +235,9 @@ func ToParams(params Params) (channel.Params, error) {
 	}
 
 	challengeDuration := uint64(params.ChallengeDuration)
-	parts := []map[int]wallet.Address{
-		{StellarBackendID: &participantA},
-		{StellarBackendID: &participantB},
+	parts := []map[wallet.BackendID]wallet.Address{
+		{types.StellarBackendID: &participantA},
+		{types.StellarBackendID: &participantB},
 	}
 	app := channel.NoApp()
 	nonce := ToNonce(params.Nonce)

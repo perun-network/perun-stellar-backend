@@ -24,6 +24,7 @@ import (
 	pchannel "perun.network/go-perun/channel"
 	pwallet "perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/event"
+	wtypes "perun.network/perun-stellar-backend/wallet/types"
 	"perun.network/perun-stellar-backend/wire"
 )
 
@@ -65,7 +66,7 @@ func (cb *ContractBackend) Open(ctx context.Context, perunAddr xdr.ScAddress, pa
 
 func (cb *ContractBackend) Abort(ctx context.Context, perunAddr xdr.ScAddress, state *pchannel.State) error {
 
-	chanId := state.ID
+	chanId := state.ID[wtypes.StellarBackendID]
 	abortTxArgs, err := buildChanIdTxArgs(chanId)
 	if err != nil {
 		return errors.New("error while building abort_funding tx")
@@ -141,7 +142,7 @@ func (cb *ContractBackend) Close(ctx context.Context, perunAddr xdr.ScAddress, s
 
 	err = event.AssertCloseEvent(evs)
 	if err == event.ErrNoCloseEvent {
-		chanInfo, err := cb.GetChannelInfo(ctx, perunAddr, state.ID)
+		chanInfo, err := cb.GetChannelInfo(ctx, perunAddr, state.ID[wtypes.StellarBackendID])
 		if err != nil {
 			return errors.New("could not get channel info")
 		}
@@ -205,7 +206,7 @@ func (cb *ContractBackend) Dispute(ctx context.Context, perunAddr xdr.ScAddress,
 
 	err = event.AssertDisputeEvent(evs)
 	if err == event.ErrNoDisputeEvent {
-		chanInfo, err := cb.GetChannelInfo(ctx, perunAddr, state.ID)
+		chanInfo, err := cb.GetChannelInfo(ctx, perunAddr, state.ID[wtypes.StellarBackendID])
 		if err != nil {
 			return errors.New("could not retrieve channel info")
 		}
@@ -227,7 +228,7 @@ func (cb *ContractBackend) Withdraw(ctx context.Context, perunAddr xdr.ScAddress
 		return errors.New("invalid party index for withdrawal")
 	}
 
-	withdrawTxArgs, err := buildChanIdxTxArgs(chanID, withdrawerIdx)
+	withdrawTxArgs, err := buildChanIdxTxArgs(chanID[wtypes.StellarBackendID], withdrawerIdx)
 	if err != nil {
 		return errors.New("error building fund tx")
 	}
@@ -246,7 +247,7 @@ func (cb *ContractBackend) Withdraw(ctx context.Context, perunAddr xdr.ScAddress
 		return err
 	}
 
-	chanInfo, err := cb.GetChannelInfo(ctx, perunAddr, chanID)
+	chanInfo, err := cb.GetChannelInfo(ctx, perunAddr, chanID[wtypes.StellarBackendID])
 	if err != nil {
 		return err
 	}

@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2024 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,6 +22,8 @@ import (
 	pchannel "perun.network/go-perun/channel"
 	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/wallet"
+	wtypes "perun.network/perun-stellar-backend/wallet/types"
+
 	"perun.network/perun-stellar-backend/wire"
 	"time"
 )
@@ -96,7 +98,7 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 		case <-time.After(f.pollingInterval):
 
 			log.Printf("%s: Polling for opened channel...\n", party)
-			chanState, err := f.cb.GetChannelInfo(ctx, f.perunAddr, req.State.ID)
+			chanState, err := f.cb.GetChannelInfo(ctx, f.perunAddr, req.State.ID[wtypes.StellarBackendID])
 			if err != nil {
 				log.Printf("%s: Error while polling for opened channel: %v\n", party, err)
 				continue
@@ -145,7 +147,7 @@ func (f *Funder) FundChannel(ctx context.Context, state *pchannel.State, funderI
 		return errors.New("asset address is not equal to the address stored in the state")
 	}
 
-	return f.cb.Fund(ctx, f.perunAddr, state.ID, funderIdx)
+	return f.cb.Fund(ctx, f.perunAddr, state.ID[wtypes.StellarBackendID], funderIdx)
 }
 
 func (f *Funder) AbortChannel(ctx context.Context, state *pchannel.State) error {

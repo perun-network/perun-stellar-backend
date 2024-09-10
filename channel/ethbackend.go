@@ -22,7 +22,9 @@ import (
 
 	"math/big"
 	"perun.network/go-perun/channel"
+	"perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/channel/types"
+	wtypes "perun.network/perun-stellar-backend/wallet/types"
 )
 
 // This part of the package transfers Ethereum backend functionality to encode States the same way they are encoded in the Eth Backend
@@ -56,7 +58,7 @@ func ToEthState(s *channel.State) EthChannelState {
 		case EthBackendID:
 			assets[i] = assetToEthAsset(s.Allocation.Assets[i])
 
-		case StellarBackendID:
+		case wtypes.StellarBackendID:
 			assets[i] = assetToStellarAsset(s.Allocation.Assets[i])
 
 		default:
@@ -113,8 +115,8 @@ func assetToStellarAsset(asset channel.Asset) ChannelAsset {
 	}
 
 	return ChannelAsset{
-		BackendID: StellarBackendID,
-		ChainID:   big.NewInt(StellarBackendID),
+		BackendID: wtypes.StellarBackendID,
+		ChainID:   big.NewInt(wtypes.StellarBackendID),
 		EthAsset:  common.Address{},
 		CCAsset:   assetBytes,
 	}
@@ -147,7 +149,7 @@ var (
 
 // ChannelState is an auto generated low-level Go binding around an user-defined struct.
 type EthChannelState struct {
-	ChannelID [32]byte
+	ChannelID map[wallet.BackendID][32]byte
 	Version   uint64
 	Outcome   ChannelAllocation
 	AppData   []byte
@@ -168,7 +170,7 @@ type ChannelAsset struct {
 }
 
 type ChannelSubAlloc struct {
-	ID       [32]byte
+	ID       map[wallet.BackendID][32]byte
 	Balances []*big.Int
 	IndexMap []uint16
 }

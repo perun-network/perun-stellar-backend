@@ -25,14 +25,13 @@ import (
 )
 
 const EthBackendID = 1
-const StellarBackendID = 2
 
 type backend struct{}
 
 var Backend = backend{}
 
 func init() {
-	channel.SetBackend(Backend, StellarBackendID)
+	channel.SetBackend(Backend, wtypes.StellarBackendID)
 }
 
 func (b backend) CalcID(params *channel.Params) (channel.ID, error) {
@@ -92,16 +91,16 @@ func (b backend) NewAppID() (channel.AppID, error) {
 	return &AppID{addr}, nil
 }
 
-func checkBackends(backends []int) error {
+func checkBackends(backends []wallet.BackendID) error {
 	if len(backends) == 0 {
 		return errors.New("backends slice is empty")
 	}
 
 	hasStellarBackend := false
-	seenBackends := make(map[int]bool)
+	seenBackends := make(map[wallet.BackendID]bool)
 
 	for _, backend := range backends {
-		if backend == StellarBackendID {
+		if backend == wtypes.StellarBackendID {
 			hasStellarBackend = true
 		}
 		if seenBackends[backend] {

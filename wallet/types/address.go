@@ -86,7 +86,7 @@ func (p Participant) PublicKeyString() string {
 	return hex.EncodeToString(p.PublicKey)
 }
 
-func (p Participant) BackendID() int {
+func (p Participant) BackendID() wallet.BackendID {
 	return StellarBackendID
 }
 

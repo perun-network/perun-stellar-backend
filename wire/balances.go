@@ -22,11 +22,11 @@ import (
 	"github.com/stellar/go/xdr"
 	"math/big"
 	"perun.network/go-perun/channel"
+	"perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/channel/types"
+	wtypes "perun.network/perun-stellar-backend/wallet/types"
 	"perun.network/perun-stellar-backend/wire/scval"
 )
-
-const StellarBackendID = 2
 
 var MaxBalance = new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 127), big.NewInt(1))
 
@@ -264,7 +264,7 @@ func makeAllocationMulti(assets []channel.Asset, balsA, balsB []*big.Int) (*chan
 
 	numParts := 2
 
-	backendIDs := make([]int, StellarBackendID)
+	backendIDs := make([]wallet.BackendID, wtypes.StellarBackendID)
 
 	alloc := channel.NewAllocation(numParts, backendIDs, assets...)
 

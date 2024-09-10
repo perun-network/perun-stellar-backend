@@ -10,11 +10,14 @@ import (
 
 	pchannel "perun.network/go-perun/channel"
 	pclient "perun.network/go-perun/client"
+	pwallet "perun.network/go-perun/wallet"
 	"perun.network/go-perun/watcher/local"
 	"perun.network/go-perun/wire"
 	"perun.network/perun-stellar-backend/channel"
 	"perun.network/perun-stellar-backend/wallet"
 )
+
+const StellarBackendID pwallet.BackendID = 2
 
 type PaymentClient struct {
 	perunClient *pclient.Client
@@ -41,7 +44,14 @@ func SetupPaymentClient(
 	}
 	// Setup Perun client.
 	wireAddr := simple.NewAddress(acc.Address().String())
-	perunClient, err := pclient.New(wireAddr, bus, funder, adj, w, watcher)
+	wireBackendAddrs := map[pwallet.BackendID]wire.Address{
+		StellarBackendID: wireAddr,
+	}
+	walletMap := map[pwallet.BackendID]pwallet.Wallet{
+		StellarBackendID: w,
+	}
+
+	perunClient, err := pclient.New(wireBackendAddrs, bus, funder, adj, walletMap, watcher)
 	if err != nil {
 		return nil, errors.New("creating client")
 	}
@@ -73,17 +83,25 @@ func (c *PaymentClient) OpenChannel(peer wire.Address, balances pchannel.Balance
 	// We define the channel participants. The proposer has always index 0. Here
 	// we use the on-chain addresses as off-chain addresses, but we could also
 	// use different ones.
+	proposerAddr := map[pwallet.BackendID]wire.Address{
+		StellarBackendID: c.WireAddress(),
+	}
 
-	participants := []wire.Address{c.WireAddress(), peer}
+	proposerWalletAddr := map[pwallet.BackendID]pwallet.Address{
+		StellarBackendID: c.account.Address(),
+	}
 
-	initAlloc := pchannel.NewAllocation(2, c.currencies...)
+	peerAddr := map[pwallet.BackendID]wire.Address{
+		StellarBackendID: peer,
+	}
+	participants := []map[pwallet.BackendID]wire.Address{proposerAddr, peerAddr}
+	initAlloc := pchannel.NewAllocation(2, []pwallet.BackendID{StellarBackendID}, c.currencies...)
 	initAlloc.Balances = balances
-
 	// Prepare the channel proposal by defining the channel parameters.
 	challengeDuration := uint64(10) // On-chain challenge duration in seconds.
 	proposal, err := pclient.NewLedgerChannelProposal(
 		challengeDuration,
-		c.account.Address(),
+		proposerWalletAddr,
 		initAlloc,
 		participants,
 	)

@@ -22,8 +22,10 @@ import (
 	"github.com/stellar/go/xdr"
 	"math/big"
 	"perun.network/go-perun/channel"
+	"perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/wire/scval"
+	"strconv"
 )
 
 const ChannelIDLength = 32
@@ -36,17 +38,18 @@ const (
 )
 
 type State struct {
-	ChannelID xdr.ScBytes
+	ChannelID xdr.ScMap
 	Balances  Balances
 	Version   xdr.Uint64
 	Finalized bool
 }
 
 func (s State) ToScVal() (xdr.ScVal, error) {
-	if len(s.ChannelID) != ChannelIDLength {
+	if len(s.ChannelID) != 2 {
 		return xdr.ScVal{}, errors.New("invalid channel id length")
 	}
-	channelID, err := scval.WrapScBytes(s.ChannelID)
+
+	channelID, err := scval.WrapScMap(s.ChannelID)
 	if err != nil {
 		return xdr.ScVal{}, err
 	}
@@ -89,13 +92,18 @@ func (s *State) FromScVal(v xdr.ScVal) error {
 	if err != nil {
 		return err
 	}
-	channelID, ok := channelIDVal.GetBytes()
+
+	channelID, ok := channelIDVal.GetMap()
 	if !ok {
-		return errors.New("expected bytes")
+		return errors.New("expected map")
 	}
-	if len(channelID) != ChannelIDLength {
-		return errors.New("invalid channel id length")
+
+	for _, v := range *channelID {
+		if len(*v.Key.Bytes) != ChannelIDLength {
+			return errors.New("invalid channel id length")
+		}
 	}
+
 	balancesVal, err := GetMapValue(scval.MustWrapScSymbol(SymbolStateBalances), *m)
 	if err != nil {
 		return err
@@ -120,7 +128,7 @@ func (s *State) FromScVal(v xdr.ScVal) error {
 	if !ok {
 		return errors.New("expected bool")
 	}
-	s.ChannelID = channelID
+	s.ChannelID = *channelID
 	s.Balances = balances
 	s.Version = version
 	s.Finalized = finalized
@@ -179,8 +187,14 @@ func MakeState(state channel.State) (State, error) {
 	if err != nil {
 		return State{}, err
 	}
+
+	chanIdMap, err := MakeChannelId(&state)
+	if err != nil {
+		return State{}, err
+	}
+
 	return State{
-		ChannelID: state.ID[:],
+		ChannelID: chanIdMap,
 		Balances:  balances,
 		Version:   xdr.Uint64(state.Version),
 		Finalized: state.IsFinal,
@@ -196,8 +210,39 @@ func scBytesToByteArray(bytesXdr xdr.ScBytes) ([types.HashLenXdr]byte, error) {
 	return arr, nil
 }
 
+func scMapToMap(MapXdr xdr.ScMap) (map[wallet.BackendID][types.HashLenXdr]byte, error) {
+	result := make(map[wallet.BackendID][types.HashLenXdr]byte)
+
+	for _, entry := range MapXdr {
+		backendID, err := parseBackendID(entry.Key)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse BackendID from key: %w", err)
+		}
+
+		bytesXdr := entry.Val.MustBytes()
+
+		var arr [types.HashLenXdr]byte
+		copy(arr[:], bytesXdr)
+
+		result[backendID] = arr
+	}
+
+	return result, nil
+}
+
+func parseBackendID(key xdr.ScVal) (wallet.BackendID, error) {
+	sym := key.MustSym()
+
+	backendID, err := strconv.Atoi(string(sym))
+	if err != nil {
+		return 0, fmt.Errorf("failed to convert symbol to BackendID: %w", err)
+	}
+
+	return wallet.BackendID(backendID), nil
+}
+
 func ToState(stellarState State) (channel.State, error) {
-	ChanID, err := scBytesToByteArray(stellarState.ChannelID)
+	ChanID, err := scMapToMap(stellarState.ChannelID)
 	if err != nil {
 		return channel.State{}, err
 	}
