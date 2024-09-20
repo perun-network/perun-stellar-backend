@@ -1,3 +1,17 @@
+// Copyright 2024 PolyCrypt GmbH
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package test
 
 import (
@@ -6,6 +20,9 @@ import (
 	"log"
 	"math/big"
 	"perun.network/go-perun/channel"
+	"perun.network/go-perun/wallet"
+	wtypes "perun.network/perun-stellar-backend/wallet/types"
+
 	"perun.network/go-perun/client"
 	"time"
 )
@@ -46,10 +63,12 @@ func (c *PaymentClient) HandleProposal(p client.ChannelProposal, r *client.Propo
 			fmt.Printf("Error rejecting proposal: %v\n", errReject)
 		}
 	}
-
+	accountAddressMap := map[wallet.BackendID]wallet.Address{
+		wtypes.StellarBackendID: c.account.Address(),
+	}
 	// Create a channel accept message and send it.
 	accept := lcp.Accept(
-		c.account.Address(),      // The account we use in the channel.
+		accountAddressMap,        // The account we use in the channel.
 		client.WithRandomNonce(), // Our share of the channel nonce.
 	)
 	ch, err := r.Accept(context.TODO(), accept)

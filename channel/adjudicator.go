@@ -71,9 +71,15 @@ func (a *Adjudicator) GetAssetAddrs() []xdr.ScAddress {
 	return addrs
 }
 
-func (a *Adjudicator) Subscribe(ctx context.Context, cid pchannel.ID) (pchannel.AdjudicatorSubscription, error) {
+func (a *Adjudicator) Subscribe(ctx context.Context, cidMap map[pwallet.BackendID]pchannel.ID) (pchannel.AdjudicatorSubscription, error) {
 	perunAddr := a.GetPerunAddr()
 	assetAddrs := a.GetAssetAddrs()
+
+	cid, ok := cidMap[wtypes.StellarBackendID]
+	if !ok {
+		return nil, errors.New("channel ID not found")
+	}
+
 	return NewAdjudicatorSub(ctx, cid, a.CB, perunAddr, assetAddrs, a.challengeDuration)
 }
 

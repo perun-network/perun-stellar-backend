@@ -24,6 +24,7 @@ import (
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/channel/types"
+	wtypes "perun.network/perun-stellar-backend/wallet/types"
 	"perun.network/perun-stellar-backend/wire/scval"
 	"strconv"
 )
@@ -38,18 +39,19 @@ const (
 )
 
 type State struct {
-	ChannelID xdr.ScMap
+	ChannelID xdr.ScBytes //xdr.ScMap
 	Balances  Balances
 	Version   xdr.Uint64
 	Finalized bool
 }
 
 func (s State) ToScVal() (xdr.ScVal, error) {
-	if len(s.ChannelID) != 2 {
+	if len(s.ChannelID) != 32 {
 		return xdr.ScVal{}, errors.New("invalid channel id length")
 	}
 
-	channelID, err := scval.WrapScMap(s.ChannelID)
+	channelID, err := scval.WrapScBytes(s.ChannelID)
+
 	if err != nil {
 		return xdr.ScVal{}, err
 	}
@@ -83,7 +85,7 @@ func (s State) ToScVal() (xdr.ScVal, error) {
 func (s *State) FromScVal(v xdr.ScVal) error {
 	m, ok := v.GetMap()
 	if !ok {
-		return errors.New("expected map")
+		return errors.New("expected map decoding State")
 	}
 	if len(*m) != 4 {
 		return errors.New("expected map of length 4")
@@ -93,17 +95,13 @@ func (s *State) FromScVal(v xdr.ScVal) error {
 		return err
 	}
 
-	channelID, ok := channelIDVal.GetMap()
+	channelID, ok := channelIDVal.GetBytes()
 	if !ok {
-		return errors.New("expected map")
+		return errors.New("expected bytes decoding channel id")
 	}
-
-	for _, v := range *channelID {
-		if len(*v.Key.Bytes) != ChannelIDLength {
-			return errors.New("invalid channel id length")
-		}
+	if len(channelID) != ChannelIDLength {
+		return errors.New("invalid channel id length")
 	}
-
 	balancesVal, err := GetMapValue(scval.MustWrapScSymbol(SymbolStateBalances), *m)
 	if err != nil {
 		return err
@@ -128,7 +126,7 @@ func (s *State) FromScVal(v xdr.ScVal) error {
 	if !ok {
 		return errors.New("expected bool")
 	}
-	s.ChannelID = *channelID
+	s.ChannelID = channelID
 	s.Balances = balances
 	s.Version = version
 	s.Finalized = finalized
@@ -188,13 +186,10 @@ func MakeState(state channel.State) (State, error) {
 		return State{}, err
 	}
 
-	chanIdMap, err := MakeChannelId(&state)
-	if err != nil {
-		return State{}, err
-	}
+	chanIDStellar := state.ID[wtypes.StellarBackendID]
 
 	return State{
-		ChannelID: chanIdMap,
+		ChannelID: chanIDStellar[:],
 		Balances:  balances,
 		Version:   xdr.Uint64(state.Version),
 		Finalized: state.IsFinal,
@@ -242,7 +237,7 @@ func parseBackendID(key xdr.ScVal) (wallet.BackendID, error) {
 }
 
 func ToState(stellarState State) (channel.State, error) {
-	ChanID, err := scMapToMap(stellarState.ChannelID)
+	ChanID, err := scBytesToByteArray(stellarState.ChannelID)
 	if err != nil {
 		return channel.State{}, err
 	}
@@ -281,7 +276,10 @@ func ToState(stellarState State) (channel.State, error) {
 		return channel.State{}, err
 	}
 
-	PerunState := channel.State{ID: ChanID,
+	chanIDMap := make(map[wallet.BackendID][types.HashLenXdr]byte)
+	chanIDMap[wtypes.StellarBackendID] = ChanID
+
+	PerunState := channel.State{ID: chanIDMap,
 		Version:    uint64(stellarState.Version),
 		Allocation: *Alloc,
 		IsFinal:    stellarState.Finalized,
@@ -320,7 +318,6 @@ func convertAssets(contractIDs xdr.ScVec) ([]channel.Asset, error) {
 		if err != nil {
 			return nil, err
 		}
-		// return asset, nil
 
 		assets = append(assets, asset)
 

@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2024 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -79,7 +79,7 @@ func (p Params) ToScVal() (xdr.ScVal, error) {
 func (p *Params) FromScVal(v xdr.ScVal) error {
 	m, ok := v.GetMap()
 	if !ok {
-		return errors.New("expected map")
+		return errors.New("expected map decoding Params")
 	}
 	if len(*m) != 4 {
 		return errors.New("expected map of length 4")
@@ -106,7 +106,7 @@ func (p *Params) FromScVal(v xdr.ScVal) error {
 	}
 	nonce, ok := nonceVal.GetBytes()
 	if !ok {
-		return errors.New("expected bytes")
+		return errors.New("expected bytes decoding nonce")
 	}
 	if len(nonce) != NonceLength {
 		return errors.New("invalid nonce length")

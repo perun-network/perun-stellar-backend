@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2024 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,6 +29,8 @@ type Account struct {
 	privateKey ed25519.PrivateKey
 	// ParticipantAddress references the ParticipantAddress of the Participant this account belongs to.
 	ParticipantAddress keypair.FromAddress
+	// CCAddr is the cross-chain address of the participant.
+	CCAddr [types.CCAddressLength]byte
 }
 
 // NewRandomAccountWithAddress creates a new account with a random private key and the given address as
@@ -38,7 +40,7 @@ func NewRandomAccountWithAddress(rng *rand.Rand, addr *keypair.FromAddress) (*Ac
 	if err != nil {
 		return nil, err
 	}
-	return &Account{privateKey: s, ParticipantAddress: *addr}, nil
+	return &Account{privateKey: s, ParticipantAddress: *addr, CCAddr: [types.CCAddressLength]byte{}}, nil
 }
 
 // NewRandomAccount creates a new account with a random private key. It also creates a random key pair, using its
@@ -72,11 +74,11 @@ func NewRandomAddress(rng *rand.Rand) wallet.Address {
 
 // Address returns the Participant this account belongs to.
 func (a Account) Address() wallet.Address {
-	return types.NewParticipant(a.ParticipantAddress, a.privateKey.Public().(ed25519.PublicKey))
+	return types.NewParticipant(a.ParticipantAddress, a.privateKey.Public().(ed25519.PublicKey), a.CCAddr)
 }
 
 func (a Account) Participant() *types.Participant {
-	return types.NewParticipant(a.ParticipantAddress, a.privateKey.Public().(ed25519.PublicKey))
+	return types.NewParticipant(a.ParticipantAddress, a.privateKey.Public().(ed25519.PublicKey), a.CCAddr)
 }
 
 // SignData signs the given data with the account's private key.

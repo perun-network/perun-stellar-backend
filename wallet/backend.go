@@ -54,5 +54,5 @@ func (b backend) VerifySignature(msg []byte, sig wallet.Sig, a wallet.Address) (
 	if len(sig) != ed25519.SignatureSize {
 		return false, errors.New("invalid signature size")
 	}
-	return ed25519.Verify(p.PublicKey, msg, sig), nil
+	return ed25519.Verify(p.StellarPubKey, msg, sig), nil
 }

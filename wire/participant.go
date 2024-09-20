@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2024 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,34 +27,55 @@ import (
 )
 
 const (
-	PubKeyLength                         = 32
-	SymbolParticipantAddr   xdr.ScSymbol = "addr"
-	SymbolParticipantPubKey xdr.ScSymbol = "pubkey"
+	StellarPubKeyLength              = 32
+	CCPubKeyLength                   = 65
+	CCAddrLength                     = 20
+	SymbolStellarAddr   xdr.ScSymbol = "stellar_addr"
+	SymbolStellarPubKey xdr.ScSymbol = "stellar_pubkey"
+	SymbolCCAddress     xdr.ScSymbol = "cc_addr"
+	ChanTypeCrossSymbol xdr.ScSymbol = "Cross"
 )
 
 type Participant struct {
-	Addr   xdr.ScAddress
-	PubKey xdr.ScBytes
+	StellarAddr   xdr.ScAddress
+	StellarPubKey xdr.ScBytes
+	CCAddr        xdr.ScBytes // Ethereum Address cannot be encoded as xdr.ScAddress, has to be encoded as xdr.ScBytes
 }
 
 func (p Participant) ToScVal() (xdr.ScVal, error) {
-	addr, err := scval.WrapScAddress(p.Addr)
+	stellarAddr, err := scval.WrapScAddress(p.StellarAddr)
 	if err != nil {
 		return xdr.ScVal{}, err
 	}
-	if len(p.PubKey) != PubKeyLength {
-		return xdr.ScVal{}, errors.New("invalid public key length")
+
+	if len(p.StellarPubKey) != StellarPubKeyLength && len(p.StellarPubKey) != CCPubKeyLength {
+		return xdr.ScVal{}, errors.New("invalid Layer 2 public key length")
 	}
-	pubKey, err := scval.WrapScBytes(p.PubKey)
+
+	if len(p.CCAddr) != CCAddrLength {
+		return xdr.ScVal{}, errors.New("invalid cross-chain address length")
+	}
+
+	xdrSym := scval.MustWrapScSymbol(ChanTypeCrossSymbol)
+	xdrStellarPubkeyBytes := scval.MustWrapScBytes(p.StellarPubKey) //p.StellarPubKey)
+
+	stellarPubKey := xdr.ScVec{xdrSym, xdrStellarPubkeyBytes}
+	stellarPubKeyVal, err := scval.WrapVec(stellarPubKey)
+	if err != nil {
+		return xdr.ScVal{}, err
+	}
+
+	ccAddr, err := scval.WrapScBytes(p.CCAddr)
 	if err != nil {
 		return xdr.ScVal{}, err
 	}
 	m, err := MakeSymbolScMap(
 		[]xdr.ScSymbol{
-			SymbolParticipantAddr,
-			SymbolParticipantPubKey,
+			SymbolStellarAddr,
+			SymbolStellarPubKey,
+			SymbolCCAddress,
 		},
-		[]xdr.ScVal{addr, pubKey},
+		[]xdr.ScVal{stellarAddr, stellarPubKeyVal, ccAddr},
 	)
 	if err != nil {
 		return xdr.ScVal{}, err
@@ -65,32 +86,62 @@ func (p Participant) ToScVal() (xdr.ScVal, error) {
 func (p *Participant) FromScVal(v xdr.ScVal) error {
 	m, ok := v.GetMap()
 	if !ok {
-		return errors.New("expected map")
+		return errors.New("expected map decoding Participant")
 	}
-	if len(*m) != 2 {
-		return errors.New("expected map of length 2")
+	if len(*m) != 3 {
+		return errors.New("expected map of length 3")
 	}
-	addrVal, err := GetMapValue(scval.MustWrapScSymbol(SymbolParticipantAddr), *m)
+	stellarAddrVal, err := GetMapValue(scval.MustWrapScSymbol(SymbolStellarAddr), *m)
 	if err != nil {
 		return err
 	}
-	addr, ok := addrVal.GetAddress()
+	stellarAddr, ok := stellarAddrVal.GetAddress()
 	if !ok {
-		return errors.New("expected address")
+		return errors.New("expected Stellar address")
 	}
-	pubKeyVal, err := GetMapValue(scval.MustWrapScSymbol(SymbolParticipantPubKey), *m)
+	// For Cross-chain, this comes from an enum in the contract
+	stellarPubKeyVal, err := GetMapValue(scval.MustWrapScSymbol(SymbolStellarPubKey), *m)
 	if err != nil {
 		return err
 	}
-	pubKey, ok := pubKeyVal.GetBytes()
+
+	stellarPubKeyVals, ok := stellarPubKeyVal.GetVec()
 	if !ok {
-		return errors.New("expected bytes")
+		return errors.New("expected vec decoding stellarPubKeyVal")
 	}
-	if len(pubKey) != PubKeyLength {
+
+	if len(*stellarPubKeyVals) != 2 {
+		return errors.New("expected vec of length 2")
+	}
+
+	stellarPubKey, ok := (*stellarPubKeyVals)[1].GetBytes()
+	if !ok {
+		return errors.New("expected bytes decoding stellarPubKeyVal")
+	}
+	_, ok = (*stellarPubKeyVals)[0].GetSym()
+	if !ok {
+		return errors.New("expected symbol decoding stellarPubKeyVal")
+	}
+
+	if len(stellarPubKey) != CCPubKeyLength {
+		return errors.New("invalid stellar public key length")
+	}
+
+	ccAddrVal, err := GetMapValue(scval.MustWrapScSymbol(SymbolCCAddress), *m)
+	if err != nil {
+		return err
+	}
+	ccAddr, ok := ccAddrVal.GetBytes()
+	if !ok {
+		return errors.New("expected bytes decoding ccAddrVal")
+	}
+	if len(ccAddr) != CCAddrLength {
 		return errors.New("invalid public key length")
 	}
-	p.Addr = addr
-	p.PubKey = pubKey
+
+	p.StellarAddr = stellarAddr
+	p.StellarPubKey = stellarPubKey
+	p.CCAddr = ccAddr
 	return nil
 }
 
@@ -131,27 +182,39 @@ func ParticipantFromScVal(v xdr.ScVal) (Participant, error) {
 }
 
 func MakeParticipant(participant types.Participant) (Participant, error) {
-	addr, err := assettypes.MakeAccountAddress(&participant.Address)
+	stellarAddr, err := assettypes.MakeAccountAddress(&participant.StellarAddress)
 	if err != nil {
 		return Participant{}, err
 	}
-	if len(participant.PublicKey) != PubKeyLength {
-		return Participant{}, errors.New("invalid public key length")
+	if len(participant.StellarPubKey) != StellarPubKeyLength {
+		return Participant{}, errors.New("invalid Stellar public key length")
 	}
-	pubKey := xdr.ScBytes(participant.PublicKey)
+	if len(participant.CCAddr) != CCAddrLength {
+		return Participant{}, errors.New("invalid cross-chain address length")
+	}
+	stellarPubKey := xdr.ScBytes(participant.StellarPubKey)
+	ccAddr := xdr.ScBytes(participant.CCAddr[:])
 	return Participant{
-		Addr:   addr,
-		PubKey: pubKey,
+		StellarAddr:   stellarAddr,
+		StellarPubKey: stellarPubKey,
+		CCAddr:        ccAddr,
 	}, nil
 }
 
 func ToParticipant(participant Participant) (types.Participant, error) {
-	kp, err := assettypes.ToAccountAddress(participant.Addr)
+	kp, err := assettypes.ToAccountAddress(participant.StellarAddr)
 	if err != nil {
 		return types.Participant{}, err
 	}
-	if len(participant.PubKey) != ed25519.PublicKeySize {
+
+	var ccAddr [20]byte
+	copy(ccAddr[:], participant.CCAddr[:])
+
+	if len(participant.StellarPubKey) != ed25519.PublicKeySize {
 		return types.Participant{}, errors.New("invalid public key length")
 	}
-	return *types.NewParticipant(kp, ed25519.PublicKey(participant.PubKey)), nil
+	if len(participant.CCAddr) != 20 {
+		return types.Participant{}, errors.New("invalid cross-chain secp256k1 address length")
+	}
+	return *types.NewParticipant(kp, ed25519.PublicKey(participant.StellarPubKey), ccAddr), nil
 }
