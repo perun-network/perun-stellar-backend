@@ -177,7 +177,7 @@ func MakeParams(params channel.Params) (Params, error) {
 		return Params{}, errors.New("expected exactly two participants")
 	}
 
-	participantA, err := types.ToParticipant(params.Parts[types.StellarBackendID][0])
+	participantA, err := types.ToParticipant(params.Parts[0][types.StellarBackendID])
 	if err != nil {
 		return Params{}, err
 	}
@@ -185,7 +185,7 @@ func MakeParams(params channel.Params) (Params, error) {
 	if err != nil {
 		return Params{}, err
 	}
-	participantB, err := types.ToParticipant(params.Parts[types.StellarBackendID][1])
+	participantB, err := types.ToParticipant(params.Parts[1][types.StellarBackendID])
 	if err != nil {
 		return Params{}, err
 	}

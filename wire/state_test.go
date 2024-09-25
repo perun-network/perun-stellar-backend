@@ -43,6 +43,7 @@ func TestStateConversion(t *testing.T) {
 	rng := polytest.Prng(t)
 	perunFirstState := *ptest.NewRandomState(rng,
 		ptest.WithNumParts(2),
+		ptest.WithBackend(2),
 		ptest.WithNumAssets(2),
 		ptest.WithNumLocked(0),
 		ptest.WithoutApp(),
