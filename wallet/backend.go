@@ -15,10 +15,11 @@
 package wallet
 
 import (
-	"crypto/ed25519"
-	"errors"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/pkg/errors"
 	"io"
 	"perun.network/go-perun/wallet"
+	"perun.network/go-perun/wire/perunio"
 	"perun.network/perun-stellar-backend/wallet/types"
 )
 
@@ -39,11 +40,8 @@ func (b backend) NewAddress() wallet.Address {
 
 // DecodeSig decodes a signature of length SignatureLength from the reader.
 func (b backend) DecodeSig(reader io.Reader) (wallet.Sig, error) {
-	sig := make([]byte, SignatureLength)
-	if _, err := io.ReadFull(reader, sig); err != nil {
-		return nil, err
-	}
-	return sig, nil
+	buf := make(wallet.Sig, 65)
+	return buf, perunio.Decode(reader, &buf)
 }
 
 func (b backend) VerifySignature(msg []byte, sig wallet.Sig, a wallet.Address) (bool, error) {
@@ -51,8 +49,17 @@ func (b backend) VerifySignature(msg []byte, sig wallet.Sig, a wallet.Address) (
 	if !ok {
 		return false, errors.New("participant has invalid type")
 	}
-	if len(sig) != ed25519.SignatureSize {
-		return false, errors.New("invalid signature size")
+	hash := crypto.Keccak256(msg)
+	prefix := []byte("\x19Ethereum Signed Message:\n32")
+	hash = crypto.Keccak256(prefix, hash)
+	sigCopy := make([]byte, 65)
+	copy(sigCopy, sig)
+	if len(sigCopy) == 65 && (sigCopy[65-1] >= 27) {
+		sigCopy[65-1] -= 27
 	}
-	return ed25519.Verify(p.StellarPubKey, msg, sig), nil
+	pk, err := crypto.SigToPub(hash, sigCopy)
+	if err != nil {
+		return false, errors.WithStack(err)
+	}
+	return pk.X.Cmp(p.StellarPubKey.X) == 0 && pk.Y.Cmp(p.StellarPubKey.Y) == 0 && pk.Curve == p.StellarPubKey.Curve, nil
 }

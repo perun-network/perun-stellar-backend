@@ -16,10 +16,14 @@ package wire
 
 import (
 	"bytes"
-	"crypto/ed25519"
+	"crypto/ecdsa"
 	"errors"
+	"fmt"
+	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	xdr3 "github.com/stellar/go-xdr/xdr3"
 	"github.com/stellar/go/xdr"
+	"log"
+	"math/big"
 	assettypes "perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/wallet/types"
 
@@ -49,6 +53,7 @@ func (p Participant) ToScVal() (xdr.ScVal, error) {
 	}
 
 	if len(p.StellarPubKey) != StellarPubKeyLength && len(p.StellarPubKey) != CCPubKeyLength {
+		log.Println(len(p.StellarPubKey))
 		return xdr.ScVal{}, errors.New("invalid Layer 2 public key length")
 	}
 
@@ -181,18 +186,58 @@ func ParticipantFromScVal(v xdr.ScVal) (Participant, error) {
 	return p, err
 }
 
+// Convert ECDSA public key to bytes
+func PublicKeyToBytes(pubKey *ecdsa.PublicKey) []byte {
+	// Get the X and Y coordinates
+	xBytes := pubKey.X.Bytes()
+	yBytes := pubKey.Y.Bytes()
+
+	// Calculate the byte lengths for fixed-width representation
+	curveBits := pubKey.Curve.Params().BitSize
+	curveByteSize := (curveBits + 7) / 8 // Calculate byte size
+
+	// Create fixed-size byte slices for X and Y
+	xPadded := make([]byte, curveByteSize)
+	yPadded := make([]byte, curveByteSize)
+	copy(xPadded[curveByteSize-len(xBytes):], xBytes)
+	copy(yPadded[curveByteSize-len(yBytes):], yBytes)
+
+	// Concatenate the X and Y coordinates
+	pubKeyBytes := make([]byte, 0, 65)
+	pubKeyBytes = append(pubKeyBytes, 0x04) // Uncompressed prefix
+	pubKeyBytes = append(pubKeyBytes, xPadded...)
+	pubKeyBytes = append(pubKeyBytes, yPadded...)
+	return pubKeyBytes
+}
+
+// Convert bytes back to ECDSA public key
+func BytesToPublicKey(data []byte) (*big.Int, *big.Int, error) {
+	if len(data) != 65 || data[0] != 0x04 {
+		return nil, nil, errors.New("invalid public key")
+	}
+	// Split data into X and Y
+	x := new(big.Int).SetBytes(data[1:33])
+	y := new(big.Int).SetBytes(data[33:])
+
+	// Return the public key
+	return x, y, nil
+}
+
 func MakeParticipant(participant types.Participant) (Participant, error) {
 	stellarAddr, err := assettypes.MakeAccountAddress(&participant.StellarAddress)
 	if err != nil {
 		return Participant{}, err
 	}
-	if len(participant.StellarPubKey) != StellarPubKeyLength {
+	if &participant.StellarPubKey == nil {
 		return Participant{}, errors.New("invalid Stellar public key length")
 	}
-	if len(participant.CCAddr) != CCAddrLength {
-		return Participant{}, errors.New("invalid cross-chain address length")
+
+	if !participant.StellarPubKey.Curve.IsOnCurve(participant.StellarPubKey.X, participant.StellarPubKey.Y) {
+		return Participant{}, errors.New("Stellar public key is not on the curve")
 	}
-	stellarPubKey := xdr.ScBytes(participant.StellarPubKey)
+	pk := PublicKeyToBytes(participant.StellarPubKey)
+
+	stellarPubKey := xdr.ScBytes(pk)
 	ccAddr := xdr.ScBytes(participant.CCAddr[:])
 	return Participant{
 		StellarAddr:   stellarAddr,
@@ -210,11 +255,23 @@ func ToParticipant(participant Participant) (types.Participant, error) {
 	var ccAddr [20]byte
 	copy(ccAddr[:], participant.CCAddr[:])
 
-	if len(participant.StellarPubKey) != ed25519.PublicKeySize {
-		return types.Participant{}, errors.New("invalid public key length")
-	}
 	if len(participant.CCAddr) != 20 {
 		return types.Participant{}, errors.New("invalid cross-chain secp256k1 address length")
 	}
-	return *types.NewParticipant(kp, ed25519.PublicKey(participant.StellarPubKey), ccAddr), nil
+	// Choose the curve (assuming P256 for this example)
+	curve := secp256k1.S256()
+
+	// Unmarshal the bytes back into X and Y coordinates
+	x, y, err := BytesToPublicKey(participant.StellarPubKey)
+	if x == nil || y == nil || err != nil {
+		return types.Participant{}, fmt.Errorf("invalid public key data %v", err)
+	}
+
+	// Create an ECDSA public key with the curve and the extracted X, Y coordinates
+	pubKey := &ecdsa.PublicKey{
+		Curve: curve,
+		X:     x,
+		Y:     y,
+	}
+	return *types.NewParticipant(kp, pubKey, ccAddr), nil
 }

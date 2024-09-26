@@ -15,16 +15,16 @@
 package channel
 
 import (
+	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/pkg/errors"
 	"log"
-
 	"math/big"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/channel/types"
 	wtypes "perun.network/perun-stellar-backend/wallet/types"
+	"strings"
 )
 
 // This part of the package transfers Ethereum backend functionality to encode States the same way they are encoded in the Eth Backend
@@ -69,6 +69,7 @@ func ToEthState(s *channel.State) EthChannelState {
 
 	outcome := ChannelAllocation{
 		Assets:   assets,
+		Backends: s.Allocation.Backends,
 		Balances: s.Balances,
 		Locked:   locked,
 	}
@@ -96,10 +97,9 @@ func assetToEthAsset(asset channel.Asset) ChannelAsset {
 	}
 
 	return ChannelAsset{
-		BackendID: EthBackendID,
-		ChainID:   ethAsset.ChainID.Int,
-		EthAsset:  ethAsset.EthAddress(),
-		CCAsset:   []byte{},
+		ChainID:  ethAsset.ChainID.Int,
+		EthAsset: ethAsset.EthAddress(),
+		CCAsset:  make([]byte, 0),
 	}
 }
 
@@ -115,35 +115,42 @@ func assetToStellarAsset(asset channel.Asset) ChannelAsset {
 	}
 
 	return ChannelAsset{
-		BackendID: wtypes.StellarBackendID,
-		ChainID:   big.NewInt(wtypes.StellarBackendID),
-		EthAsset:  common.Address{},
-		CCAsset:   assetBytes,
+		ChainID:  big.NewInt(wtypes.StellarBackendID),
+		EthAsset: common.HexToAddress("0x0000000000000000000000000000000000000000"),
+		CCAsset:  assetBytes,
 	}
 }
 
 // EncodeState encodes the state as with abi.encode() in the smart contracts.
 func EncodeEthState(state *EthChannelState) ([]byte, error) {
-	args := abi.Arguments{{Type: abiState}}
-	enc, err := args.Pack(*state)
-	return enc, errors.WithStack(err)
-}
+	// Define the ABI spec for the state type
+	const stateType = `tuple(
+        bytes32[] channelID, 
+        uint64 version, 
+        tuple(
+            tuple(uint256 chainID, address ethHolder, bytes ccHolder)[] assets, 
+            uint256[] backends, 
+            uint256[][] balances, 
+            tuple(bytes32[] ID, uint256[] balances, uint16[] indexMap)[] locked
+        ) outcome, 
+        bytes appData, 
+        bool isFinal
+    )`
 
-var (
-	// compile time check that we implement the channel backend interface.
-	// _ channel.Backend = new(Backend)
-	// Definition of ABI datatypes.
-	abiUint256, _ = abi.NewType("uint256", "", nil)
-	abiAddress, _ = abi.NewType("address", "", nil)
-	abiBytes32, _ = abi.NewType("bytes32", "", nil)
-	abiParams     abi.Type
-	abiState      abi.Type
-	abiProgress   abi.Method
-	abiRegister   abi.Method
-	// MaxBalance is the maximum amount of funds per asset that a user can possess.
-	// It is set to 2 ^ 256 - 1.
-	MaxBalance = abi.MaxUint256
-)
+	// Create a new ABI object with just the stateType
+	parsedAbi, err := abi.JSON(strings.NewReader(fmt.Sprintf(`[{"type":"%s"}]`, stateType)))
+	if err != nil {
+		return nil, err
+	}
+
+	// Encode the state data into ABI format
+	encoded, err := parsedAbi.Pack("", state)
+	if err != nil {
+		return nil, err
+	}
+
+	return encoded, nil
+}
 
 // here we have ethereum methods
 
@@ -158,15 +165,15 @@ type EthChannelState struct {
 
 type ChannelAllocation struct {
 	Assets   []ChannelAsset
+	Backends []wallet.BackendID
 	Balances [][]*big.Int
 	Locked   []ChannelSubAlloc
 }
 
 type ChannelAsset struct {
-	BackendID int
-	ChainID   *big.Int
-	EthAsset  common.Address
-	CCAsset   []byte
+	ChainID  *big.Int
+	EthAsset common.Address
+	CCAsset  []byte
 }
 
 type ChannelSubAlloc struct {

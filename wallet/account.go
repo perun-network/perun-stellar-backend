@@ -15,8 +15,10 @@
 package wallet
 
 import (
-	"crypto/ed25519"
-	"errors"
+	"crypto/ecdsa"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+	"github.com/pkg/errors"
 	"github.com/stellar/go/keypair"
 	"math/rand"
 	"perun.network/go-perun/wallet"
@@ -26,7 +28,7 @@ import (
 // Account is used for signing channel state.
 type Account struct {
 	// privateKey is the private key of the account.
-	privateKey ed25519.PrivateKey
+	privateKey ecdsa.PrivateKey
 	// ParticipantAddress references the ParticipantAddress of the Participant this account belongs to.
 	ParticipantAddress keypair.FromAddress
 	// CCAddr is the cross-chain address of the participant.
@@ -36,11 +38,11 @@ type Account struct {
 // NewRandomAccountWithAddress creates a new account with a random private key and the given address as
 // Account.ParticipantAddress.
 func NewRandomAccountWithAddress(rng *rand.Rand, addr *keypair.FromAddress) (*Account, error) {
-	_, s, err := ed25519.GenerateKey(rng)
+	s, err := ecdsa.GenerateKey(secp256k1.S256(), rng)
 	if err != nil {
 		return nil, err
 	}
-	return &Account{privateKey: s, ParticipantAddress: *addr, CCAddr: [types.CCAddressLength]byte{}}, nil
+	return &Account{privateKey: *s, ParticipantAddress: *addr}, nil
 }
 
 // NewRandomAccount creates a new account with a random private key. It also creates a random key pair, using its
@@ -74,17 +76,27 @@ func NewRandomAddress(rng *rand.Rand) wallet.Address {
 
 // Address returns the Participant this account belongs to.
 func (a Account) Address() wallet.Address {
-	return types.NewParticipant(a.ParticipantAddress, a.privateKey.Public().(ed25519.PublicKey), a.CCAddr)
+	pubKey, ok := a.privateKey.Public().(*ecdsa.PublicKey) // Ensure correct type
+	if !ok {
+		panic("unexpected type for ecdsa.PublicKey")
+	}
+	return types.NewParticipant(a.ParticipantAddress, pubKey, a.CCAddr)
 }
 
 func (a Account) Participant() *types.Participant {
-	return types.NewParticipant(a.ParticipantAddress, a.privateKey.Public().(ed25519.PublicKey), a.CCAddr)
+	return types.NewParticipant(a.ParticipantAddress, a.privateKey.Public().(*ecdsa.PublicKey), a.CCAddr)
 }
 
 // SignData signs the given data with the account's private key.
 func (a Account) SignData(data []byte) ([]byte, error) {
-	if len(a.privateKey) != ed25519.PrivateKeySize {
-		return nil, errors.New("invalid private key size")
+	hash := crypto.Keccak256(data)
+	prefix := []byte("\x19Ethereum Signed Message:\n32")
+	hash = crypto.Keccak256(prefix, hash)
+
+	sig, err := crypto.Sign(hash, &a.privateKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "SignHash")
 	}
-	return ed25519.Sign(a.privateKey, data), nil
+	sig[64] += 27
+	return sig, nil
 }

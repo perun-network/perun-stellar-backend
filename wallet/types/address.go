@@ -15,11 +15,16 @@
 package types
 
 import (
+	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
+	"crypto/x509"
 	"encoding/hex"
 	"fmt"
+	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/strkey"
+	"math/big"
 	"perun.network/go-perun/wallet"
 )
 
@@ -32,12 +37,12 @@ type Participant struct {
 	// Address is the stellar ParticipantAddress of the participant.
 	StellarAddress keypair.FromAddress
 	// PublicKey is the public key of the participant, which is used to verify signatures on channel state.
-	StellarPubKey ed25519.PublicKey
+	StellarPubKey *ecdsa.PublicKey
 	// CCAddr is the cross-chain address of the participant.
 	CCAddr [CCAddressLength]byte
 }
 
-func NewParticipant(addr keypair.FromAddress, pk ed25519.PublicKey, ccAddr [CCAddressLength]byte) *Participant {
+func NewParticipant(addr keypair.FromAddress, pk *ecdsa.PublicKey, ccAddr [CCAddressLength]byte) *Participant {
 	return &Participant{
 		StellarAddress: addr,
 		StellarPubKey:  pk,
@@ -47,44 +52,59 @@ func NewParticipant(addr keypair.FromAddress, pk ed25519.PublicKey, ccAddr [CCAd
 
 // MarshalBinary encodes the participant into binary form.
 func (p Participant) MarshalBinary() (data []byte, err error) {
-	if len(p.StellarPubKey) != ed25519.PublicKeySize {
-		return nil, fmt.Errorf("invalid Stellar public key size: %d", len(p.StellarPubKey))
-	}
+	// Marshal the Stellar public key using secp256k1's raw byte format (uncompressed)
+	pubKeyBytes := elliptic.Marshal(p.StellarPubKey.Curve, p.StellarPubKey.X, p.StellarPubKey.Y)
+
 	binAddr, err := p.StellarAddress.MarshalBinary()
 	if err != nil {
 		return nil, err
 	}
-	res := make([]byte, ed25519.PublicKeySize+len(binAddr)+CCAddressLength)
-	copy(res, p.StellarPubKey)
-	copy(res[ed25519.PublicKeySize:], binAddr)
-	copy(res[ed25519.PublicKeySize+len(binAddr):], p.CCAddr[:])
+
+	res := make([]byte, len(pubKeyBytes)+len(binAddr)+CCAddressLength)
+	copy(res, pubKeyBytes)
+	copy(res[len(pubKeyBytes):], binAddr)
+	copy(res[len(pubKeyBytes)+len(binAddr):], p.CCAddr[:])
+
 	return res, nil
 }
 
 // UnmarshalBinary decodes the participant from binary form.
 func (p *Participant) UnmarshalBinary(data []byte) error {
-	if len(data) < ed25519.PublicKeySize {
-		return fmt.Errorf("invalid data size: %d", len(data))
+	// Check the minimum length required for the public key
+	if len(data) < 65 { // 65 bytes is the length of an uncompressed secp256k1 public key
+		return fmt.Errorf("invalid data size for public key")
 	}
-	p.StellarPubKey = data[:ed25519.PublicKeySize]
-	p.StellarAddress = keypair.FromAddress{}
-	p.CCAddr = [CCAddressLength]byte{}
-	offset := ed25519.PublicKeySize
 
+	// Unmarshal the public key (first 65 bytes)
+	x, y := elliptic.Unmarshal(secp256k1.S256(), data[:65])
+	if x == nil || y == nil {
+		return fmt.Errorf("failed to unmarshal ECDSA public key")
+	}
+	p.StellarPubKey = &ecdsa.PublicKey{
+		Curve: secp256k1.S256(),
+		X:     x,
+		Y:     y,
+	}
+
+	// Unmarshal the Stellar address (assuming the next part is for Stellar address)
+	offset := 65
 	binAddrLength := len(data) - offset - CCAddressLength
-
 	if binAddrLength <= 0 || offset+binAddrLength > len(data) {
 		return fmt.Errorf("invalid data size for Stellar address")
 	}
+
+	// Unmarshal Stellar address
 	if err := p.StellarAddress.UnmarshalBinary(data[offset : offset+binAddrLength]); err != nil {
 		return fmt.Errorf("failed to unmarshal Stellar address: %w", err)
 	}
 
+	// Unmarshal CCAddr (last part)
 	offset += binAddrLength
 	if len(data[offset:]) != CCAddressLength {
 		return fmt.Errorf("invalid cross-chain address size")
 	}
 	copy(p.CCAddr[:], data[offset:])
+
 	return nil
 }
 
@@ -106,7 +126,8 @@ func (p Participant) AddressString() string {
 }
 
 func (p Participant) PublicKeyString() string {
-	return hex.EncodeToString(p.StellarPubKey)
+	pubKeyBytes, _ := x509.MarshalPKIXPublicKey(&p.StellarPubKey)
+	return hex.EncodeToString(pubKeyBytes)
 }
 
 func (p Participant) BackendID() wallet.BackendID {
@@ -114,17 +135,23 @@ func (p Participant) BackendID() wallet.BackendID {
 }
 
 func ZeroAddress() (*Participant, error) {
-	zeros := [32]byte{}
-	pk := ed25519.PublicKey(zeros[:])
-	stellarAddr, err := strkey.Encode(strkey.VersionByteAccountID, pk)
+	// Create a zero-value ECDSA public key (X = 0, Y = 0)
+	zeroPubKey := ecdsa.PublicKey{
+		Curve: elliptic.P256(),
+		X:     new(big.Int),
+		Y:     new(big.Int),
+	}
+
+	stellarAddr, err := keypair.Random() // Generate a random Stellar keypair for the zero address.
 	if err != nil {
 		return nil, err
 	}
-	a := &Participant{}
-	err = a.StellarAddress.UnmarshalText([]byte(stellarAddr))
-	a.StellarPubKey = pk
-	a.CCAddr = [CCAddressLength]byte{}
-	return a, err
+
+	return &Participant{
+		StellarAddress: *stellarAddr.FromAddress(),
+		StellarPubKey:  &zeroPubKey,
+		CCAddr:         [CCAddressLength]byte{},
+	}, nil
 }
 
 func AsParticipant(address wallet.Address) *Participant {
