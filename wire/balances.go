@@ -20,6 +20,7 @@ import (
 	"errors"
 	xdr3 "github.com/stellar/go-xdr/xdr3"
 	"github.com/stellar/go/xdr"
+	"log"
 	"math/big"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/wallet"
@@ -174,7 +175,11 @@ func MakeBalances(alloc channel.Allocation) (Balances, error) {
 			return Balances{}, err
 		}
 
-		tokenVal := scval.MustWrapScAddress(token)
+		tokenVal, err := scval.MustWrapScAddress(token)
+		if err != nil {
+			log.Println("Error wrapping token address")
+			return Balances{}, err
+		}
 
 		tokens = append(tokens, tokenVal)
 	}
@@ -264,6 +269,7 @@ func makeAllocationMulti(assets []channel.Asset, balsA, balsB []*big.Int) (*chan
 
 	numParts := 2
 
+	// TODO might be mixed backends
 	backendIDs := make([]wallet.BackendID, wtypes.StellarBackendID)
 
 	alloc := channel.NewAllocation(numParts, backendIDs, assets...)

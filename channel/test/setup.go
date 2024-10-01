@@ -42,7 +42,7 @@ import (
 )
 
 const (
-	PerunContractPath        = "testdata/perun_soroban_multi_contract.wasm"
+	PerunContractPath        = "testdata/perun_soroban_cross_contract.wasm"
 	StellarAssetContractPath = "testdata/perun_soroban_token.wasm"
 	initLumensBalance        = "10000000"
 	initTokenBalance         = uint64(2000000)
@@ -104,7 +104,7 @@ func getDataFilePath(filename string) (string, error) {
 
 func NewTestSetup(t *testing.T) *Setup {
 
-	accs, kpsToFund, ws := MakeRandPerunAccsWallets(5)
+	_, kpsToFund, _ := MakeRandPerunAccsWallets(5)
 	require.NoError(t, CreateFundStellarAccounts(kpsToFund, initLumensBalance))
 
 	depTokenOneKp := kpsToFund[2]
@@ -129,6 +129,13 @@ func NewTestSetup(t *testing.T) *Setup {
 	require.NoError(t, InitTokenContract(depTokenOneKp, tokenAddressOne))
 	require.NoError(t, InitTokenContract(depTokenTwoKp, tokenAddressTwo))
 
+	acc0, err := wallet.NewRandomAccountWithAddress(mathrand.New(mathrand.NewSource(0)), kpsToFund[0].FromAddress())
+	acc1, err := wallet.NewRandomAccountWithAddress(mathrand.New(mathrand.NewSource(0)), kpsToFund[1].FromAddress())
+	w0 := wallet.NewEphemeralWallet()
+	w0.AddAccount(acc0)
+	w1 := wallet.NewEphemeralWallet()
+	w1.AddAccount(acc1)
+
 	SetupAccountsAndContracts(t, depTokenKps, kpsToFund[:2], tokenAddresses, initTokenBalance)
 
 	var assetContractIDs []pchannel.Asset
@@ -139,15 +146,15 @@ func NewTestSetup(t *testing.T) *Setup {
 		assetContractIDs = append(assetContractIDs, assetContractID)
 	}
 
-	cbs := NewContractBackendsFromKeys(kpsToFund[:2])
+	cbs := NewContractBackendsFromKeys(kpsToFund[:2], []pwallet.Account{acc0, acc1})
 
 	aliceCB := cbs[0]
-	aliceWallet := ws[0]
+	aliceWallet := w0
 
 	bobCB := cbs[1]
-	bobWallet := ws[1]
+	bobWallet := w1
 
-	channelAccs := []*wallet.Account{accs[0], accs[1]}
+	channelAccs := []*wallet.Account{acc0, acc1}
 	channelCBs := []*client.ContractBackend{aliceCB, bobCB}
 	channelWallets := []*wallet.EphemeralWallet{aliceWallet, bobWallet}
 
@@ -192,18 +199,21 @@ func CreateFundersAndAdjudicators(accs []*wallet.Account, cbs []*client.Contract
 	return funders, adjs
 }
 
-func NewContractBackendsFromKeys(kps []*keypair.Full) []*client.ContractBackend {
+func NewContractBackendsFromKeys(kps []*keypair.Full, acc []pwallet.Account) []*client.ContractBackend {
 	cbs := make([]*client.ContractBackend, len(kps))
 	// generate Configs
 	for i, kp := range kps {
-		cbs[i] = NewContractBackendFromKey(kp)
+		cbs[i] = NewContractBackendFromKey(kp, &acc[i])
 	}
 	return cbs
 }
 
-func NewContractBackendFromKey(kp *keypair.Full) *client.ContractBackend {
+func NewContractBackendFromKey(kp *keypair.Full, acc *pwallet.Account) *client.ContractBackend {
 	trConfig := client.TransactorConfig{}
 	trConfig.SetKeyPair(kp)
+	if acc != nil {
+		trConfig.SetAccount(acc)
+	}
 	return client.NewContractBackend(&trConfig)
 }
 
@@ -294,7 +304,7 @@ func CreateFundStellarAccounts(pairs []*keypair.Full, initialBalance string) err
 		}
 	}
 
-	txParams := client.GetBaseTransactionParamsWithFee(&masterAccount, txnbuild.MinBaseFee, ops...)
+	txParams := client.GetBaseTransactionParamsWithFee(&masterAccount, txnbuild.MinBaseFee+100, ops...)
 
 	txSigned, err := client.CreateSignedTransactionWithParams([]*keypair.Full{sourceKey}, txParams)
 
@@ -338,6 +348,7 @@ func NewParamsWithAddressStateWithAsset(t *testing.T, partsAddr []pwallet.Addres
 	}
 	return ptest.NewRandomParamsAndState(rng, ptest.WithNumLocked(0).Append(
 		ptest.WithAssets(assets...),
+		ptest.WithBackend(2),
 		ptest.WithNumAssets(len(assets)),
 		ptest.WithVersion(0),
 		ptest.WithNumParts(numParts),

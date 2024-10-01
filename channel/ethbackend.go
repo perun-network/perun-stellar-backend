@@ -15,24 +15,32 @@
 package channel
 
 import (
-	"fmt"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"log"
 	"math/big"
 	"perun.network/go-perun/channel"
-	"perun.network/go-perun/wallet"
+	"perun.network/go-perun/channel/multi"
 	"perun.network/perun-stellar-backend/channel/types"
 	wtypes "perun.network/perun-stellar-backend/wallet/types"
-	"strings"
 )
 
 // This part of the package transfers Ethereum backend functionality to encode States the same way they are encoded in the Eth Backend
 
 // ToEthState converts a channel.State to a ChannelState struct.
 func ToEthState(s *channel.State) EthChannelState {
+	backends := make([]*big.Int, len(s.Allocation.Assets))
+	channelIDs := make([]channel.ID, len(s.Allocation.Assets))
+	for i := range s.Allocation.Assets { // we assume that for each asset there is an element in backends corresponding to the backendID the asset belongs to.
+		backends[i] = big.NewInt(int64(s.Allocation.Backends[i]))
+		channelIDs[i] = s.ID[s.Allocation.Backends[i]]
+	}
 	locked := make([]ChannelSubAlloc, len(s.Locked))
 	for i, sub := range s.Locked {
+		subIDs := make([]channel.ID, len(backends))
+		for j := range subIDs {
+			subIDs[j] = sub.ID[s.Allocation.Backends[j]]
+		}
 		// Create index map.
 		indexMap := make([]uint16, s.NumParts())
 		if len(sub.IndexMap) == 0 {
@@ -45,7 +53,7 @@ func ToEthState(s *channel.State) EthChannelState {
 			}
 		}
 
-		locked[i] = ChannelSubAlloc{ID: sub.ID, Balances: sub.Bals, IndexMap: indexMap}
+		locked[i] = ChannelSubAlloc{ID: subIDs, Balances: sub.Bals, IndexMap: indexMap}
 	}
 
 	// iterate over s.Allocation.Backends and check if they are of type EthAsset
@@ -57,9 +65,11 @@ func ToEthState(s *channel.State) EthChannelState {
 		switch backendID {
 		case EthBackendID:
 			assets[i] = assetToEthAsset(s.Allocation.Assets[i])
+			log.Println("EthAsset: ", assets[i])
 
 		case wtypes.StellarBackendID:
 			assets[i] = assetToStellarAsset(s.Allocation.Assets[i])
+			log.Println("StellarAsset: ", assets[i])
 
 		default:
 			log.Panicf("wrong backend ID: %d", backendID)
@@ -69,7 +79,7 @@ func ToEthState(s *channel.State) EthChannelState {
 
 	outcome := ChannelAllocation{
 		Assets:   assets,
-		Backends: s.Allocation.Backends,
+		Backends: backends,
 		Balances: s.Balances,
 		Locked:   locked,
 	}
@@ -82,7 +92,7 @@ func ToEthState(s *channel.State) EthChannelState {
 		log.Panicf("error encoding app data: %v", err)
 	}
 	return EthChannelState{
-		ChannelID: s.ID,
+		ChannelID: channelIDs,
 		Version:   s.Version,
 		Outcome:   outcome,
 		AppData:   appData,
@@ -91,25 +101,33 @@ func ToEthState(s *channel.State) EthChannelState {
 }
 
 func assetToEthAsset(asset channel.Asset) ChannelAsset {
-	ethAsset, ok := asset.(*types.EthAsset)
+	multiAsset, ok := asset.(multi.Asset)
 	if !ok {
-		log.Panicf("expected asset of type Ethereum, but got wrong asset type: %T", asset)
+		log.Panicf("expected asset of type MultiLedgerAsset, but got wrong asset type: %T", asset)
 	}
-
+	id := new(big.Int)
+	_, ok = id.SetString(string(multiAsset.AssetID().LedgerId.MapKey()), 10) // base 10 for decimal numbers
+	if !ok {
+		log.Panicf("Error: Failed to parse string into big.Int")
+	}
 	return ChannelAsset{
-		ChainID:  ethAsset.ChainID.Int,
-		EthAsset: ethAsset.EthAddress(),
+		ChainID:  id,
+		EthAsset: common.HexToAddress(multiAsset.Address()),
 		CCAsset:  make([]byte, 0),
 	}
 }
 
 func assetToStellarAsset(asset channel.Asset) ChannelAsset {
-	stellarAsset, ok := asset.(*types.StellarAsset)
-	if !ok {
-		log.Panicf("expected asset of type Stellar, but got wrong asset type: %T", asset)
+	var assetBytes []byte
+	var err error
+
+	switch v := asset.(type) {
+	case *types.StellarAsset:
+		assetBytes, err = v.MarshalBinary()
+	default:
+		log.Panicf("expected asset of type Stellar or MultiAsset, but got: %T", asset)
 	}
 
-	assetBytes, err := stellarAsset.MarshalBinary()
 	if err != nil {
 		log.Panicf("error encoding asset: %v", err)
 	}
@@ -123,40 +141,135 @@ func assetToStellarAsset(asset channel.Asset) ChannelAsset {
 
 // EncodeState encodes the state as with abi.encode() in the smart contracts.
 func EncodeEthState(state *EthChannelState) ([]byte, error) {
-	// Define the ABI spec for the state type
-	const stateType = `tuple(
-        bytes32[] channelID, 
-        uint64 version, 
-        tuple(
-            tuple(uint256 chainID, address ethHolder, bytes ccHolder)[] assets, 
-            uint256[] backends, 
-            uint256[][] balances, 
-            tuple(bytes32[] ID, uint256[] balances, uint16[] indexMap)[] locked
-        ) outcome, 
-        bytes appData, 
-        bool isFinal
-    )`
 
-	// Create a new ABI object with just the stateType
-	parsedAbi, err := abi.JSON(strings.NewReader(fmt.Sprintf(`[{"type":"%s"}]`, stateType)))
+	// Define the top-level ABI type for the state struct.
+	stateType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
+		{Name: "channelID", Type: "bytes32[]"},
+		{Name: "version", Type: "uint64"},
+		{Name: "outcome", Type: "tuple", Components: []abi.ArgumentMarshaling{
+			{Name: "assets", Type: "tuple[]", Components: []abi.ArgumentMarshaling{
+				{Name: "chainID", Type: "uint256"},
+				{Name: "ethHolder", Type: "address"},
+				{Name: "ccHolder", Type: "bytes"},
+			}},
+			{Name: "backends", Type: "uint256[]"},
+			{Name: "balances", Type: "uint256[][]"},
+			{Name: "locked", Type: "tuple[]", Components: []abi.ArgumentMarshaling{
+				{Name: "ID", Type: "bytes32[]"},
+				{Name: "balances", Type: "uint256[]"},
+				{Name: "indexMap", Type: "uint16[]"},
+			}},
+		}},
+		{Name: "appData", Type: "bytes"},
+		{Name: "isFinal", Type: "bool"},
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	// Encode the state data into ABI format
-	encoded, err := parsedAbi.Pack("", state)
-	if err != nil {
-		return nil, err
+	// Define the Arguments.
+	args := abi.Arguments{
+		{Type: stateType},
 	}
 
-	return encoded, nil
+	// Pack the data for encoding.
+	return args.Pack(
+		struct {
+			ChannelID [][32]byte
+			Version   uint64
+			Outcome   struct {
+				Assets []struct {
+					ChainID   *big.Int
+					EthHolder common.Address
+					CcHolder  []byte
+				}
+				Backends []*big.Int
+				Balances [][]*big.Int
+				Locked   []struct {
+					ID       [][32]byte
+					Balances []*big.Int
+					IndexMap []uint16
+				}
+			}
+			AppData []byte
+			IsFinal bool
+		}{
+			ChannelID: state.ChannelID,
+			Version:   state.Version,
+			Outcome: struct {
+				Assets []struct {
+					ChainID   *big.Int
+					EthHolder common.Address
+					CcHolder  []byte
+				}
+				Backends []*big.Int
+				Balances [][]*big.Int
+				Locked   []struct {
+					ID       [][32]byte
+					Balances []*big.Int
+					IndexMap []uint16
+				}
+			}{
+				Assets: func() []struct {
+					ChainID   *big.Int
+					EthHolder common.Address
+					CcHolder  []byte
+				} {
+					var assets []struct {
+						ChainID   *big.Int
+						EthHolder common.Address
+						CcHolder  []byte
+					}
+					for _, asset := range state.Outcome.Assets {
+						assets = append(assets, struct {
+							ChainID   *big.Int
+							EthHolder common.Address
+							CcHolder  []byte
+						}{
+							ChainID:   asset.ChainID,
+							EthHolder: asset.EthAsset,
+							CcHolder:  asset.CCAsset,
+						})
+					}
+					return assets
+				}(),
+				Backends: state.Outcome.Backends,
+				Balances: state.Outcome.Balances,
+				Locked: func() []struct {
+					ID       [][32]byte
+					Balances []*big.Int
+					IndexMap []uint16
+				} {
+					var locked []struct {
+						ID       [][32]byte
+						Balances []*big.Int
+						IndexMap []uint16
+					}
+					for _, lock := range state.Outcome.Locked {
+						locked = append(locked, struct {
+							ID       [][32]byte
+							Balances []*big.Int
+							IndexMap []uint16
+						}{
+							ID:       lock.ID,
+							Balances: lock.Balances,
+							IndexMap: lock.IndexMap,
+						})
+					}
+					return locked
+				}(),
+			},
+			AppData: state.AppData,
+			IsFinal: state.IsFinal,
+		},
+	)
 }
 
 // here we have ethereum methods
 
 // ChannelState is an auto generated low-level Go binding around an user-defined struct.
 type EthChannelState struct {
-	ChannelID map[wallet.BackendID][32]byte
+	ChannelID [][32]byte
 	Version   uint64
 	Outcome   ChannelAllocation
 	AppData   []byte
@@ -165,7 +278,7 @@ type EthChannelState struct {
 
 type ChannelAllocation struct {
 	Assets   []ChannelAsset
-	Backends []wallet.BackendID
+	Backends []*big.Int
 	Balances [][]*big.Int
 	Locked   []ChannelSubAlloc
 }
@@ -177,7 +290,7 @@ type ChannelAsset struct {
 }
 
 type ChannelSubAlloc struct {
-	ID       map[wallet.BackendID][32]byte
+	ID       [][32]byte
 	Balances []*big.Int
 	IndexMap []uint16
 }

@@ -1,14 +1,17 @@
 package client
 
 import (
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"github.com/stellar/go/clients/horizonclient"
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/protocols/horizon"
 	"github.com/stellar/go/txnbuild"
-
 	"github.com/stellar/go/xdr"
+	"log"
 	"perun.network/go-perun/wallet"
+	chTypes "perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/wallet/types"
 	"perun.network/perun-stellar-backend/wire"
 	"sync"
@@ -18,6 +21,7 @@ const stellarDefaultChainId = 1
 
 type Sender interface {
 	SignSendTx(txnbuild.Transaction) (xdr.TransactionMeta, error)
+	SetHzClient(*horizonclient.Client)
 }
 
 type ContractBackend struct {
@@ -99,6 +103,31 @@ func (cb *ContractBackend) GetTransactor() *StellarSigner {
 	return &cb.tr
 }
 
+func (cb *ContractBackend) GetBalance(cID xdr.ScAddress) (string, error) {
+	tr := cb.GetTransactor()
+	add, err := tr.GetAddress()
+	if err != nil {
+		return "", err
+	}
+	accountId, err := xdr.AddressToAccountId(add)
+	if err != nil {
+		return "", err
+	}
+	scAdd, err := xdr.NewScAddress(xdr.ScAddressTypeScAddressTypeAccount, accountId)
+	if err != nil {
+		return "", err
+	}
+	TokenNameArgs, err := BuildGetTokenBalanceArgs(scAdd)
+	if err != nil {
+		return "", err
+	}
+	_, bal, err := cb.InvokeUnsignedTx("balance", TokenNameArgs, cID)
+	if err != nil {
+		return "", err
+	}
+	return bal, nil
+}
+
 func (st *StellarSigner) GetHorizonAccount() (horizon.Account, error) {
 	hzAddress, err := st.GetAddress()
 	if err != nil {
@@ -130,28 +159,27 @@ func (st *StellarSigner) GetHorizonClient() *horizonclient.Client {
 	return st.hzClient
 }
 
-func (c *ContractBackend) InvokeUnsignedTx(fname string, callTxArgs xdr.ScVec, contractAddr xdr.ScAddress) (wire.Channel, error) {
+func (c *ContractBackend) InvokeUnsignedTx(fname string, callTxArgs xdr.ScVec, contractAddr xdr.ScAddress) (wire.Channel, string, error) { //xdr.TransactionMeta, error
 	c.cbMutex.Lock()
 	defer c.cbMutex.Unlock()
 	fnameXdr := xdr.ScSymbol(fname)
 	hzAcc, err := c.tr.GetHorizonAccount()
 	if err != nil {
-		return wire.Channel{}, err
+		return wire.Channel{}, "", err
 	}
 
 	hzClient := c.tr.GetHorizonClient()
 
-	txSender, ok := c.tr.sender.(*TxSender)
-	if !ok {
-		return wire.Channel{}, errors.New("sender is not of type *TxSender")
-	}
-
-	txSender.SetHzClient(hzClient)
+	c.tr.sender.SetHzClient(hzClient)
+	chanInf := fname == "get_channel"
 
 	invokeHostFunctionOp := BuildContractCallOp(hzAcc, fnameXdr, callTxArgs, contractAddr)
-	chanInfo, _, _ := PreflightHostFunctionsResult(hzClient, &hzAcc, *invokeHostFunctionOp)
+	chanInfo, bal, _, _, err := PreflightHostFunctionsResult(hzClient, &hzAcc, *invokeHostFunctionOp, chanInf)
+	if err != nil {
+		return wire.Channel{}, "", err
+	}
 
-	return chanInfo, nil
+	return chanInfo, bal, nil
 }
 
 func (c *ContractBackend) InvokeSignedTx(fname string, callTxArgs xdr.ScVec, contractAddr xdr.ScAddress) (xdr.TransactionMeta, error) {
@@ -159,32 +187,60 @@ func (c *ContractBackend) InvokeSignedTx(fname string, callTxArgs xdr.ScVec, con
 	defer c.cbMutex.Unlock()
 	fnameXdr := xdr.ScSymbol(fname)
 	hzAcc, err := c.tr.GetHorizonAccount()
+	log.Println("hzAcc: ", hzAcc)
 	if err != nil {
 		return xdr.TransactionMeta{}, err
 	}
 
 	hzClient := c.tr.GetHorizonClient()
+	log.Println("hzClient: ", hzClient)
 
-	txSender, ok := c.tr.sender.(*TxSender)
-	if !ok {
-		return xdr.TransactionMeta{}, errors.New("sender is not of type *TxSender")
-	}
-
-	txSender.SetHzClient(hzClient)
-
+	c.tr.sender.SetHzClient(hzClient)
 	invokeHostFunctionOp := BuildContractCallOp(hzAcc, fnameXdr, callTxArgs, contractAddr)
-	preFlightOp, _ := PreflightHostFunctions(hzClient, &hzAcc, *invokeHostFunctionOp)
-	minFeeCustom := int64(500000)
-	txParams := GetBaseTransactionParamsWithFee(&hzAcc, minFeeCustom, &preFlightOp)
+	log.Println("invokeHostFunctionOp: ", invokeHostFunctionOp)
+	preFlightOp, minFee, err := PreflightHostFunctions(hzClient, &hzAcc, *invokeHostFunctionOp)
+	log.Println("preFlightOp: ", preFlightOp)
+	if err != nil {
+		return xdr.TransactionMeta{}, err
+	}
+	minFeeCustom := int64(100)
+	txParams := GetBaseTransactionParamsWithFee(&hzAcc, minFee+minFeeCustom, &preFlightOp)
+	log.Println("txParams: ", txParams)
 	txUnsigned, err := txnbuild.NewTransaction(txParams)
+	log.Println("txUnsigned: ", txUnsigned)
 	if err != nil {
 		return xdr.TransactionMeta{}, err
 	}
 	txMeta, err := c.tr.sender.SignSendTx(*txUnsigned)
+	log.Println("txMeta2: ", txMeta)
 
 	if err != nil {
 		return xdr.TransactionMeta{}, err
 	}
 
 	return txMeta, nil
+}
+
+/*
+ * StringToScAddress converts a string to a xdr.ScAddress.
+ */
+func StringToScAddress(s string) (xdr.ScAddress, error) {
+	hash, err := StringToHash(s)
+	if err != nil {
+		return xdr.ScAddress{}, err
+	}
+	return chTypes.MakeContractAddress(hash)
+}
+
+/*
+ * StringToHash converts a hex string to a xdr.Hash.
+ */
+func StringToHash(s string) (xdr.Hash, error) {
+	bytes, err := hex.DecodeString(s)
+	if err != nil {
+		return xdr.Hash{}, fmt.Errorf("failed to decode hex string: %w", err)
+	}
+	var hash xdr.Hash
+	copy(hash[:], bytes)
+	return hash, nil
 }

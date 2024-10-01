@@ -1,20 +1,19 @@
 package test
 
 import (
-	"fmt"
-	"math/big"
-	"perun.network/go-perun/wire/net/simple"
-
 	"context"
 	"errors"
+	"fmt"
+	"math/big"
 
 	pchannel "perun.network/go-perun/channel"
 	pclient "perun.network/go-perun/client"
 	pwallet "perun.network/go-perun/wallet"
 	"perun.network/go-perun/watcher/local"
-	"perun.network/go-perun/wire"
+	pwire "perun.network/go-perun/wire"
 	"perun.network/perun-stellar-backend/channel"
 	"perun.network/perun-stellar-backend/wallet"
+	"perun.network/perun-stellar-backend/wire"
 )
 
 const StellarBackendID pwallet.BackendID = 2
@@ -25,7 +24,7 @@ type PaymentClient struct {
 	currencies  []pchannel.Asset
 	channels    chan *PaymentChannel
 	Channel     *PaymentChannel
-	wAddr       wire.Address
+	wAddr       pwire.Address
 	balance     *big.Int
 }
 
@@ -33,7 +32,7 @@ func SetupPaymentClient(
 	w *wallet.EphemeralWallet,
 	acc *wallet.Account,
 	stellarTokenIDs []pchannel.Asset,
-	bus *wire.LocalBus,
+	bus *pwire.LocalBus,
 	funder *channel.Funder,
 	adj *channel.Adjudicator,
 
@@ -43,8 +42,8 @@ func SetupPaymentClient(
 		return nil, fmt.Errorf("intializing watcher: %w", err)
 	}
 	// Setup Perun client.
-	wireAddr := simple.NewAddress(acc.Address().String())
-	wireBackendAddrs := map[pwallet.BackendID]wire.Address{
+	wireAddr := &wire.WirePart{Participant: acc.Participant()}
+	wireBackendAddrs := map[pwallet.BackendID]pwire.Address{
 		StellarBackendID: wireAddr,
 	}
 	walletMap := map[pwallet.BackendID]pwallet.Wallet{
@@ -79,11 +78,11 @@ func (c *PaymentClient) startWatching(ch *pclient.Channel) {
 	}()
 }
 
-func (c *PaymentClient) OpenChannel(peer wire.Address, balances pchannel.Balances) {
+func (c *PaymentClient) OpenChannel(peer pwire.Address, balances pchannel.Balances) {
 	// We define the channel participants. The proposer has always index 0. Here
 	// we use the on-chain addresses as off-chain addresses, but we could also
 	// use different ones.
-	proposerAddr := map[pwallet.BackendID]wire.Address{
+	proposerAddr := map[pwallet.BackendID]pwire.Address{
 		StellarBackendID: c.WireAddress(),
 	}
 
@@ -91,11 +90,15 @@ func (c *PaymentClient) OpenChannel(peer wire.Address, balances pchannel.Balance
 		StellarBackendID: c.account.Address(),
 	}
 
-	peerAddr := map[pwallet.BackendID]wire.Address{
+	peerAddr := map[pwallet.BackendID]pwire.Address{
 		StellarBackendID: peer,
 	}
-	participants := []map[pwallet.BackendID]wire.Address{proposerAddr, peerAddr}
-	initAlloc := pchannel.NewAllocation(2, []pwallet.BackendID{StellarBackendID}, c.currencies...)
+	backends := make([]pwallet.BackendID, len(c.currencies))
+	for i := range c.currencies {
+		backends[i] = StellarBackendID
+	}
+	participants := []map[pwallet.BackendID]pwire.Address{proposerAddr, peerAddr}
+	initAlloc := pchannel.NewAllocation(2, backends, c.currencies...)
 	initAlloc.Balances = balances
 	// Prepare the channel proposal by defining the channel parameters.
 	challengeDuration := uint64(10) // On-chain challenge duration in seconds.
@@ -120,7 +123,7 @@ func (c *PaymentClient) OpenChannel(peer wire.Address, balances pchannel.Balance
 	c.Channel = newPaymentChannel(ch, c.currencies)
 }
 
-func (p *PaymentClient) WireAddress() wire.Address {
+func (p *PaymentClient) WireAddress() pwire.Address {
 	return p.wAddr
 }
 

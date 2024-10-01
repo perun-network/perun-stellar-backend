@@ -35,7 +35,7 @@ func init() {
 }
 
 func (b backend) CalcID(params *channel.Params) (channel.ID, error) {
-	wp := wire.MustMakeParams(*params)
+	wp, _ := wire.MustMakeParams(*params)
 	bytes, err := wp.MarshalBinary()
 	if err != nil {
 		return channel.ID{}, err
@@ -97,16 +97,11 @@ func checkBackends(backends []wallet.BackendID) error {
 	}
 
 	hasStellarBackend := false
-	seenBackends := make(map[wallet.BackendID]bool)
 
 	for _, backend := range backends {
 		if backend == wtypes.StellarBackendID {
 			hasStellarBackend = true
 		}
-		if seenBackends[backend] {
-			return errors.Join(errors.New("duplicate backend ID found"), errors.New(string(rune(backend))))
-		}
-		seenBackends[backend] = true
 	}
 
 	if !hasStellarBackend {

@@ -24,6 +24,7 @@ import (
 	"github.com/stellar/go/xdr"
 	"log"
 	"math/big"
+	"perun.network/go-perun/wire"
 	assettypes "perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/wallet/types"
 
@@ -39,6 +40,50 @@ const (
 	SymbolCCAddress     xdr.ScSymbol = "cc_addr"
 	ChanTypeCrossSymbol xdr.ScSymbol = "Cross"
 )
+
+type WirePart struct {
+	*types.Participant
+}
+
+func (w WirePart) Equal(address wire.Address) bool {
+	return w.Participant.Equal(address.(*WirePart).Participant)
+}
+
+func (w WirePart) Cmp(address wire.Address) int {
+	if w.Participant.Equal(address.(*WirePart).Participant) {
+		return 0
+	} else {
+		return 1
+	}
+}
+
+func (w WirePart) Verify(_ []byte, sig []byte) error {
+	if !bytes.Equal(sig, []byte("Authenticate")) {
+		return errors.New("invalid signature")
+	}
+	return nil
+}
+
+func (w WirePart) MarshalBinary() ([]byte, error) {
+	return w.Participant.MarshalBinary()
+}
+
+func (w *WirePart) UnmarshalBinary(data []byte) error {
+	return w.Participant.UnmarshalBinary(data)
+}
+
+func NewWirePart(participant *types.Participant) *WirePart {
+	return &WirePart{participant}
+}
+
+// Verify verifies a message signature.
+// It returns an error if the signature is invalid.
+func (p Participant) Verify(_ []byte, sig []byte) error {
+	if !bytes.Equal(sig, []byte("Authenticate")) {
+		return errors.New("invalid signature")
+	}
+	return nil
+}
 
 type Participant struct {
 	StellarAddr   xdr.ScAddress
@@ -62,7 +107,7 @@ func (p Participant) ToScVal() (xdr.ScVal, error) {
 	}
 
 	xdrSym := scval.MustWrapScSymbol(ChanTypeCrossSymbol)
-	xdrStellarPubkeyBytes := scval.MustWrapScBytes(p.StellarPubKey) //p.StellarPubKey)
+	xdrStellarPubkeyBytes, _ := scval.MustWrapScBytes(p.StellarPubKey)
 
 	stellarPubKey := xdr.ScVec{xdrSym, xdrStellarPubkeyBytes}
 	stellarPubKeyVal, err := scval.WrapVec(stellarPubKey)

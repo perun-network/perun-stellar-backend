@@ -33,6 +33,12 @@ type ChainID struct {
 	*big.Int
 }
 
+// AssetID identifies an asset on a specific chain.
+type AssetID struct {
+	BackendID uint32
+	LedgerId  ChainID
+}
+
 // MakeChainID makes a ChainID for the given id.
 func MakeChainID(id *big.Int) ChainID {
 	if id.Sign() < 0 {
@@ -63,7 +69,7 @@ func (id ChainID) MapKey() multi.LedgerIDMapKey {
 type (
 	// Asset is an Ethereum asset.
 	EthAsset struct {
-		ChainID     ChainID
+		ChainID     AssetID
 		AssetHolder wtypes.EthAddress
 	}
 
@@ -99,13 +105,13 @@ func (a *EthAsset) UnmarshalBinary(data []byte) error {
 
 // LedgerID returns the ledger ID the asset lives on.
 func (a EthAsset) LedgerID() multi.LedgerID {
-	return &a.ChainID
+	return &a.ChainID.LedgerId
 }
 
 // NewAsset creates a new asset from an chainID and the AssetHolder address.
 func NewAsset(chainID *big.Int, assetHolder common.Address) *EthAsset {
 	id := MakeChainID(chainID)
-	return &EthAsset{id, *wtypes.AsWalletAddr(assetHolder)}
+	return &EthAsset{AssetID{1, id}, *wtypes.AsWalletAddr(assetHolder)}
 }
 
 // EthAddress returns the Ethereum address of the asset.
@@ -119,5 +125,10 @@ func (a EthAsset) Equal(b channel.Asset) bool {
 	if !ok {
 		return false
 	}
-	return a.ChainID.MapKey() == ethAsset.ChainID.MapKey() && a.EthAddress() == ethAsset.EthAddress()
+	return a.ChainID.LedgerId.MapKey() == ethAsset.ChainID.LedgerId.MapKey() && a.EthAddress() == ethAsset.EthAddress()
+}
+
+// Address returns the address of the asset.
+func (a EthAsset) Address() string {
+	return a.AssetHolder.String()
 }

@@ -69,14 +69,14 @@ func TestHappyChannel(t *testing.T) {
 		reqAlice := pchannel.AdjudicatorReq{
 			Params:    perunParams,
 			Tx:        tx,
-			Acc:       accs[0],
+			Acc:       map[pwallet.BackendID]pwallet.Account{2: accs[0]},
 			Idx:       pchannel.Index(0),
 			Secondary: false}
 
 		reqBob := pchannel.AdjudicatorReq{
 			Params:    perunParams,
 			Tx:        tx,
-			Acc:       accs[1],
+			Acc:       map[pwallet.BackendID]pwallet.Account{2: accs[1]},
 			Idx:       pchannel.Index(1),
 			Secondary: false}
 
@@ -85,7 +85,7 @@ func TestHappyChannel(t *testing.T) {
 		require.NoError(t, adjAlice.Withdraw(ctxAliceWithdraw, reqAlice, nil))
 
 		perunAddrAlice := adjAlice.GetPerunAddr()
-		stellarChanAlice, err := adjAlice.CB.GetChannelInfo(ctx, perunAddrAlice, next.ID)
+		stellarChanAlice, err := adjAlice.CB.GetChannelInfo(ctx, perunAddrAlice, next.ID[2])
 		require.True(t, stellarChanAlice.Control.WithdrawnA)
 
 		require.NoError(t, err)
@@ -138,14 +138,14 @@ func TestChannel_RegisterFinal(t *testing.T) {
 		reqAlice := pchannel.AdjudicatorReq{
 			Params:    perunParams,
 			Tx:        tx,
-			Acc:       accs[0],
+			Acc:       map[pwallet.BackendID]pwallet.Account{2: accs[0]},
 			Idx:       pchannel.Index(0),
 			Secondary: false}
 
 		require.NoError(t, adjAlice.Register(ctxAliceRegister, reqAlice, nil))
 
 		perunAddrAlice := adjAlice.GetPerunAddr()
-		stellarChanAlice, err := adjAlice.CB.GetChannelInfo(ctx, perunAddrAlice, next.ID)
+		stellarChanAlice, err := adjAlice.CB.GetChannelInfo(ctx, perunAddrAlice, next.ID[2])
 
 		require.True(t, stellarChanAlice.Control.Disputed)
 

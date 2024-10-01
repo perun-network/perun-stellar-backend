@@ -14,7 +14,7 @@ require (
 	github.com/ethereum/go-ethereum v1.10.12
 	github.com/stellar/go-xdr v0.0.0-20231122183749-b53fb00bcac2
 	github.com/stretchr/testify v1.8.4
-	perun.network/go-perun v0.11.1-0.20240920121016-969c6a7cbaff
+	perun.network/go-perun v0.11.1-0.20241001124918-3c1e2619e407
 	polycry.pt/poly-go v0.0.0-20220301085937-fb9d71b45a37
 )
 

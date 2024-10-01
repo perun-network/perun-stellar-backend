@@ -1,4 +1,4 @@
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2023 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import (
 	"errors"
 	xdr3 "github.com/stellar/go-xdr/xdr3"
 	"github.com/stellar/go/xdr"
+	"log"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/wallet/types"
@@ -179,18 +180,22 @@ func MakeParams(params channel.Params) (Params, error) {
 
 	participantA, err := types.ToParticipant(params.Parts[0][types.StellarBackendID])
 	if err != nil {
+		log.Println("Error in MakeParams: ", err)
 		return Params{}, err
 	}
 	a, err := MakeParticipant(*participantA)
 	if err != nil {
+		log.Println("Error2 in MakeParams: ", err)
 		return Params{}, err
 	}
 	participantB, err := types.ToParticipant(params.Parts[1][types.StellarBackendID])
 	if err != nil {
+		log.Println("Error3 in MakeParams: ", err)
 		return Params{}, err
 	}
 	b, err := MakeParticipant(*participantB)
 	if err != nil {
+		log.Println("Error4 in MakeParams: ", err)
 		return Params{}, err
 	}
 	nonce := MakeNonce(params.Nonce)
@@ -209,19 +214,19 @@ func MakeChannelId(state *channel.State) (xdr.ScMap, error) {
 	for backendID, idArray := range state.ID {
 		key := xdr.ScSymbol(strconv.Itoa(int(backendID)))
 		keys = append(keys, key)
-		val := scval.MustWrapScBytes(idArray[:])
+		val, _ := scval.MustWrapScBytes(idArray[:])
 		values = append(values, val)
 	}
 
 	return MakeSymbolScMap(keys, values)
 }
 
-func MustMakeParams(params channel.Params) Params {
+func MustMakeParams(params channel.Params) (Params, error) {
 	p, err := MakeParams(params)
 	if err != nil {
-		panic(err)
+		return Params{}, err
 	}
-	return p
+	return p, nil
 }
 
 func ToParams(params Params) (channel.Params, error) {

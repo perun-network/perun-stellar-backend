@@ -33,7 +33,7 @@ func (c *PaymentClient) HandleProposal(p client.ChannelProposal, r *client.Propo
 		// Ensure that we got a ledger channel proposal.
 		lcp, ok := p.(*client.LedgerChannelProposalMsg)
 		if !ok {
-			return nil, fmt.Errorf("Invalid proposal type: %T\n", p)
+			return nil, fmt.Errorf("Invalid proposal type: %T", p)
 		}
 
 		// Check that we have the correct number of participants.
@@ -50,7 +50,7 @@ func (c *PaymentClient) HandleProposal(p client.ChannelProposal, r *client.Propo
 		}
 
 		if err := channel.AssertAssetsEqual(lcp.InitBals.Assets, pAssets); err != nil {
-			return nil, fmt.Errorf("Invalid assets: %v\n", err)
+			return nil, fmt.Errorf("Invalid assets: %v", err)
 		} else if lcp.FundingAgreement[assetIdx][peerIdx].Cmp(big.NewInt(0)) != 0 { //lcp.FundingAgreement[assetIdx][clientIdx].Cmp(lcp.FundingAgreement[assetIdx][peerIdx]) != 0
 			return nil, fmt.Errorf("Invalid funding balance")
 		}

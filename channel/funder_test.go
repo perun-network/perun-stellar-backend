@@ -18,6 +18,7 @@ package channel_test
 
 import (
 	"github.com/stretchr/testify/require"
+	"log"
 	pchannel "perun.network/go-perun/channel"
 	pwallet "perun.network/go-perun/wallet"
 	chtest "perun.network/perun-stellar-backend/channel/test"
@@ -74,5 +75,6 @@ func TestFunding_TimeoutNotFunded(t *testing.T) {
 	funders := setup.GetFunders()
 	ctxTimeout := setup.NewCtx(chtest.DefaultTestTimeout)
 	gotErr := funders[0].Fund(ctxTimeout, *freqs[0])
+	log.Println(gotErr)
 	require.True(t, pchannel.IsFundingTimeoutError(gotErr))
 }
