@@ -120,7 +120,7 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 				if !ok {
 					return fmt.Errorf("expected StellarAsset at index 0, got %T", req.State.Assets[0])
 				}
-				cAdd0, err := types.MakeContractAddress(t0.ContractID())
+				cAdd0, err := types.MakeContractAddress(t0.Asset.ContractID())
 				if err != nil {
 					return err
 				}
@@ -139,7 +139,7 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 				if !ok {
 					return fmt.Errorf("expected StellarAsset at index 1, got %T", req.State.Assets[1])
 				}
-				cAdd1, err := types.MakeContractAddress(t1.ContractID())
+				cAdd1, err := types.MakeContractAddress(t1.Asset.ContractID())
 				if err != nil {
 					return err
 				}
@@ -160,7 +160,7 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 				if !ok {
 					return fmt.Errorf("expected StellarAsset at index 0, got %T", req.State.Assets[0])
 				}
-				cAdd0, err := types.MakeContractAddress(t0.ContractID())
+				cAdd0, err := types.MakeContractAddress(t0.Asset.ContractID())
 				if err != nil {
 					return err
 				}
@@ -172,7 +172,7 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 				if !ok {
 					return fmt.Errorf("expected StellarAsset at index 1, got %T", req.State.Assets[1])
 				}
-				cAdd1, err := types.MakeContractAddress(t1.ContractID())
+				cAdd1, err := types.MakeContractAddress(t1.Asset.ContractID())
 				if err != nil {
 					return err
 				}

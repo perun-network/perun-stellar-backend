@@ -246,7 +246,7 @@ func (cb *ContractBackend) Withdraw(ctx context.Context, perunAddr xdr.ScAddress
 		log.Println("Error while getting client address: ", err)
 	}
 	tokenAddr0 := req.Tx.State.Assets[0].(*types.StellarAsset)
-	cAdd0, err := types.MakeContractAddress(tokenAddr0.ContractID())
+	cAdd0, err := types.MakeContractAddress(tokenAddr0.Asset.ContractID())
 	if err != nil {
 		return err
 	}
@@ -256,7 +256,7 @@ func (cb *ContractBackend) Withdraw(ctx context.Context, perunAddr xdr.ScAddress
 	}
 	tokenAddr1 := req.Tx.State.Assets[1].(*types.StellarAsset)
 
-	cAdd1, err := types.MakeContractAddress(tokenAddr1.ContractID())
+	cAdd1, err := types.MakeContractAddress(tokenAddr1.Asset.ContractID())
 	if err != nil {
 		return err
 	}

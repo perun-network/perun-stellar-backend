@@ -43,7 +43,7 @@ func (s *TxSender) SignSendTx(txUnsigned txnbuild.Transaction) (xdr.TransactionM
 	}
 
 	txSent, err := s.hzClient.SubmitTransaction(tx)
-	log.Println("Sent tx", txSent)
+	log.Println("Sent tx")
 	if err != nil {
 		return xdr.TransactionMeta{}, err
 	}
