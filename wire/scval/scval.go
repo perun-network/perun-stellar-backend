@@ -103,6 +103,10 @@ func WrapScBytes(b xdr.ScBytes) (xdr.ScVal, error) {
 	return xdr.NewScVal(xdr.ScValTypeScvBytes, b)
 }
 
+func WrapScVec(v xdr.ScVec) (xdr.ScVal, error) {
+	return xdr.NewScVal(xdr.ScValTypeScvVec, &v)
+}
+
 func MustWrapScBytes(b xdr.ScBytes) (xdr.ScVal, error) {
 	v, err := WrapScBytes(b)
 	if err != nil {

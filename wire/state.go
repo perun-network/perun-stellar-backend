@@ -39,22 +39,40 @@ const (
 )
 
 type State struct {
-	ChannelID xdr.ScBytes //xdr.ScMap
+	ChannelID xdr.ScVec // xdr.ScBytes are elements in the vector
 	Balances  Balances
 	Version   xdr.Uint64
 	Finalized bool
 }
 
 func (s State) ToScVal() (xdr.ScVal, error) {
-	if len(s.ChannelID) != 32 {
-		return xdr.ScVal{}, errors.New("invalid channel id length")
+	chanIDScVec := xdr.ScVec{}
+
+	for i := 0; i < len(s.ChannelID); i++ {
+		chanID := s.ChannelID[i]
+		chanIDBytes, ok := chanID.GetBytes()
+		if !ok {
+			return xdr.ScVal{}, errors.New("expected bytes decoding channel id")
+		}
+
+		if len(chanIDBytes) != 32 {
+			return xdr.ScVal{}, errors.New("invalid channel id length")
+		}
+
+		wrappedChanID, err := scval.WrapScBytes(chanIDBytes)
+		if err != nil {
+			return xdr.ScVal{}, err
+		}
+
+		chanIDScVec = append(chanIDScVec, wrappedChanID)
+
 	}
 
-	channelID, err := scval.WrapScBytes(s.ChannelID)
-
+	chanIDs, err := scval.WrapScVec(chanIDScVec)
 	if err != nil {
 		return xdr.ScVal{}, err
 	}
+
 	balances, err := s.Balances.ToScVal()
 	if err != nil {
 		return xdr.ScVal{}, err
@@ -74,7 +92,7 @@ func (s State) ToScVal() (xdr.ScVal, error) {
 			SymbolStateVersion,
 			SymbolStateFinalized,
 		},
-		[]xdr.ScVal{channelID, balances, version, finalized},
+		[]xdr.ScVal{chanIDs, balances, version, finalized},
 	)
 	if err != nil {
 		return xdr.ScVal{}, err
@@ -95,13 +113,25 @@ func (s *State) FromScVal(v xdr.ScVal) error {
 		return err
 	}
 
-	channelID, ok := channelIDVal.GetBytes()
+	channelIDVec, ok := channelIDVal.GetVec()
 	if !ok {
 		return errors.New("expected bytes decoding channel id")
 	}
-	if len(channelID) != ChannelIDLength {
-		return errors.New("invalid channel id length")
+
+	for i := 0; i < len(*channelIDVec); i++ {
+
+		channelIDVal := (*channelIDVec)[i]
+		channelIDBytes, ok := channelIDVal.GetBytes()
+		if !ok {
+			return errors.New("expected bytes decoding channel id")
+		}
+
+		if len(channelIDBytes) != ChannelIDLength {
+			return errors.New("invalid channel id length")
+		}
+
 	}
+
 	balancesVal, err := GetMapValue(scval.MustWrapScSymbol(SymbolStateBalances), *m)
 	if err != nil {
 		return err
@@ -126,7 +156,7 @@ func (s *State) FromScVal(v xdr.ScVal) error {
 	if !ok {
 		return errors.New("expected bool")
 	}
-	s.ChannelID = channelID
+	s.ChannelID = *channelIDVec
 	s.Balances = balances
 	s.Version = version
 	s.Finalized = finalized
@@ -187,9 +217,17 @@ func MakeState(state channel.State) (State, error) {
 	}
 
 	chanIDStellar := state.ID[wtypes.StellarBackendID]
+	chanIDVec := xdr.ScVec{}
+
+	chanIDBytes := xdr.ScBytes(chanIDStellar[:])
+	chanIDVal, err := scval.WrapScBytes(chanIDBytes)
+	if err != nil {
+		return State{}, err
+	}
+	chanIDVec = append(chanIDVec, chanIDVal)
 
 	return State{
-		ChannelID: chanIDStellar[:],
+		ChannelID: chanIDVec,
 		Balances:  balances,
 		Version:   xdr.Uint64(state.Version),
 		Finalized: state.IsFinal,
@@ -237,9 +275,29 @@ func parseBackendID(key xdr.ScVal) (wallet.BackendID, error) {
 }
 
 func ToState(stellarState State) (channel.State, error) {
-	ChanID, err := scBytesToByteArray(stellarState.ChannelID)
-	if err != nil {
-		return channel.State{}, err
+	chanIDMap := make(map[wallet.BackendID][types.HashLenXdr]byte)
+
+	offset := 1
+	if len(stellarState.ChannelID) == 1 {
+		offset = 2
+	}
+
+	for i, chanID := range stellarState.ChannelID {
+
+		fmt.Println("chanid: ", chanID)
+
+		chanIDBytes, ok := chanID.GetBytes()
+		if !ok {
+			return channel.State{}, errors.New("expected bytes decoding channel id")
+		}
+
+		chanID, err := scBytesToByteArray(chanIDBytes)
+		if err != nil {
+			return channel.State{}, err
+		}
+
+		chanIDMap[wallet.BackendID(i+offset)] = chanID
+
 	}
 
 	var balsABigInt []*big.Int
@@ -275,9 +333,6 @@ func ToState(stellarState State) (channel.State, error) {
 	if err != nil {
 		return channel.State{}, err
 	}
-
-	chanIDMap := make(map[wallet.BackendID][types.HashLenXdr]byte)
-	chanIDMap[wtypes.StellarBackendID] = ChanID
 
 	PerunState := channel.State{ID: chanIDMap,
 		Version:    uint64(stellarState.Version),
