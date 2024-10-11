@@ -20,7 +20,6 @@ import (
 	"errors"
 	xdr3 "github.com/stellar/go-xdr/xdr3"
 	"github.com/stellar/go/xdr"
-	"log"
 	"math/big"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/wallet"
@@ -31,16 +30,22 @@ import (
 
 var MaxBalance = new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 127), big.NewInt(1))
 
+// Tokens field:
+// multiasset case xdr.ScAddress -> xdr.ScVec{xdr.ScAddress1, xdr.ScAddress2} (Stellar MultiAsset)
+// crossasset case xdr.ScAddress -> xdR.ScVec{xdr.ScMap{xdr.ScAddress, Int}, xdr.ScMap{xdr.ScBytes, Int}} for Stellar (xdr.ScAddress), Ethereum (xdr.ScBytes) respectively
 type Balances struct {
 	BalA   xdr.ScVec //{xdr.Int128Parts, xdr.Int128Parts}
 	BalB   xdr.ScVec //{xdr.Int128Parts, xdr.Int128Parts}
-	Tokens xdr.ScVec // multiasset xdr.ScAddress -> xdr.ScVec{xdr.ScAddress1, xdr.ScAddress2}
+	Tokens xdr.ScVec
 }
 
 const (
 	SymbolBalancesBalA   xdr.ScSymbol = "bal_a"
 	SymbolBalancesBalB   xdr.ScSymbol = "bal_b"
 	SymbolBalancesTokens xdr.ScSymbol = "tokens"
+
+	SymbolTokensAddress xdr.ScSymbol = "address"
+	SymbolTokensChain   xdr.ScSymbol = "chain"
 )
 
 func (b Balances) ToScVal() (xdr.ScVal, error) {
@@ -152,6 +157,94 @@ func (b *Balances) UnmarshalBinary(data []byte) error {
 	return err
 }
 
+func MakeTokens(assets []channel.Asset) (xdr.ScVec, error) {
+	var tokens xdr.ScVec
+	for _, ast := range assets {
+		switch asset := ast.(type) {
+		case *types.StellarAsset:
+			LidMapKey := asset.LedgerID().MapKey()
+
+			lidval := xdr.ScString(LidMapKey)
+
+			sa, err := types.ToStellarAsset(asset)
+			if err != nil {
+				return xdr.ScVec{}, err
+			}
+			token, err := sa.MakeScAddress()
+			if err != nil {
+				return xdr.ScVec{}, err
+			}
+
+			tokenAddrVal, err := scval.MustWrapScAddress(token)
+			if err != nil {
+				return xdr.ScVec{}, err
+			}
+
+			tokenChainVal, err := scval.MustWrapScString(lidval)
+			if err != nil {
+				return xdr.ScVec{}, err
+			}
+
+			tokenMap, err := MakeSymbolScMap(
+				[]xdr.ScSymbol{
+					SymbolTokensAddress,
+					SymbolTokensChain,
+				},
+				[]xdr.ScVal{tokenAddrVal, tokenChainVal},
+			)
+			if err != nil {
+				return xdr.ScVec{}, err
+			}
+
+			tokenMapVal, err := scval.WrapScMap(tokenMap)
+			if err != nil {
+				return xdr.ScVec{}, err
+			}
+
+			tokens = append(tokens, tokenMapVal)
+
+		case *types.EthAsset:
+			LidMapKey := asset.LedgerID().MapKey()
+
+			lidval := xdr.ScString(LidMapKey)
+
+			ethAddrBytes := asset.EthAddress().Bytes()
+
+			tokenAddrBytesVal, err := scval.MustWrapScBytes(ethAddrBytes)
+			if err != nil {
+				return xdr.ScVec{}, err
+			}
+
+			tokenChainVal, err := scval.MustWrapScString(lidval)
+			if err != nil {
+				return xdr.ScVec{}, err
+			}
+
+			tokenMap, err := MakeSymbolScMap(
+				[]xdr.ScSymbol{
+					SymbolTokensAddress,
+					SymbolTokensChain,
+				},
+				[]xdr.ScVal{tokenAddrBytesVal, tokenChainVal},
+			)
+			if err != nil {
+				return xdr.ScVec{}, err
+			}
+
+			tokenMapVal, err := scval.WrapScMap(tokenMap)
+			if err != nil {
+				return xdr.ScVec{}, err
+			}
+
+			tokens = append(tokens, tokenMapVal)
+
+		default:
+			return xdr.ScVec{}, errors.New("unexpected asset type")
+		}
+	}
+	return tokens, nil
+}
+
 func MakeBalances(alloc channel.Allocation) (Balances, error) {
 	if err := alloc.Valid(); err != nil {
 		return Balances{}, err
@@ -160,28 +253,9 @@ func MakeBalances(alloc channel.Allocation) (Balances, error) {
 		return Balances{}, errors.New("expected no locked funds")
 	}
 	assets := alloc.Assets
-	var tokens xdr.ScVec
-	for i, ast := range assets {
-		_, ok := ast.(*types.StellarAsset)
-		if !ok {
-			return Balances{}, errors.New("expected stellar asset")
-		}
-		sa, err := types.ToStellarAsset(assets[i])
-		if err != nil {
-			return Balances{}, err
-		}
-		token, err := sa.MakeScAddress()
-		if err != nil {
-			return Balances{}, err
-		}
-
-		tokenVal, err := scval.MustWrapScAddress(token)
-		if err != nil {
-			log.Println("Error wrapping token address")
-			return Balances{}, err
-		}
-
-		tokens = append(tokens, tokenVal)
+	tokens, err := MakeTokens(assets)
+	if err != nil {
+		return Balances{}, err
 	}
 
 	numParts := alloc.NumParts()

@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/common"
 	xdr3 "github.com/stellar/go-xdr/xdr3"
 	"github.com/stellar/go/xdr"
 	"math/big"
@@ -349,34 +350,100 @@ func ToState(stellarState State) (channel.State, error) {
 	return PerunState, nil
 }
 
-func convertAsset(contractID xdr.ScAddress) (channel.Asset, error) {
-	stellarAsset, err := types.NewStellarAssetFromScAddress(contractID)
-	if err != nil {
-		return nil, err
-	}
-	return stellarAsset, nil
-}
+// func convertAsset(contractID xdr.ScAddress) (channel.Asset, error) {
+// 	stellarAsset, err := types.NewStellarAssetFromScAddress(contractID)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return stellarAsset, nil
+// }
 
-func convertAssets(contractIDs xdr.ScVec) ([]channel.Asset, error) {
+func convertAssets(tokens xdr.ScVec) ([]channel.Asset, error) {
 
 	var assets []channel.Asset
 
-	for _, val := range contractIDs {
-		contractID, ok := val.GetAddress()
+	for _, val := range tokens {
+
+		tokenMap, ok := val.GetMap()
+
 		if !ok {
-			return nil, errors.New("could not turn value into address")
+			return nil, errors.New("could not turn value into map")
 		}
-		if contractID.Type != xdr.ScAddressTypeScAddressTypeContract {
-			return nil, errors.New("invalid address type")
+
+		if len(*tokenMap) != 2 {
+			return nil, errors.New("expected map of length 2")
 		}
-		asset, err := convertAsset(contractID)
+
+		tokenAddr, err := GetMapValue(scval.MustWrapScSymbol(SymbolTokensAddress), *tokenMap)
 		if err != nil {
 			return nil, err
 		}
 
-		assets = append(assets, asset)
+		switch tokenAddr.Type {
+		case xdr.ScValTypeScvAddress:
+			address, ok := tokenAddr.GetAddress()
+			if !ok {
+				return nil, errors.New("could not get address from token")
+			}
+			if address.Type != xdr.ScAddressTypeScAddressTypeContract {
+				return nil, errors.New("invalid address type for Stellar Asset Contract")
+			}
+
+			asset, err := types.NewStellarAssetFromScAddress(address)
+			if err != nil {
+				return nil, err
+			}
+
+			assets = append(assets, asset)
+
+		case xdr.ScValTypeScvBytes:
+			bytes, ok := tokenAddr.GetBytes()
+			if !ok {
+				return nil, errors.New("could not get bytes from token")
+			}
+			if len(bytes) != 20 {
+				return nil, errors.New("invalid byte length for EthAsset")
+			}
+
+			var ethAddrArray [20]byte
+
+			copy(ethAddrArray[:], bytes)
+
+			newEthgAddr := common.BytesToAddress(ethAddrArray[:])
+
+			ethAsset := types.NewAsset(big.NewInt(1), newEthgAddr)
+
+			assets = append(assets, ethAsset)
+
+		default:
+			return nil, errors.New("unexpected token address type")
+		}
 
 	}
 
 	return assets, nil
 }
+
+// func convertAssetsNotCross(contractIDs xdr.ScVec) ([]channel.Asset, error) {
+
+// 	var assets []channel.Asset
+
+// 	for _, val := range contractIDs {
+// 		contractID, ok := val.GetAddress()
+// 		if !ok {
+// 			return nil, errors.New("could not turn value into address")
+// 		}
+// 		if contractID.Type != xdr.ScAddressTypeScAddressTypeContract {
+// 			return nil, errors.New("invalid address type")
+// 		}
+// 		asset, err := convertAsset(contractID)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+
+// 		assets = append(assets, asset)
+
+// 	}
+
+// 	return assets, nil
+// }
