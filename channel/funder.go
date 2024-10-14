@@ -194,6 +194,9 @@ func (f *Funder) openChannel(ctx context.Context, req pchannel.FundingReq) error
 		return errors.New("error while opening channel in party A")
 	}
 	_, err = f.cb.GetChannelInfo(ctx, f.perunAddr, req.State.ID[wtypes.StellarBackendID])
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

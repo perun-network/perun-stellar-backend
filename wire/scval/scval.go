@@ -91,8 +91,20 @@ func WrapScString(str xdr.ScString) (xdr.ScVal, error) {
 	return xdr.NewScVal(xdr.ScValTypeScvString, str)
 }
 
+func WrapScUint64(ui xdr.Uint64) (xdr.ScVal, error) {
+	return xdr.NewScVal(xdr.ScValTypeScvU64, ui)
+}
+
 func MustWrapScString(str xdr.ScString) (xdr.ScVal, error) {
 	v, err := WrapScString(str)
+	if err != nil {
+		return xdr.ScVal{}, err
+	}
+	return v, nil
+}
+
+func MustWrapScUint64(ui xdr.Uint64) (xdr.ScVal, error) {
+	v, err := WrapScUint64(ui)
 	if err != nil {
 		return xdr.ScVal{}, err
 	}

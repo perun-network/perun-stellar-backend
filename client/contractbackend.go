@@ -9,7 +9,6 @@ import (
 	"github.com/stellar/go/protocols/horizon"
 	"github.com/stellar/go/txnbuild"
 	"github.com/stellar/go/xdr"
-	"log"
 	"perun.network/go-perun/wallet"
 	chTypes "perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/wallet/types"
@@ -187,32 +186,25 @@ func (c *ContractBackend) InvokeSignedTx(fname string, callTxArgs xdr.ScVec, con
 	defer c.cbMutex.Unlock()
 	fnameXdr := xdr.ScSymbol(fname)
 	hzAcc, err := c.tr.GetHorizonAccount()
-	log.Println("hzAcc: ", hzAcc)
 	if err != nil {
 		return xdr.TransactionMeta{}, err
 	}
 
 	hzClient := c.tr.GetHorizonClient()
-	log.Println("hzClient: ", hzClient)
 
 	c.tr.sender.SetHzClient(hzClient)
 	invokeHostFunctionOp := BuildContractCallOp(hzAcc, fnameXdr, callTxArgs, contractAddr)
-	log.Println("invokeHostFunctionOp: ", invokeHostFunctionOp)
 	preFlightOp, minFee, err := PreflightHostFunctions(hzClient, &hzAcc, *invokeHostFunctionOp)
-	log.Println("preFlightOp: ", preFlightOp)
 	if err != nil {
 		return xdr.TransactionMeta{}, err
 	}
 	minFeeCustom := int64(100)
 	txParams := GetBaseTransactionParamsWithFee(&hzAcc, minFee+minFeeCustom, &preFlightOp)
-	log.Println("txParams: ", txParams)
 	txUnsigned, err := txnbuild.NewTransaction(txParams)
-	log.Println("txUnsigned: ", txUnsigned)
 	if err != nil {
 		return xdr.TransactionMeta{}, err
 	}
 	txMeta, err := c.tr.sender.SignSendTx(*txUnsigned)
-	log.Println("txMeta2: ", txMeta)
 
 	if err != nil {
 		return xdr.TransactionMeta{}, err
