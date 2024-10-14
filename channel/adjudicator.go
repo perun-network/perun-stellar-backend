@@ -24,6 +24,7 @@ import (
 	pwallet "perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/wallet"
+	wtypes "perun.network/perun-stellar-backend/wallet/types"
 	"time"
 )
 
@@ -70,9 +71,15 @@ func (a *Adjudicator) GetAssetAddrs() []xdr.ScAddress {
 	return addrs
 }
 
-func (a *Adjudicator) Subscribe(ctx context.Context, cid pchannel.ID) (pchannel.AdjudicatorSubscription, error) {
+func (a *Adjudicator) Subscribe(ctx context.Context, cidMap map[pwallet.BackendID]pchannel.ID) (pchannel.AdjudicatorSubscription, error) {
 	perunAddr := a.GetPerunAddr()
 	assetAddrs := a.GetAssetAddrs()
+
+	cid, ok := cidMap[wtypes.StellarBackendID]
+	if !ok {
+		return nil, errors.New("channel ID not found")
+	}
+
 	return NewAdjudicatorSub(ctx, cid, a.CB, perunAddr, assetAddrs, a.challengeDuration)
 }
 
@@ -82,7 +89,7 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 		log.Println("Withdraw called by Adjudicator")
 
 		if err := a.Close(ctx, req.Tx.State, req.Tx.Sigs); err != nil {
-			chanControl, errChanState := a.CB.GetChannelInfo(ctx, a.perunAddr, req.Tx.State.ID)
+			chanControl, errChanState := a.CB.GetChannelInfo(ctx, a.perunAddr, req.Tx.State.ID[wtypes.StellarBackendID])
 			if errChanState != nil {
 				return errChanState
 			}
@@ -144,7 +151,7 @@ func (a *Adjudicator) Dispute(ctx context.Context, state *pchannel.State, sigs [
 }
 
 func (a *Adjudicator) ForceClose(ctx context.Context, state *pchannel.State, sigs []pwallet.Sig) error {
-	return a.CB.ForceClose(ctx, a.perunAddr, state.ID)
+	return a.CB.ForceClose(ctx, a.perunAddr, state.ID[wtypes.StellarBackendID])
 }
 
 func (a Adjudicator) Progress(ctx context.Context, req pchannel.ProgressReq) error {

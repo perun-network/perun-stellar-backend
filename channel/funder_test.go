@@ -18,11 +18,31 @@ package channel_test
 
 import (
 	"github.com/stretchr/testify/require"
+	"log"
 	pchannel "perun.network/go-perun/channel"
 	pwallet "perun.network/go-perun/wallet"
 	chtest "perun.network/perun-stellar-backend/channel/test"
 	"testing"
 )
+
+func TestCrossChainFunding_Happy(t *testing.T) {
+	setup := chtest.NewTestSetup(t)
+	stellarAsset := setup.GetTokenAsset()
+	accs := setup.GetAccounts()
+	addrAlice := accs[0].Address()
+	addrBob := accs[1].Address()
+	// here need ethereum address and stellar address
+	addrList := []pwallet.Address{addrAlice, addrBob}
+
+	perunParams, perunState := chtest.NewParamsWithAddressStateWithAsset(t, addrList, stellarAsset)
+	freqAlice := pchannel.NewFundingReq(perunParams, perunState, 0, perunState.Balances)
+	freqBob := pchannel.NewFundingReq(perunParams, perunState, 1, perunState.Balances)
+	freqs := []*pchannel.FundingReq{freqAlice, freqBob}
+	funders := setup.GetFunders()
+	ctx := setup.NewCtx(chtest.DefaultTestTimeout)
+	err := chtest.FundAll(ctx, funders, freqs)
+	require.NoError(t, err)
+}
 
 func TestFunding_Happy(t *testing.T) {
 	setup := chtest.NewTestSetup(t)
@@ -55,5 +75,6 @@ func TestFunding_TimeoutNotFunded(t *testing.T) {
 	funders := setup.GetFunders()
 	ctxTimeout := setup.NewCtx(chtest.DefaultTestTimeout)
 	gotErr := funders[0].Fund(ctxTimeout, *freqs[0])
+	log.Println(gotErr)
 	require.True(t, pchannel.IsFundingTimeoutError(gotErr))
 }

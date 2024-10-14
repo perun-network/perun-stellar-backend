@@ -15,6 +15,7 @@
 package channel
 
 import (
+	"log"
 	"math/rand"
 
 	"perun.network/go-perun/channel"
@@ -43,7 +44,8 @@ func (a AppID) Equal(b channel.AppID) bool {
 func (a AppID) Key() channel.AppIDKey {
 	b, err := a.MarshalBinary()
 	if err != nil {
-		panic(err)
+		log.Fatalln(err)
+		return "0"
 	}
 	return channel.AppIDKey(b)
 }

@@ -20,24 +20,24 @@ func WrapTrue() (xdr.ScVal, error) {
 	return xdr.NewScVal(xdr.ScValTypeScvBool, true)
 }
 
-func MustWrapTrue() xdr.ScVal {
+func MustWrapTrue() (xdr.ScVal, error) {
 	v, err := WrapTrue()
 	if err != nil {
-		panic(err)
+		return xdr.ScVal{}, err
 	}
-	return v
+	return v, nil
 }
 
 func WrapFalse() (xdr.ScVal, error) {
 	return xdr.NewScVal(xdr.ScValTypeScvBool, false)
 }
 
-func MustWrapFalse() xdr.ScVal {
+func MustWrapFalse() (xdr.ScVal, error) {
 	v, err := WrapFalse()
 	if err != nil {
-		panic(err)
+		return xdr.ScVal{}, err
 	}
-	return v
+	return v, nil
 }
 
 func WrapBool(b bool) (xdr.ScVal, error) {
@@ -48,7 +48,7 @@ func WrapBool(b bool) (xdr.ScVal, error) {
 	}
 }
 
-func MustWrapBool(b bool) xdr.ScVal {
+func MustWrapBool(b bool) (xdr.ScVal, error) {
 	if b {
 		return MustWrapTrue()
 	} else {

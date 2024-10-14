@@ -15,34 +15,96 @@
 package types
 
 import (
+	"encoding/hex"
 	"errors"
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/xdr"
+	"log"
 	"perun.network/go-perun/channel"
+	"perun.network/go-perun/channel/multi"
 )
 
 const HashLenXdr = 32
 
-type StellarAsset struct {
-	contractID xdr.Hash
+type (
+	Asset struct {
+		contractID xdr.Hash
+	}
+	StellarAsset struct {
+		Asset Asset
+		id    CCID
+	}
+	CCID struct {
+		BackendID uint32
+		LedgerId  ContractLID
+	}
+
+	ContractLID struct{ *string }
+)
+
+// MakeContractID makes a ChainID for the given id.
+func MakeContractID(id string) ContractLID {
+	return ContractLID{&id}
 }
 
-func (s StellarAsset) ContractID() xdr.Hash {
-	return s.contractID
+// MakeCCID makes a CCID for the given id.
+func MakeCCID(ledgerID ContractLID) CCID {
+	return CCID{2, ledgerID}
+}
+
+// UnmarshalBinary unmarshals the contractID from its binary representation.
+func (id *ContractLID) UnmarshalBinary(data []byte) error {
+	str := hex.EncodeToString(data) // Convert binary data to hex string
+	id.string = &str
+	return nil
+}
+
+// MarshalBinary marshals the contractID into its binary representation.
+func (id ContractLID) MarshalBinary() ([]byte, error) {
+	if id.string == nil {
+		return nil, errors.New("nil ContractID")
+	}
+	return hex.DecodeString(*id.string)
+}
+
+func (id ContractLID) MapKey() multi.LedgerIDMapKey {
+	if id.string == nil {
+		return ""
+	}
+	return multi.LedgerIDMapKey(*id.string)
+}
+
+func (a Asset) ContractID() xdr.Hash {
+	return a.contractID
 }
 
 func NewStellarAsset(contractID xdr.Hash) *StellarAsset {
-	return &StellarAsset{contractID: contractID}
+	return &StellarAsset{Asset: Asset{contractID}, id: MakeCCID(MakeContractID("2"))}
 }
 
 func (s StellarAsset) MarshalBinary() (data []byte, err error) {
-	return s.contractID.MarshalBinary()
+	return s.Asset.MarshalBinary()
 }
 
 func (s *StellarAsset) UnmarshalBinary(data []byte) error {
 	var addr [HashLenXdr]byte
 	copy(addr[:], data)
-	err := s.contractID.UnmarshalBinary(data)
+	err := s.Asset.UnmarshalBinary(data)
+	if err != nil {
+		return errors.New("could not unmarshal contract id")
+	}
+	s.id = MakeCCID(MakeContractID("2"))
+	return nil
+}
+
+func (a Asset) MarshalBinary() (data []byte, err error) {
+	return a.contractID.MarshalBinary()
+}
+
+func (a *Asset) UnmarshalBinary(data []byte) error {
+	var addr [HashLenXdr]byte
+	copy(addr[:], data)
+	err := a.contractID.UnmarshalBinary(data)
 	if err != nil {
 		return errors.New("could not unmarshal contract id")
 	}
@@ -54,8 +116,38 @@ func (s StellarAsset) Equal(asset channel.Asset) bool {
 	return ok
 }
 
+func (a Asset) Equal(asset channel.Asset) bool {
+	_, ok := asset.(*Asset)
+	return ok
+}
+
+func (s StellarAsset) Address() string {
+	return s.Asset.Address()
+}
+
+func (a Asset) Address() string {
+	return a.contractID.HexString()
+
+}
+
+// MapKey returns the asset's map key representation.
+func (a StellarAsset) MapKey() AssetMapKey {
+	d, err := a.MarshalBinary()
+	if err != nil {
+		log.Fatalf("could not marshal asset: %v", err)
+		return ""
+	}
+
+	return AssetMapKey(d)
+}
+
+// LedgerID returns the ledger ID the asset lives on.
+func (a StellarAsset) LedgerID() multi.LedgerID {
+	return &a.id.LedgerId
+}
+
 func (s StellarAsset) MakeScAddress() (xdr.ScAddress, error) {
-	hash := s.contractID
+	hash := s.Asset.contractID
 	scvAddr, err := MakeContractAddress(hash)
 	if err != nil {
 		return xdr.ScAddress{}, errors.New("could not generate contract address")
@@ -69,7 +161,8 @@ func (s *StellarAsset) FromScAddress(address xdr.ScAddress) error {
 		return errors.New("invalid address type")
 	}
 
-	s.contractID = *address.ContractId
+	s.Asset.contractID = *address.ContractId
+	s.id = MakeCCID(MakeContractID("2"))
 	return nil
 }
 
@@ -79,6 +172,7 @@ func NewStellarAssetFromScAddress(address xdr.ScAddress) (*StellarAsset, error) 
 	if err != nil {
 		return nil, err
 	}
+	s.id = MakeCCID(MakeContractID("2"))
 	return s, nil
 }
 

@@ -22,22 +22,32 @@ import (
 	"github.com/stellar/go/xdr"
 	"math/big"
 	"perun.network/go-perun/channel"
+	"perun.network/go-perun/channel/multi"
+	"perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/channel/types"
+	wtypes "perun.network/perun-stellar-backend/wallet/types"
 	"perun.network/perun-stellar-backend/wire/scval"
+	"strconv"
 )
 
 var MaxBalance = new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 127), big.NewInt(1))
 
+// Tokens field:
+// multiasset case xdr.ScAddress -> xdr.ScVec{xdr.ScAddress1, xdr.ScAddress2} (Stellar MultiAsset)
+// crossasset case xdr.ScAddress -> xdR.ScVec{xdr.ScMap{xdr.ScAddress, Int}, xdr.ScMap{xdr.ScBytes, Int}} for Stellar (xdr.ScAddress), Ethereum (xdr.ScBytes) respectively
 type Balances struct {
 	BalA   xdr.ScVec //{xdr.Int128Parts, xdr.Int128Parts}
 	BalB   xdr.ScVec //{xdr.Int128Parts, xdr.Int128Parts}
-	Tokens xdr.ScVec // multiasset xdr.ScAddress -> xdr.ScVec{xdr.ScAddress1, xdr.ScAddress2}
+	Tokens xdr.ScVec
 }
 
 const (
 	SymbolBalancesBalA   xdr.ScSymbol = "bal_a"
 	SymbolBalancesBalB   xdr.ScSymbol = "bal_b"
 	SymbolBalancesTokens xdr.ScSymbol = "tokens"
+
+	SymbolTokensAddress xdr.ScSymbol = "address"
+	SymbolTokensChain   xdr.ScSymbol = "chain"
 )
 
 func (b Balances) ToScVal() (xdr.ScVal, error) {
@@ -149,6 +159,108 @@ func (b *Balances) UnmarshalBinary(data []byte) error {
 	return err
 }
 
+func extractAndConvertLedgerID(asset interface{}) (uint64, error) {
+	var lidMapKey multi.LedgerIDMapKey
+
+	switch asset := asset.(type) {
+	case *types.StellarAsset:
+		lidMapKey = asset.LedgerID().MapKey()
+	case *types.EthAsset:
+		lidMapKey = asset.LedgerID().MapKey()
+	default:
+		return 0, errors.New("unknown asset type")
+	}
+
+	lidval, err := strconv.ParseUint(string(lidMapKey), 10, 64)
+	if err != nil {
+		return 0, errors.New("invalid Ledger ID format")
+	}
+
+	return lidval, nil
+}
+
+func MakeTokens(assets []channel.Asset) (xdr.ScVec, error) {
+	var tokens xdr.ScVec
+
+	for _, ast := range assets {
+		lidvalXdr, err := extractAndConvertLedgerID(ast)
+		if err != nil {
+			return xdr.ScVec{}, err
+		}
+		lidvalXdrValue := xdr.Uint64(lidvalXdr)
+
+		var tokenAddrVal xdr.ScVal
+		var tokenAddrSymbol xdr.ScSymbol
+
+		switch asset := ast.(type) {
+		case *types.StellarAsset:
+			tokenAddrSymbol = "Stellar"
+
+			sa, err := types.ToStellarAsset(asset)
+			if err != nil {
+				return xdr.ScVec{}, err
+			}
+			token, err := sa.MakeScAddress()
+			if err != nil {
+				return xdr.ScVec{}, err
+			}
+
+			tokenAddrVal, err = scval.MustWrapScAddress(token)
+			if err != nil {
+				return xdr.ScVec{}, err
+			}
+
+		case *types.EthAsset:
+			tokenAddrSymbol = "Eth"
+
+			tokenAddrVal, err = scval.MustWrapScBytes(asset.EthAddress().Bytes())
+			if err != nil {
+				return xdr.ScVec{}, err
+			}
+
+		default:
+			return xdr.ScVec{}, errors.New("unexpected asset type")
+		}
+
+		tokenAddrSymVal := scval.MustWrapScSymbol(tokenAddrSymbol)
+
+		tokenAddrVecVal, err := scval.WrapVec(xdr.ScVec{tokenAddrSymVal, tokenAddrVal})
+		if err != nil {
+			return xdr.ScVec{}, err
+		}
+
+		tokenChainVal, err := scval.MustWrapScUint64(lidvalXdrValue)
+		if err != nil {
+			return xdr.ScVec{}, err
+		}
+
+		tokenMap, err := MakeSymbolScMap(
+			[]xdr.ScSymbol{SymbolTokensAddress, SymbolTokensChain},
+			[]xdr.ScVal{tokenAddrVecVal, tokenChainVal},
+		)
+		if err != nil {
+			return xdr.ScVec{}, err
+		}
+
+		tokenMapVal, err := scval.WrapScMap(tokenMap)
+		if err != nil {
+			return xdr.ScVec{}, err
+		}
+
+		tokens = append(tokens, tokenMapVal)
+	}
+
+	tokenCrossSym := xdr.ScSymbol("Cross")
+	tokenCrossSymVal := scval.MustWrapScSymbol(tokenCrossSym)
+
+	tokensVecVal, err := scval.WrapVec(tokens)
+	if err != nil {
+		return xdr.ScVec{}, err
+	}
+
+	return xdr.ScVec{tokenCrossSymVal, tokensVecVal}, nil
+}
+
 func MakeBalances(alloc channel.Allocation) (Balances, error) {
 	if err := alloc.Valid(); err != nil {
 		return Balances{}, err
@@ -157,24 +269,9 @@ func MakeBalances(alloc channel.Allocation) (Balances, error) {
 		return Balances{}, errors.New("expected no locked funds")
 	}
 	assets := alloc.Assets
-	var tokens xdr.ScVec
-	for i, ast := range assets {
-		_, ok := ast.(*types.StellarAsset)
-		if !ok {
-			return Balances{}, errors.New("expected stellar asset")
-		}
-		sa, err := types.ToStellarAsset(assets[i])
-		if err != nil {
-			return Balances{}, err
-		}
-		token, err := sa.MakeScAddress()
-		if err != nil {
-			return Balances{}, err
-		}
-
-		tokenVal := scval.MustWrapScAddress(token)
-
-		tokens = append(tokens, tokenVal)
+	tokens, err := MakeTokens(assets)
+	if err != nil {
+		return Balances{}, err
 	}
 
 	numParts := alloc.NumParts()
@@ -224,61 +321,6 @@ func MakeBalances(alloc channel.Allocation) (Balances, error) {
 	}, nil
 }
 
-func ToAllocation(b Balances) (*channel.Allocation, error) {
-
-	var balsPart xdr.ScVal
-
-	var stAssets []channel.Asset
-
-	var alloc *channel.Allocation
-
-	// iterate for asset addresses inside allocation
-
-	for i, val := range b.Tokens {
-
-		balsPart = b.BalA[i]
-		token, ok := val.GetAddress()
-		if !ok {
-			return nil, errors.New("expected address")
-		}
-
-		stAsset, err := types.NewStellarAssetFromScAddress(token)
-		if err != nil {
-			return nil, err
-		}
-
-		stAssets = append(stAssets, stAsset)
-
-	}
-
-	alloc = channel.NewAllocation(2, stAssets...)
-
-	for i, _ := range b.Tokens {
-		balsPartVec := *balsPart.MustVec()
-
-		for _, val := range balsPartVec {
-			bal, ok := val.GetI128()
-			if !ok {
-				return nil, errors.New("expected i128")
-			}
-
-			balInt, err := ToBigInt(bal)
-			if err != nil {
-				return nil, err
-			}
-
-			alloc.SetBalance(channel.Index(i), stAssets[i], balInt)
-
-		}
-
-	}
-
-	if err := alloc.Valid(); err != nil {
-		return nil, err
-	}
-	return alloc, nil
-}
-
 // MakeInt128Parts converts a big.Int to xdr.Int128Parts.
 // It returns an error if the big.Int is negative or too large.
 func MakeInt128Parts(i *big.Int) (xdr.Int128Parts, error) {
@@ -305,19 +347,6 @@ func ToBigInt(i xdr.Int128Parts) (*big.Int, error) {
 	return new(big.Int).SetBytes(b), nil
 }
 
-func makeAllocation(asset channel.Asset, balA, balB *big.Int) (*channel.Allocation, error) {
-	alloc := channel.NewAllocation(2, asset)
-	alloc.SetBalance(0, asset, balA)
-	alloc.SetBalance(1, asset, balB)
-	alloc.Locked = make([]channel.SubAlloc, 0)
-
-	if err := alloc.Valid(); err != nil {
-		return nil, err
-	}
-
-	return alloc, nil
-}
-
 func makeAllocationMulti(assets []channel.Asset, balsA, balsB []*big.Int) (*channel.Allocation, error) {
 
 	if len(balsA) != len(balsB) {
@@ -330,7 +359,10 @@ func makeAllocationMulti(assets []channel.Asset, balsA, balsB []*big.Int) (*chan
 
 	numParts := 2
 
-	alloc := channel.NewAllocation(numParts, assets...)
+	// TODO might be mixed backends
+	backendIDs := make([]wallet.BackendID, wtypes.StellarBackendID)
+
+	alloc := channel.NewAllocation(numParts, backendIDs, assets...)
 
 	for i, _ := range assets {
 		alloc.Balances[i] = []*big.Int{balsA[i], balsB[i]}

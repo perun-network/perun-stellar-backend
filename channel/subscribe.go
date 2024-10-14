@@ -48,7 +48,7 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 
 		case *event.CloseEvent:
 
-			log.Println("CloseEvent received - build ConcludedEvent")
+			log.Println("CloseEvent received - build ConcludedEvent, ", e.ID())
 
 			conclEvent := pchannel.AdjudicatorEventBase{
 				VersionV: e.Version(),

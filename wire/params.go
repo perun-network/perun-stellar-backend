@@ -19,10 +19,12 @@ import (
 	"errors"
 	xdr3 "github.com/stellar/go-xdr/xdr3"
 	"github.com/stellar/go/xdr"
+	"log"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/wallet/types"
 	"perun.network/perun-stellar-backend/wire/scval"
+	"strconv"
 )
 
 const NonceLength = 32
@@ -78,7 +80,7 @@ func (p Params) ToScVal() (xdr.ScVal, error) {
 func (p *Params) FromScVal(v xdr.ScVal) error {
 	m, ok := v.GetMap()
 	if !ok {
-		return errors.New("expected map")
+		return errors.New("expected map decoding Params")
 	}
 	if len(*m) != 4 {
 		return errors.New("expected map of length 4")
@@ -105,7 +107,7 @@ func (p *Params) FromScVal(v xdr.ScVal) error {
 	}
 	nonce, ok := nonceVal.GetBytes()
 	if !ok {
-		return errors.New("expected bytes")
+		return errors.New("expected bytes decoding nonce")
 	}
 	if len(nonce) != NonceLength {
 		return errors.New("invalid nonce length")
@@ -176,20 +178,24 @@ func MakeParams(params channel.Params) (Params, error) {
 		return Params{}, errors.New("expected exactly two participants")
 	}
 
-	participantA, err := types.ToParticipant(params.Parts[0])
+	participantA, err := types.ToParticipant(params.Parts[0][types.StellarBackendID])
 	if err != nil {
+		log.Println("Error in MakeParams: ", err)
 		return Params{}, err
 	}
 	a, err := MakeParticipant(*participantA)
 	if err != nil {
+		log.Println("Error2 in MakeParams: ", err)
 		return Params{}, err
 	}
-	participantB, err := types.ToParticipant(params.Parts[1])
+	participantB, err := types.ToParticipant(params.Parts[1][types.StellarBackendID])
 	if err != nil {
+		log.Println("Error3 in MakeParams: ", err)
 		return Params{}, err
 	}
 	b, err := MakeParticipant(*participantB)
 	if err != nil {
+		log.Println("Error4 in MakeParams: ", err)
 		return Params{}, err
 	}
 	nonce := MakeNonce(params.Nonce)
@@ -201,12 +207,26 @@ func MakeParams(params channel.Params) (Params, error) {
 	}, nil
 }
 
-func MustMakeParams(params channel.Params) Params {
+func MakeChannelId(state *channel.State) (xdr.ScMap, error) {
+	keys := make([]xdr.ScSymbol, 0, len(state.ID))
+	values := make([]xdr.ScVal, 0, len(state.ID))
+
+	for backendID, idArray := range state.ID {
+		key := xdr.ScSymbol(strconv.Itoa(int(backendID)))
+		keys = append(keys, key)
+		val, _ := scval.MustWrapScBytes(idArray[:])
+		values = append(values, val)
+	}
+
+	return MakeSymbolScMap(keys, values)
+}
+
+func MustMakeParams(params channel.Params) (Params, error) {
 	p, err := MakeParams(params)
 	if err != nil {
-		panic(err)
+		return Params{}, err
 	}
-	return p
+	return p, nil
 }
 
 func ToParams(params Params) (channel.Params, error) {
@@ -220,7 +240,10 @@ func ToParams(params Params) (channel.Params, error) {
 	}
 
 	challengeDuration := uint64(params.ChallengeDuration)
-	parts := []wallet.Address{&participantA, &participantB}
+	parts := []map[wallet.BackendID]wallet.Address{
+		{types.StellarBackendID: &participantA},
+		{types.StellarBackendID: &participantB},
+	}
 	app := channel.NoApp()
 	nonce := ToNonce(params.Nonce)
 	ledgerChannel := true

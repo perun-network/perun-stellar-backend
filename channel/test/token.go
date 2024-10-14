@@ -20,6 +20,8 @@ import (
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/xdr"
 	"github.com/stretchr/testify/require"
+	"log"
+	"math"
 	"perun.network/perun-stellar-backend/channel"
 	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/client"
@@ -73,10 +75,10 @@ func BuildInitTokenArgs(adminAddr xdr.ScAddress, decimals uint32, tokenName stri
 	}
 
 	tokenNameScString := xdr.ScString(tokenName)
-	tokenNameXdr := scval.MustWrapScString(tokenNameScString)
+	tokenNameXdr, _ := scval.MustWrapScString(tokenNameScString)
 
 	tokenSymbolString := xdr.ScString(tokenSymbol)
-	tokenSymbolXdr := scval.MustWrapScString(tokenSymbolString)
+	tokenSymbolXdr, _ := scval.MustWrapScString(tokenSymbolString)
 
 	initTokenArgs := xdr.ScVec{
 		adminScAddr,
@@ -90,7 +92,7 @@ func BuildInitTokenArgs(adminAddr xdr.ScAddress, decimals uint32, tokenName stri
 
 func InitTokenContract(kp *keypair.Full, contractIDAddress xdr.ScAddress) error {
 
-	cb := NewContractBackendFromKey(kp)
+	cb := NewContractBackendFromKey(kp, nil)
 
 	adminScAddr, err := types.MakeAccountAddress(kp)
 	if err != nil {
@@ -122,7 +124,7 @@ func InitTokenContract(kp *keypair.Full, contractIDAddress xdr.ScAddress) error 
 
 func GetTokenName(kp *keypair.Full, contractAddress xdr.ScAddress) error {
 
-	cb := NewContractBackendFromKey(kp)
+	cb := NewContractBackendFromKey(kp, nil)
 	TokenNameArgs := xdr.ScVec{}
 
 	_, err := cb.InvokeSignedTx("name", TokenNameArgs, contractAddress)
@@ -174,7 +176,7 @@ func BuildTransferTokenArgs(from xdr.ScAddress, to xdr.ScAddress, amount xdr.Int
 }
 
 func Deploy(t *testing.T, kp *keypair.Full, contractPath string) (xdr.ScAddress, xdr.Hash) {
-	deployerCB := NewContractBackendFromKey(kp)
+	deployerCB := NewContractBackendFromKey(kp, nil)
 	tr := deployerCB.GetTransactor()
 	hzClient := tr.GetHorizonClient()
 	deployerAccReq := horizonclient.AccountRequest{AccountID: kp.Address()}
@@ -183,20 +185,26 @@ func Deploy(t *testing.T, kp *keypair.Full, contractPath string) (xdr.ScAddress,
 	require.NoError(t, err)
 
 	installContractOpInstall := channel.AssembleInstallContractCodeOp(kp.Address(), contractPath)
-	preFlightOp, _ := client.PreflightHostFunctions(hzClient, &deployerAcc, *installContractOpInstall)
+	preFlightOp, minFeeInstall, err := client.PreflightHostFunctions(hzClient, &deployerAcc, *installContractOpInstall)
 
-	minFeeInstallCustom := 500000
-	txParamsInstall := client.GetBaseTransactionParamsWithFee(&deployerAcc, int64(minFeeInstallCustom), &preFlightOp)
+	require.NoError(t, err)
+
+	txParamsInstall := client.GetBaseTransactionParamsWithFee(&deployerAcc, int64(100)+minFeeInstall, &preFlightOp)
 	txSignedInstall, err := client.CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParamsInstall)
 	require.NoError(t, err)
 
 	_, err = hzClient.SubmitTransaction(txSignedInstall)
+	var hErr *horizonclient.Error
+	if errors.As(err, &hErr) {
+		log.Println(hErr.Problem, "fee: ", minFeeInstall)
+	}
 
 	require.NoError(t, err)
 
 	createContractOp := channel.AssembleCreateContractOp(kp.Address(), contractPath, "a1", client.NETWORK_PASSPHRASE)
-	preFlightOpCreate, _ := client.PreflightHostFunctions(hzClient, &deployerAcc, *createContractOp)
-	txParamsCreate := client.GetBaseTransactionParamsWithFee(&deployerAcc, int64(minFeeInstallCustom), &preFlightOpCreate)
+	preFlightOpCreate, minFeeDeploy, err := client.PreflightHostFunctions(hzClient, &deployerAcc, *createContractOp)
+	require.NoError(t, err)
+	txParamsCreate := client.GetBaseTransactionParamsWithFee(&deployerAcc, int64(100)+minFeeDeploy, &preFlightOpCreate)
 	txSignedCreate, err := client.CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParamsCreate)
 
 	require.NoError(t, err)
@@ -215,7 +223,11 @@ func Deploy(t *testing.T, kp *keypair.Full, contractPath string) (xdr.ScAddress,
 }
 
 func MintToken(kp *keypair.Full, contractAddr xdr.ScAddress, amount uint64, recipientAddr xdr.ScAddress) error {
-	cb := NewContractBackendFromKey(kp)
+	cb := NewContractBackendFromKey(kp, nil)
+
+	if amount > math.MaxInt64 {
+		return errors.New("amount represents negative number")
+	}
 
 	amountTo128Xdr := xdr.Int128Parts{Hi: 0, Lo: xdr.Uint64(amount)}
 

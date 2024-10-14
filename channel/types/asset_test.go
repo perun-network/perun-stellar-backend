@@ -35,7 +35,7 @@ func TestAssetMarshalAndUnmarshalBinary(t *testing.T) {
 	err = newAsset.UnmarshalBinary(data)
 	require.NoError(t, err)
 
-	require.Equal(t, asset.ContractID().HexString(), newAsset.ContractID().HexString(), "Mismatched ContractID. Expected %x, got %x", asset.ContractID(), newAsset.ContractID())
+	require.Equal(t, asset.Asset.ContractID().HexString(), newAsset.Asset.ContractID().HexString(), "Mismatched ContractID. Expected %x, got %x", asset.Asset.ContractID(), newAsset.Asset.ContractID())
 }
 
 func TestMakeAccountAddress(t *testing.T) {
