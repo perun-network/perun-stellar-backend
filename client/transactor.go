@@ -5,7 +5,6 @@ import (
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/txnbuild"
 	"github.com/stellar/go/xdr"
-	"log"
 )
 
 func CreateSignedTransactionWithParams(signers []*keypair.Full, txParams txnbuild.TransactionParams,
@@ -36,19 +35,16 @@ func NewSender(kp *keypair.Full) Sender {
 
 func (s *TxSender) SignSendTx(txUnsigned txnbuild.Transaction) (xdr.TransactionMeta, error) {
 	tx, err := txUnsigned.Sign(NETWORK_PASSPHRASE, s.kp)
-	log.Println("Signing tx", tx)
 	if err != nil {
 		return xdr.TransactionMeta{}, err
 
 	}
 
 	txSent, err := s.hzClient.SubmitTransaction(tx)
-	log.Println("Sent tx")
 	if err != nil {
 		return xdr.TransactionMeta{}, err
 	}
 	txMeta, err := DecodeTxMeta(txSent)
-	log.Println("Decoded tx meta", txMeta)
 	if err != nil {
 		return xdr.TransactionMeta{}, ErrCouldNotDecodeTxMeta
 	}

@@ -26,7 +26,6 @@ import (
 	"perun.network/perun-stellar-backend/wallet"
 	wtypes "perun.network/perun-stellar-backend/wallet/types"
 
-	"perun.network/perun-stellar-backend/wire"
 	"time"
 )
 
@@ -36,12 +35,12 @@ const DefaultPollingInterval = time.Duration(6) * time.Second
 type Funder struct {
 	cb              *client.ContractBackend
 	perunAddr       xdr.ScAddress
-	assetAddrs      xdr.ScVec
+	assetAddrs      []xdr.ScVec
 	maxIters        int
 	pollingInterval time.Duration
 }
 
-func NewFunder(acc *wallet.Account, contractBackend *client.ContractBackend, perunAddr xdr.ScAddress, assetAddrs xdr.ScVec) *Funder {
+func NewFunder(acc *wallet.Account, contractBackend *client.ContractBackend, perunAddr xdr.ScAddress, assetAddrs []xdr.ScVec) *Funder {
 	return &Funder{
 		cb:              contractBackend,
 		perunAddr:       perunAddr,
@@ -55,13 +54,8 @@ func (f *Funder) GetPerunAddr() xdr.ScAddress {
 	return f.perunAddr
 }
 
-func (f *Funder) GetAssetAddrs() []xdr.ScAddress {
-	var addrs []xdr.ScAddress
-	for _, addrScVal := range f.assetAddrs {
-		addr := addrScVal.MustAddress()
-		addrs = append(addrs, addr)
-	}
-	return addrs
+func (f *Funder) GetAssetAddrs() []xdr.ScVec {
+	return f.assetAddrs
 }
 
 func (f *Funder) Fund(ctx context.Context, req pchannel.FundingReq) error {
@@ -191,7 +185,7 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 func (f *Funder) openChannel(ctx context.Context, req pchannel.FundingReq) error {
 	err := f.cb.Open(ctx, f.perunAddr, req.Params, req.State)
 	if err != nil {
-		return errors.New("error while opening channel in party A")
+		return errors.Join(errors.New("error while opening channel in party A"), err)
 	}
 	_, err = f.cb.GetChannelInfo(ctx, f.perunAddr, req.State.ID[wtypes.StellarBackendID])
 	if err != nil {
@@ -202,14 +196,14 @@ func (f *Funder) openChannel(ctx context.Context, req pchannel.FundingReq) error
 
 func (f *Funder) FundChannel(ctx context.Context, state *pchannel.State, funderIdx bool) error {
 
-	balsStellar, err := wire.MakeBalances(state.Allocation)
+	/*balsStellar, err := wire.MakeBalances(state.Allocation)
 	if err != nil {
 		return errors.New("error while making balances")
 	}
 
 	if !containsAllAssets(balsStellar.Tokens, f.assetAddrs) {
 		return errors.New("asset address is not equal to the address stored in the state")
-	}
+	}*/
 
 	return f.cb.Fund(ctx, f.perunAddr, state.ID[wtypes.StellarBackendID], funderIdx)
 }

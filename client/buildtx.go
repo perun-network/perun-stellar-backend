@@ -84,12 +84,12 @@ func buildSignedStateTxArgs(state pchannel.State, sigs []pwallet.Sig) (xdr.ScVec
 		return xdr.ScVec{}, err
 	}
 
-	fundArgs := xdr.ScVec{
+	signedStateArgs := xdr.ScVec{
 		xdrState,
 		sigAXdr,
 		sigBXdr,
 	}
-	return fundArgs, nil
+	return signedStateArgs, nil
 }
 
 func BuildMintTokenArgs(mintTo xdr.ScAddress, amount xdr.ScVal) (xdr.ScVec, error) {

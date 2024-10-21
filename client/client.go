@@ -41,25 +41,23 @@ type keyHolder struct {
 }
 
 func (cb *ContractBackend) Open(ctx context.Context, perunAddr xdr.ScAddress, params *pchannel.Params, state *pchannel.State) error {
-	log.Println("Open called: ", params, state)
+	log.Println("Open called: ", params)
 	openTxArgs, err := buildOpenTxArgs(*params, *state)
 	if err != nil {
 		log.Println(err)
 		return errors.New("error while building open tx")
 	}
-	log.Println("OpenTxArgs: ", openTxArgs)
-	txMeta, err := cb.InvokeSignedTx("open", openTxArgs, perunAddr)
 
-	log.Println("TxMeta: ", txMeta)
+	txMeta, err := cb.InvokeSignedTx("open", openTxArgs, perunAddr)
 	if err != nil {
-		return errors.New("error while invoking and processing host function: open")
+		return errors.Join(errors.New("error while invoking and processing host function: open"), err)
 	}
 
 	evs, err := event.DecodeEventsPerun(txMeta)
 	if err != nil {
 		return err
 	}
-	log.Println("evs: ", evs)
+
 	err = event.AssertOpenEvent(evs)
 	if err != nil {
 		return err
@@ -128,7 +126,6 @@ func (cb *ContractBackend) Fund(ctx context.Context, perunAddr xdr.ScAddress, ch
 }
 
 func (cb *ContractBackend) Close(ctx context.Context, perunAddr xdr.ScAddress, state *pchannel.State, sigs []pwallet.Sig) error {
-
 	log.Println("Close called by ContractBackend")
 	closeTxArgs, err := buildSignedStateTxArgs(*state, sigs)
 	if err != nil {
@@ -194,13 +191,13 @@ func (cb *ContractBackend) ForceClose(ctx context.Context, perunAddr xdr.ScAddre
 }
 
 func (cb *ContractBackend) Dispute(ctx context.Context, perunAddr xdr.ScAddress, state *pchannel.State, sigs []pwallet.Sig) error {
-	closeTxArgs, err := buildSignedStateTxArgs(*state, sigs)
+	disputeTxArgs, err := buildSignedStateTxArgs(*state, sigs)
 	if err != nil {
-		return errors.New("error while building fund tx")
+		return errors.Join(errors.New("error while building dispute tx"), err)
 	}
-	txMeta, err := cb.InvokeSignedTx("dispute", closeTxArgs, perunAddr)
+	txMeta, err := cb.InvokeSignedTx("dispute", disputeTxArgs, perunAddr)
 	if err != nil {
-		return errors.New("error while invoking and processing host function: dispute")
+		return errors.Join(errors.New("error while invoking and processing host function: dispute"), err)
 	}
 	evs, err := event.DecodeEventsPerun(txMeta)
 

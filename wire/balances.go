@@ -20,6 +20,7 @@ import (
 	"errors"
 	xdr3 "github.com/stellar/go-xdr/xdr3"
 	"github.com/stellar/go/xdr"
+	"log"
 	"math/big"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/channel/multi"
@@ -32,13 +33,16 @@ import (
 
 var MaxBalance = new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 127), big.NewInt(1))
 
-// Tokens field:
-// multiasset case xdr.ScAddress -> xdr.ScVec{xdr.ScAddress1, xdr.ScAddress2} (Stellar MultiAsset)
-// crossasset case xdr.ScAddress -> xdR.ScVec{xdr.ScMap{xdr.ScAddress, Int}, xdr.ScMap{xdr.ScBytes, Int}} for Stellar (xdr.ScAddress), Ethereum (xdr.ScBytes) respectively
 type Balances struct {
 	BalA   xdr.ScVec //{xdr.Int128Parts, xdr.Int128Parts}
 	BalB   xdr.ScVec //{xdr.Int128Parts, xdr.Int128Parts}
-	Tokens xdr.ScVec
+	Tokens []Asset
+}
+
+type Asset struct {
+	Chain          xdr.ScVec     //{xdr.Int128Parts, xdr.Int128Parts}
+	StellarAddress xdr.ScAddress //{xdr.Int128Parts, xdr.Int128Parts}
+	EthAddress     xdr.ScBytes
 }
 
 const (
@@ -46,9 +50,78 @@ const (
 	SymbolBalancesBalB   xdr.ScSymbol = "bal_b"
 	SymbolBalancesTokens xdr.ScSymbol = "tokens"
 
-	SymbolTokensAddress xdr.ScSymbol = "address"
-	SymbolTokensChain   xdr.ScSymbol = "chain"
+	SymbolTokensStellarAddress xdr.ScSymbol = "stellar_address"
+	SymbolTokensEthAddress     xdr.ScSymbol = "eth_address"
+	SymbolTokensChain          xdr.ScSymbol = "chain"
 )
+
+func (a Asset) ToScVal() (xdr.ScVal, error) {
+	var err error
+	chain, err := scval.WrapVec(a.Chain)
+	if err != nil {
+		return xdr.ScVal{}, err
+	}
+	stellarAddr, err := scval.WrapScAddress(a.StellarAddress)
+	if err != nil {
+		return xdr.ScVal{}, err
+	}
+	ethAddr, err := scval.WrapScBytes(a.EthAddress)
+	if err != nil {
+		return xdr.ScVal{}, err
+	}
+	m, err := MakeSymbolScMap(
+		[]xdr.ScSymbol{
+			SymbolTokensChain,
+			SymbolTokensStellarAddress,
+			SymbolTokensEthAddress,
+		},
+		[]xdr.ScVal{chain, stellarAddr, ethAddr},
+	)
+	if err != nil {
+		return xdr.ScVal{}, err
+	}
+	return scval.WrapScMap(m)
+}
+
+func (a *Asset) FromScVal(v xdr.ScVal) error {
+	m, ok := v.GetMap()
+	if !ok {
+		return errors.New("expected map")
+	}
+	if len(*m) != 3 {
+		return errors.New("expected map of length 3")
+	}
+	chainVal, err := GetMapValue(scval.MustWrapScSymbol(SymbolTokensChain), *m)
+	if err != nil {
+		return err
+	}
+	chain, ok := chainVal.GetVec()
+	if !ok {
+		return errors.New("expected uint64 for chain")
+	}
+
+	stellarAddrVal, err := GetMapValue(scval.MustWrapScSymbol(SymbolTokensStellarAddress), *m)
+	if err != nil {
+		return err
+	}
+	stellarAddr, ok := stellarAddrVal.GetAddress()
+	if !ok {
+		return errors.New("expected address")
+	}
+
+	ethAddrVal, err := GetMapValue(scval.MustWrapScSymbol(SymbolTokensEthAddress), *m)
+	if err != nil {
+		return err
+	}
+	ethAddr, ok := ethAddrVal.GetBytes()
+	if !ok {
+		return errors.New("expected vec of bytes")
+	}
+	a.Chain = *chain
+	a.StellarAddress = stellarAddr
+	a.EthAddress = ethAddr
+	return nil
+}
 
 func (b Balances) ToScVal() (xdr.ScVal, error) {
 	var err error
@@ -60,7 +133,15 @@ func (b Balances) ToScVal() (xdr.ScVal, error) {
 	if err != nil {
 		return xdr.ScVal{}, err
 	}
-	tokens, err := scval.WrapVec(b.Tokens)
+	var tokensVec xdr.ScVec
+	for _, token := range b.Tokens {
+		t, err := token.ToScVal()
+		if err != nil {
+			return xdr.ScVal{}, err
+		}
+		tokensVec = append(tokensVec, t)
+	}
+	tokens, err := scval.WrapVec(tokensVec)
 	if err != nil {
 		return xdr.ScVal{}, err
 	}
@@ -110,14 +191,23 @@ func (b *Balances) FromScVal(v xdr.ScVal) error {
 	if err != nil {
 		return err
 	}
-	tokens, ok := tokenVal.GetVec()
+	tokensVec, ok := tokenVal.GetVec()
 	if !ok {
 		return errors.New("expected vec of addresses")
+	}
+	var tokens []Asset
+	for _, tokenVal := range *tokensVec {
+		var token Asset
+		err := token.FromScVal(tokenVal)
+		if err != nil {
+			return err
+		}
+		tokens = append(tokens, token)
 	}
 
 	b.BalA = *balA
 	b.BalB = *balB
-	b.Tokens = *tokens
+	b.Tokens = tokens
 	return nil
 }
 
@@ -159,106 +249,80 @@ func (b *Balances) UnmarshalBinary(data []byte) error {
 	return err
 }
 
-func extractAndConvertLedgerID(asset interface{}) (uint64, error) {
-	var lidMapKey multi.LedgerIDMapKey
-
-	switch asset := asset.(type) {
-	case *types.StellarAsset:
-		lidMapKey = asset.LedgerID().MapKey()
-	case *types.EthAsset:
-		lidMapKey = asset.LedgerID().MapKey()
-	default:
-		return 0, errors.New("unknown asset type")
+func extractAndConvertLedgerID(asset channel.Asset) (uint64, error) {
+	multiAsset, ok := asset.(multi.Asset)
+	if !ok {
+		return 0, errors.New("invalid Asset format")
 	}
-
+	id := multiAsset.AssetID().LedgerId()
+	if id == nil {
+		return 0, errors.New("invalid LedgerID")
+	}
+	lidMapKey := id.MapKey()
 	lidval, err := strconv.ParseUint(string(lidMapKey), 10, 64)
 	if err != nil {
+		log.Println("Could not parse ledgerID")
 		return 0, errors.New("invalid Ledger ID format")
 	}
 
 	return lidval, nil
 }
 
-func MakeTokens(assets []channel.Asset) (xdr.ScVec, error) {
-	var tokens xdr.ScVec
+func MakeTokens(assets []channel.Asset) ([]Asset, error) {
+	var tokens []Asset
 
 	for _, ast := range assets {
 		lidvalXdr, err := extractAndConvertLedgerID(ast)
 		if err != nil {
-			return xdr.ScVec{}, err
+			return nil, err
 		}
 		lidvalXdrValue := xdr.Uint64(lidvalXdr)
+		lidval, err := scval.WrapUint64(lidvalXdrValue)
+		if err != nil {
+			return nil, err
+		}
+		lidvec := xdr.ScVec{lidval}
 
-		var tokenAddrVal xdr.ScVal
-		var tokenAddrSymbol xdr.ScSymbol
+		var tokenStellarAddrVal xdr.ScAddress
+		var tokenEthAddrVal xdr.ScBytes
 
 		switch asset := ast.(type) {
 		case *types.StellarAsset:
-			tokenAddrSymbol = "Stellar"
-
 			sa, err := types.ToStellarAsset(asset)
 			if err != nil {
-				return xdr.ScVec{}, err
+				return nil, err
 			}
-			token, err := sa.MakeScAddress()
+			tokenStellarAddrVal, err = sa.MakeScAddress()
 			if err != nil {
-				return xdr.ScVec{}, err
+				return nil, err
 			}
-
-			tokenAddrVal, err = scval.MustWrapScAddress(token)
+			defAddr := make([]byte, 20)
+			tokenEthAddrVal = defAddr
 			if err != nil {
-				return xdr.ScVec{}, err
+				return nil, err
 			}
 
 		case *types.EthAsset:
-			tokenAddrSymbol = "Eth"
-
-			tokenAddrVal, err = scval.MustWrapScBytes(asset.EthAddress().Bytes())
+			tokenEthAddrVal, err = asset.AssetHolder.MarshalBinary()
 			if err != nil {
-				return xdr.ScVec{}, err
+				return nil, err
 			}
 
+			tokenStellarAddrVal = xdr.ScAddress{}
+
 		default:
-			return xdr.ScVec{}, errors.New("unexpected asset type")
+			return nil, errors.New("unexpected asset type")
 		}
 
-		tokenAddrSymVal := scval.MustWrapScSymbol(tokenAddrSymbol)
-
-		tokenAddrVecVal, err := scval.WrapVec(xdr.ScVec{tokenAddrSymVal, tokenAddrVal})
-		if err != nil {
-			return xdr.ScVec{}, err
+		token := Asset{
+			Chain:          lidvec,
+			StellarAddress: tokenStellarAddrVal,
+			EthAddress:     tokenEthAddrVal,
 		}
-
-		tokenChainVal, err := scval.MustWrapScUint64(lidvalXdrValue)
-		if err != nil {
-			return xdr.ScVec{}, err
-		}
-
-		tokenMap, err := MakeSymbolScMap(
-			[]xdr.ScSymbol{SymbolTokensAddress, SymbolTokensChain},
-			[]xdr.ScVal{tokenAddrVecVal, tokenChainVal},
-		)
-		if err != nil {
-			return xdr.ScVec{}, err
-		}
-
-		tokenMapVal, err := scval.WrapScMap(tokenMap)
-		if err != nil {
-			return xdr.ScVec{}, err
-		}
-
-		tokens = append(tokens, tokenMapVal)
+		tokens = append(tokens, token)
 	}
 
-	tokenCrossSym := xdr.ScSymbol("Cross")
-	tokenCrossSymVal := scval.MustWrapScSymbol(tokenCrossSym)
-
-	tokensVecVal, err := scval.WrapVec(tokens)
-	if err != nil {
-		return xdr.ScVec{}, err
-	}
-
-	return xdr.ScVec{tokenCrossSymVal, tokensVecVal}, nil
+	return tokens, nil
 }
 
 func MakeBalances(alloc channel.Allocation) (Balances, error) {

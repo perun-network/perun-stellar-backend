@@ -32,13 +32,11 @@ import (
 )
 
 const (
-	StellarPubKeyLength              = 32
 	CCPubKeyLength                   = 65
 	CCAddrLength                     = 20
 	SymbolStellarAddr   xdr.ScSymbol = "stellar_addr"
 	SymbolStellarPubKey xdr.ScSymbol = "stellar_pubkey"
 	SymbolCCAddress     xdr.ScSymbol = "cc_addr"
-	ChanTypeCrossSymbol xdr.ScSymbol = "Cross"
 )
 
 type WirePart struct {
@@ -97,7 +95,7 @@ func (p Participant) ToScVal() (xdr.ScVal, error) {
 		return xdr.ScVal{}, err
 	}
 
-	if len(p.StellarPubKey) != StellarPubKeyLength && len(p.StellarPubKey) != CCPubKeyLength {
+	if len(p.StellarPubKey) != CCPubKeyLength {
 		log.Println(len(p.StellarPubKey))
 		return xdr.ScVal{}, errors.New("invalid Layer 2 public key length")
 	}
@@ -106,11 +104,7 @@ func (p Participant) ToScVal() (xdr.ScVal, error) {
 		return xdr.ScVal{}, errors.New("invalid cross-chain address length")
 	}
 
-	xdrSym := scval.MustWrapScSymbol(ChanTypeCrossSymbol)
-	xdrStellarPubkeyBytes, _ := scval.MustWrapScBytes(p.StellarPubKey)
-
-	stellarPubKey := xdr.ScVec{xdrSym, xdrStellarPubkeyBytes}
-	stellarPubKeyVal, err := scval.WrapVec(stellarPubKey)
+	stellarPubKeyVal, err := scval.MustWrapScBytes(p.StellarPubKey)
 	if err != nil {
 		return xdr.ScVal{}, err
 	}
@@ -155,22 +149,9 @@ func (p *Participant) FromScVal(v xdr.ScVal) error {
 		return err
 	}
 
-	stellarPubKeyVals, ok := stellarPubKeyVal.GetVec()
-	if !ok {
-		return errors.New("expected vec decoding stellarPubKeyVal")
-	}
-
-	if len(*stellarPubKeyVals) != 2 {
-		return errors.New("expected vec of length 2")
-	}
-
-	stellarPubKey, ok := (*stellarPubKeyVals)[1].GetBytes()
+	stellarPubKey, ok := stellarPubKeyVal.GetBytes()
 	if !ok {
 		return errors.New("expected bytes decoding stellarPubKeyVal")
-	}
-	_, ok = (*stellarPubKeyVals)[0].GetSym()
-	if !ok {
-		return errors.New("expected symbol decoding stellarPubKeyVal")
 	}
 
 	if len(stellarPubKey) != CCPubKeyLength {

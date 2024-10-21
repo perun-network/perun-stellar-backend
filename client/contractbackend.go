@@ -63,8 +63,8 @@ func (tc *TransactorConfig) SetParticipant(participant *types.Participant) {
 	tc.participant = participant
 }
 
-func (tc *TransactorConfig) SetAccount(account *wallet.Account) {
-	tc.account = account
+func (tc *TransactorConfig) SetAccount(account wallet.Account) {
+	tc.account = &account
 }
 
 func (tc *TransactorConfig) SetSender(sender Sender) {
@@ -205,7 +205,6 @@ func (c *ContractBackend) InvokeSignedTx(fname string, callTxArgs xdr.ScVec, con
 		return xdr.TransactionMeta{}, err
 	}
 	txMeta, err := c.tr.sender.SignSendTx(*txUnsigned)
-
 	if err != nil {
 		return xdr.TransactionMeta{}, err
 	}

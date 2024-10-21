@@ -34,6 +34,7 @@ import (
 	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/wallet"
+	"perun.network/perun-stellar-backend/wire"
 	"perun.network/perun-stellar-backend/wire/scval"
 	pkgtest "polycry.pt/poly-go/test"
 	"runtime"
@@ -42,10 +43,10 @@ import (
 )
 
 const (
-	PerunContractPath        = "testdata/perun_soroban_cross_contract.wasm"
+	PerunContractPath        = "testdata/perun_soroban_contract.wasm"
 	StellarAssetContractPath = "testdata/perun_soroban_token.wasm"
 	initLumensBalance        = "10000000"
-	initTokenBalance         = uint64(2000000)
+	initTokenBalance         = uint64(20000000)
 	DefaultTestTimeout       = 30
 )
 
@@ -105,6 +106,8 @@ func getDataFilePath(filename string) (string, error) {
 func NewTestSetup(t *testing.T) *Setup {
 
 	_, kpsToFund, _ := MakeRandPerunAccsWallets(5)
+	// kpsToFund[2], _ = keypair.ParseFull("SD4XPDWFDY25V7NRMF47QE4WT6WOFWUJIZGFRMMCRHGVINJ3RMMDG6WS")
+	// kpsToFund[3], _ = keypair.ParseFull("SDHDGJMVERIXSN5LQ5KDLW3F2QIVM2D6CLP3BDHSKWBAYX53YDEY3FND")
 	require.NoError(t, CreateFundStellarAccounts(kpsToFund, initLumensBalance))
 
 	depTokenOneKp := kpsToFund[2]
@@ -125,10 +128,14 @@ func NewTestSetup(t *testing.T) *Setup {
 	tokenAddressTwo, _ := Deploy(t, depTokenTwoKp, relPathAsset)
 
 	tokenAddresses := []xdr.ScAddress{tokenAddressOne, tokenAddressTwo}
+	tokenVector, err := makeCrossAssetVector(tokenAddresses)
+	require.NoError(t, err)
 
 	require.NoError(t, InitTokenContract(depTokenOneKp, tokenAddressOne))
 	require.NoError(t, InitTokenContract(depTokenTwoKp, tokenAddressTwo))
 
+	// acc0 := wallet.NewAccount("5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a", *kpsToFund[0].FromAddress(), [20]byte([]byte{86, 253, 40, 156, 238, 113, 74, 94, 71, 28, 65, 132, 54, 239, 166, 62, 120, 13, 122, 135}))
+	// acc1 := wallet.NewAccount("7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6", *kpsToFund[0].FromAddress(), [20]byte([]byte{101, 54, 66, 91, 233, 90, 102, 97, 246, 198, 246, 141, 112, 155, 107, 225, 82, 120, 93, 246}))
 	acc0, err := wallet.NewRandomAccountWithAddress(mathrand.New(mathrand.NewSource(0)), kpsToFund[0].FromAddress())
 	acc1, err := wallet.NewRandomAccountWithAddress(mathrand.New(mathrand.NewSource(0)), kpsToFund[1].FromAddress())
 	w0 := wallet.NewEphemeralWallet()
@@ -158,7 +165,7 @@ func NewTestSetup(t *testing.T) *Setup {
 	channelCBs := []*client.ContractBackend{aliceCB, bobCB}
 	channelWallets := []*wallet.EphemeralWallet{aliceWallet, bobWallet}
 
-	funders, adjs := CreateFundersAndAdjudicators(channelAccs, cbs, perunAddress, tokenAddresses)
+	funders, adjs := CreateFundersAndAdjudicators(channelAccs, cbs, perunAddress, tokenVector)
 
 	setup := Setup{
 		t:        t,
@@ -186,15 +193,13 @@ func SetupAccountsAndContracts(t *testing.T, deployerKps []*keypair.Full, kps []
 		}
 	}
 }
-func CreateFundersAndAdjudicators(accs []*wallet.Account, cbs []*client.ContractBackend, perunAddress xdr.ScAddress, tokenScAddresses []xdr.ScAddress) ([]*channel.Funder, []*channel.Adjudicator) {
+func CreateFundersAndAdjudicators(accs []*wallet.Account, cbs []*client.ContractBackend, perunAddress xdr.ScAddress, tokenScAddresses []xdr.ScVec) ([]*channel.Funder, []*channel.Adjudicator) {
 	funders := make([]*channel.Funder, len(accs))
 	adjs := make([]*channel.Adjudicator, len(accs))
 
-	tokenVecAddresses := scval.MakeScVecFromScAddresses(tokenScAddresses)
-
 	for i, acc := range accs {
-		funders[i] = channel.NewFunder(acc, cbs[i], perunAddress, tokenVecAddresses)
-		adjs[i] = channel.NewAdjudicator(acc, cbs[i], perunAddress, tokenVecAddresses)
+		funders[i] = channel.NewFunder(acc, cbs[i], perunAddress, tokenScAddresses)
+		adjs[i] = channel.NewAdjudicator(acc, cbs[i], perunAddress, tokenScAddresses)
 	}
 	return funders, adjs
 }
@@ -212,7 +217,7 @@ func NewContractBackendFromKey(kp *keypair.Full, acc *pwallet.Account) *client.C
 	trConfig := client.TransactorConfig{}
 	trConfig.SetKeyPair(kp)
 	if acc != nil {
-		trConfig.SetAccount(acc)
+		trConfig.SetAccount(*acc)
 	}
 	return client.NewContractBackend(&trConfig)
 }
@@ -357,7 +362,7 @@ func NewParamsWithAddressStateWithAsset(t *testing.T, partsAddr []pwallet.Addres
 		ptest.WithLedgerChannel(true),
 		ptest.WithVirtualChannel(false),
 		ptest.WithoutApp(),
-		ptest.WithBalancesInRange(big.NewInt(0).Mul(big.NewInt(1), big.NewInt(100_000)), big.NewInt(0).Mul(big.NewInt(1), big.NewInt(100_000))),
+		ptest.WithBalances([]pchannel.Bal{big.NewInt(100), big.NewInt(150)}, []pchannel.Bal{big.NewInt(200), big.NewInt(250)}),
 	))
 }
 
@@ -366,4 +371,51 @@ func (s *Setup) NewCtx(testTimeout float64) context.Context {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	s.t.Cleanup(cancel)
 	return ctx
+}
+
+func makeCrossAssetVector(addresses []xdr.ScAddress) ([]xdr.ScVec, error) {
+	var vec []xdr.ScVec
+	for _, addr := range addresses {
+		tokenAddrSymbol := "Stellar"
+		tokenAddrSymVal := scval.MustWrapScSymbol(xdr.ScSymbol(tokenAddrSymbol))
+		tokenAddrVal, err := scval.MustWrapScAddress(addr)
+		if err != nil {
+			return nil, err
+		}
+		tokenAddrVecVal, err := scval.WrapVec(xdr.ScVec{tokenAddrSymVal, tokenAddrVal})
+		if err != nil {
+			return nil, err
+		}
+		lidvalXdrValue := xdr.Uint64(2)
+		tokenChainVal, err := scval.MustWrapScUint64(lidvalXdrValue)
+		if err != nil {
+			return nil, err
+		}
+
+		tokenMap, err := wire.MakeSymbolScMap(
+			[]xdr.ScSymbol{"address", "chain"},
+			[]xdr.ScVal{tokenAddrVecVal, tokenChainVal},
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		tokenMapVal, err := scval.WrapScMap(tokenMap)
+		if err != nil {
+			return nil, err
+		}
+
+		tokenMapVec := xdr.ScVec{tokenMapVal}
+
+		tokenCrossSym := xdr.ScSymbol("Cross")
+		tokenCrossSymVal := scval.MustWrapScSymbol(tokenCrossSym)
+
+		tokensVecVal, err := scval.WrapVec(tokenMapVec)
+		if err != nil {
+			return nil, err
+		}
+
+		vec = append(vec, xdr.ScVec{tokenCrossSymVal, tokensVecVal})
+	}
+	return vec, nil
 }

@@ -21,7 +21,7 @@ import (
 )
 
 func init() {
-	pchtest.SetRandomizer(&Randomizer{})
+	pchtest.SetRandomizer(&Randomizer{}, 2)
 	walletRdz := wtest.Randomizer{}
-	pwtest.SetRandomizer(&walletRdz)
+	pwtest.SetRandomizer(&walletRdz, 2)
 }

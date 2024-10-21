@@ -26,6 +26,8 @@ import (
 
 const HashLenXdr = 32
 
+var _ multi.Asset = (*StellarAsset)(nil)
+
 type (
 	Asset struct {
 		contractID xdr.Hash
@@ -35,12 +37,20 @@ type (
 		id    CCID
 	}
 	CCID struct {
-		BackendID uint32
-		LedgerId  ContractLID
+		backendID uint32
+		ledgerId  ContractLID
 	}
 
 	ContractLID struct{ *string }
 )
+
+func (c CCID) BackendID() uint32 {
+	return c.backendID
+}
+
+func (c CCID) LedgerId() multi.LedgerID {
+	return c.ledgerId
+}
 
 // MakeContractID makes a ChainID for the given id.
 func MakeContractID(id string) ContractLID {
@@ -130,6 +140,10 @@ func (a Asset) Address() string {
 
 }
 
+func (a StellarAsset) AssetID() multi.AssetID {
+	return a.id
+}
+
 // MapKey returns the asset's map key representation.
 func (a StellarAsset) MapKey() AssetMapKey {
 	d, err := a.MarshalBinary()
@@ -143,7 +157,7 @@ func (a StellarAsset) MapKey() AssetMapKey {
 
 // LedgerID returns the ledger ID the asset lives on.
 func (a StellarAsset) LedgerID() multi.LedgerID {
-	return &a.id.LedgerId
+	return a.id.LedgerId()
 }
 
 func (s StellarAsset) MakeScAddress() (xdr.ScAddress, error) {

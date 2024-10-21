@@ -17,9 +17,8 @@ package types
 import (
 	"bytes"
 	"errors"
-	"github.com/ethereum/go-ethereum/common"
 	"math/big"
-	wtypes "perun.network/perun-stellar-backend/wallet/types"
+	"perun.network/go-perun/wallet"
 
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/channel/multi"
@@ -31,12 +30,6 @@ var _ channel.Asset = new(EthAsset)
 // ChainID identifies a specific Ethereum backend.
 type ChainID struct {
 	*big.Int
-}
-
-// AssetID identifies an asset on a specific chain.
-type AssetID struct {
-	BackendID uint32
-	LedgerId  ChainID
 }
 
 // MakeChainID makes a ChainID for the given id.
@@ -69,13 +62,38 @@ func (id ChainID) MapKey() multi.LedgerIDMapKey {
 type (
 	// Asset is an Ethereum asset.
 	EthAsset struct {
-		ChainID     AssetID
-		AssetHolder wtypes.EthAddress
+		assetID     AssetID
+		AssetHolder wallet.Address
+	}
+
+	AssetID struct {
+		backendID uint32
+		LedgerID  ChainID
 	}
 
 	// AssetMapKey is the map key representation of an asset.
 	AssetMapKey string
 )
+
+func MakeEthAsset(id *big.Int, holder wallet.Address) EthAsset {
+	return EthAsset{assetID: AssetID{backendID: 1, LedgerID: MakeChainID(id)}, AssetHolder: holder}
+}
+
+func (id AssetID) BackendID() uint32 {
+	return id.backendID
+}
+
+func (id AssetID) LedgerId() multi.LedgerID {
+	return &id.LedgerID
+}
+
+// MakeAssetID makes a AssetID for the given id.
+func MakeAssetID(id *big.Int) multi.AssetID {
+	if id.Sign() < 0 {
+		panic("must not be smaller than zero")
+	}
+	return AssetID{backendID: 1, LedgerID: MakeChainID(id)}
+}
 
 // MapKey returns the asset's map key representation.
 func (a EthAsset) MapKey() AssetMapKey {
@@ -90,7 +108,7 @@ func (a EthAsset) MapKey() AssetMapKey {
 // MarshalBinary marshals the asset into its binary representation.
 func (a EthAsset) MarshalBinary() ([]byte, error) {
 	var buf bytes.Buffer
-	err := perunio.Encode(&buf, a.ChainID, &a.AssetHolder)
+	err := perunio.Encode(&buf, a.assetID.LedgerID, a.assetID.backendID, &a.AssetHolder)
 	if err != nil {
 		return nil, err
 	}
@@ -100,23 +118,17 @@ func (a EthAsset) MarshalBinary() ([]byte, error) {
 // UnmarshalBinary unmarshals the asset from its binary representation.
 func (a *EthAsset) UnmarshalBinary(data []byte) error {
 	buf := bytes.NewBuffer(data)
-	return perunio.Decode(buf, &a.ChainID, &a.AssetHolder)
+	return perunio.Decode(buf, &a.assetID.LedgerID, &a.assetID.backendID, &a.AssetHolder)
 }
 
 // LedgerID returns the ledger ID the asset lives on.
 func (a EthAsset) LedgerID() multi.LedgerID {
-	return &a.ChainID.LedgerId
+	return a.AssetID().LedgerId()
 }
 
-// NewAsset creates a new asset from an chainID and the AssetHolder address.
-func NewAsset(chainID *big.Int, assetHolder common.Address) *EthAsset {
-	id := MakeChainID(chainID)
-	return &EthAsset{AssetID{1, id}, *wtypes.AsWalletAddr(assetHolder)}
-}
-
-// EthAddress returns the Ethereum address of the asset.
-func (a EthAsset) EthAddress() common.Address {
-	return common.Address(a.AssetHolder)
+// LedgerID returns the ledger ID the asset lives on.
+func (a EthAsset) AssetID() multi.AssetID {
+	return a.assetID
 }
 
 // Equal returns true iff the asset equals the given asset.
@@ -125,7 +137,7 @@ func (a EthAsset) Equal(b channel.Asset) bool {
 	if !ok {
 		return false
 	}
-	return a.ChainID.LedgerId.MapKey() == ethAsset.ChainID.LedgerId.MapKey() && a.EthAddress() == ethAsset.EthAddress()
+	return a.assetID.LedgerID.MapKey() == ethAsset.assetID.LedgerID.MapKey() && a.AssetHolder.Equal(ethAsset.AssetHolder)
 }
 
 // Address returns the address of the asset.

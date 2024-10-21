@@ -65,11 +65,9 @@ func ToEthState(s *channel.State) EthChannelState {
 		switch backendID {
 		case EthBackendID:
 			assets[i] = assetToEthAsset(s.Allocation.Assets[i])
-			log.Println("EthAsset: ", assets[i])
 
 		case wtypes.StellarBackendID:
 			assets[i] = assetToStellarAsset(s.Allocation.Assets[i])
-			log.Println("StellarAsset: ", assets[i])
 
 		default:
 			log.Panicf("wrong backend ID: %d", backendID)
@@ -106,7 +104,7 @@ func assetToEthAsset(asset channel.Asset) ChannelAsset {
 		log.Panicf("expected asset of type MultiLedgerAsset, but got wrong asset type: %T", asset)
 	}
 	id := new(big.Int)
-	_, ok = id.SetString(string(multiAsset.AssetID().LedgerId.MapKey()), 10) // base 10 for decimal numbers
+	_, ok = id.SetString(string(multiAsset.AssetID().LedgerId().MapKey()), 10) // base 10 for decimal numbers
 	if !ok {
 		log.Panicf("Error: Failed to parse string into big.Int")
 	}

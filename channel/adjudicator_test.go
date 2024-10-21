@@ -57,11 +57,13 @@ func TestHappyChannel(t *testing.T) {
 		next := adjState.Clone()
 		next.Version++
 		next.IsFinal = true
-		encodedState, err := channel.EncodeState(next)
+		ethState := channel.ToEthState(next)
+		bytes, err := channel.EncodeEthState(&ethState)
 		require.NoError(t, err)
-		signAlice, err := accs[0].SignData(encodedState)
+
+		signAlice, err := accs[0].SignData(bytes)
 		require.NoError(t, err)
-		signBob, err := accs[1].SignData(encodedState)
+		signBob, err := accs[1].SignData(bytes)
 		require.NoError(t, err)
 		sigs := []pwallet.Sig{signAlice, signBob}
 		tx := pchannel.Transaction{State: next, Sigs: sigs}
@@ -126,11 +128,14 @@ func TestChannel_RegisterFinal(t *testing.T) {
 		next := adjState.Clone()
 		next.Version++
 		next.IsFinal = true
-		encodedState, err := channel.EncodeState(next)
+		ethState := channel.ToEthState(next)
+		bytes, err := channel.EncodeEthState(&ethState)
 		require.NoError(t, err)
-		signAlice, err := accs[0].SignData(encodedState)
+
+		signAlice, err := accs[0].SignData(bytes)
 		require.NoError(t, err)
-		signBob, err := accs[1].SignData(encodedState)
+		signBob, err := accs[1].SignData(bytes)
+		require.NoError(t, err)
 		require.NoError(t, err)
 		sigs := []pwallet.Sig{signAlice, signBob}
 		tx := pchannel.Transaction{State: next, Sigs: sigs}

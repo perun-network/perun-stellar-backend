@@ -218,14 +218,32 @@ func MakeState(state channel.State) (State, error) {
 	}
 
 	chanIDStellar := state.ID[wtypes.StellarBackendID]
+	var ethID [types.HashLenXdr]byte
+	if id, ok := state.ID[1]; ok {
+		ethID = id // Assign the value from state.ID[1] if it exists
+	} else {
+		ethID = [types.HashLenXdr]byte{} // Default to zeroed array if no ethID exists
+	}
 	chanIDVec := xdr.ScVec{}
 
-	chanIDBytes := xdr.ScBytes(chanIDStellar[:])
-	chanIDVal, err := scval.WrapScBytes(chanIDBytes)
-	if err != nil {
-		return State{}, err
+	for _, b := range state.Backends {
+		if b == wtypes.StellarBackendID {
+			chanIDBytes := xdr.ScBytes(chanIDStellar[:])
+			chanIDVal, err := scval.WrapScBytes(chanIDBytes)
+			if err != nil {
+				return State{}, err
+			}
+			chanIDVec = append(chanIDVec, chanIDVal)
+		} else {
+			chanIDBytes := xdr.ScBytes(ethID[:])
+			chanIDVal, err := scval.WrapScBytes(chanIDBytes)
+			if err != nil {
+				return State{}, err
+			}
+			chanIDVec = append(chanIDVec, chanIDVal)
+
+		}
 	}
-	chanIDVec = append(chanIDVec, chanIDVal)
 
 	return State{
 		ChannelID: chanIDVec,
@@ -284,9 +302,6 @@ func ToState(stellarState State) (channel.State, error) {
 	}
 
 	for i, chanID := range stellarState.ChannelID {
-
-		fmt.Println("chanid: ", chanID)
-
 		chanIDBytes, ok := chanID.GetBytes()
 		if !ok {
 			return channel.State{}, errors.New("expected bytes decoding channel id")
@@ -350,60 +365,32 @@ func ToState(stellarState State) (channel.State, error) {
 	return PerunState, nil
 }
 
-func convertAssets(tokens xdr.ScVec) ([]channel.Asset, error) {
-	if err := validateTokens(tokens); err != nil {
-		return nil, err
-	}
-
-	tokensVec, _ := tokens[1].GetVec()
+func convertAssets(tokens []Asset) ([]channel.Asset, error) {
 	var assets []channel.Asset
 
-	for _, val := range *tokensVec {
-		tokenMap, ok := val.GetMap()
-		if !ok || len(*tokenMap) != 2 {
-			return nil, errors.New("could not turn value into map or expected map of length 2")
-		}
-
-		tokenAddrVal, _, err := parseTokenAddress(*tokenMap)
-		if err != nil {
-			return nil, err
-		}
-
-		switch tokenAddrVal.Type {
-		case xdr.ScValTypeScvAddress:
-			if asset, err := createStellarAsset(tokenAddrVal); err == nil {
-				assets = append(assets, asset)
-			} else {
+	for _, val := range tokens {
+		defaultAddr := xdr.ScAddress{}
+		if val.StellarAddress != defaultAddr {
+			var steAsset types.StellarAsset
+			err := steAsset.FromScAddress(val.StellarAddress)
+			if err != nil {
 				return nil, err
 			}
-
-		case xdr.ScValTypeScvBytes:
-			if asset, err := createEthAsset(tokenAddrVal); err == nil {
-				assets = append(assets, asset)
-			} else {
+			assets = append(assets, &steAsset)
+		} else {
+			ethAsset, err := createEthAsset(val.Chain, val.EthAddress)
+			if err != nil {
 				return nil, err
 			}
-
-		default:
-			return nil, errors.New("unexpected token address type")
+			assets = append(assets, ethAsset)
 		}
+
 	}
 
 	return assets, nil
 }
 
-func validateTokens(tokens xdr.ScVec) error {
-	if len(tokens) != 2 {
-		return errors.New("expected vec of length 2, with Symbol Cross and Assets Vec")
-	}
-	tokenVecCrossSym, ok := tokens[0].GetSym()
-	if !ok || tokenVecCrossSym != "Cross" {
-		return errors.New("expected Symbol Cross for Assets")
-	}
-	return nil
-}
-
-func parseTokenAddress(tokenMap xdr.ScMap) (xdr.ScVal, xdr.ScSymbol, error) {
+/*func parseTokenAddress(tokenMap xdr.ScMap) (xdr.ScVal, xdr.ScSymbol, error) {
 	tokenAddr, err := GetMapValue(scval.MustWrapScSymbol(SymbolTokensAddress), tokenMap)
 	if err != nil {
 		return xdr.ScVal{}, "", err
@@ -427,15 +414,19 @@ func createStellarAsset(tokenAddrVal xdr.ScVal) (channel.Asset, error) {
 		return nil, errors.New("invalid address type for Stellar Asset Contract")
 	}
 	return types.NewStellarAssetFromScAddress(address)
-}
+}*/
 
-func createEthAsset(tokenAddrVal xdr.ScVal) (channel.Asset, error) {
-	bytes, ok := tokenAddrVal.GetBytes()
-	if !ok || len(bytes) != 20 {
+func createEthAsset(chain xdr.ScVec, address xdr.ScBytes) (channel.Asset, error) {
+	bytes, err := address.MarshalBinary()
+	if err != nil || len(bytes) != 20 {
 		return nil, errors.New("invalid byte length for EthAsset")
 	}
 	var ethAddrArray [20]byte
 	copy(ethAddrArray[:], bytes)
-	newEthgAddr := common.BytesToAddress(ethAddrArray[:])
-	return types.NewAsset(big.NewInt(1), newEthgAddr), nil
+	newEthAddr := common.BytesToAddress(ethAddrArray[:])
+	ethAddr := wtypes.EthAddress(newEthAddr)
+	chainID := new(big.Int)
+	chainID.SetUint64(uint64(chain[0].MustU64()))
+	ethAsset := types.MakeEthAsset(chainID, &ethAddr)
+	return &ethAsset, nil
 }

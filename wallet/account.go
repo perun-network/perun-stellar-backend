@@ -20,7 +20,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/pkg/errors"
 	"github.com/stellar/go/keypair"
-	"log"
 	"math/rand"
 	"perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/wallet/types"
@@ -101,15 +100,12 @@ func (a Account) Participant() *types.Participant {
 func (a Account) SignData(data []byte) ([]byte, error) {
 	hash := crypto.Keccak256(data)
 	prefix := []byte("\x19Ethereum Signed Message:\n32")
-	log.Println("Hash: ", hash)
 	phash := crypto.Keccak256(prefix, hash)
-	log.Println("Prefixed Hash: ", phash)
 
 	sig, err := crypto.Sign(phash, &a.privateKey)
 	if err != nil {
 		return nil, errors.Wrap(err, "SignHash")
 	}
 	sig[64] += 27
-	log.Println("Signature: ", sig)
 	return sig, nil
 }

@@ -76,7 +76,6 @@ func PreflightHostFunctions(hzClient *horizonclient.Client,
 	sourceAccount txnbuild.Account, function txnbuild.InvokeHostFunction,
 ) (txnbuild.InvokeHostFunction, int64, error) {
 	result, transactionData, err := simulateTransaction(hzClient, sourceAccount, &function)
-	log.Println("result: ", result)
 	if err != nil {
 		return txnbuild.InvokeHostFunction{}, 0, err
 	}
@@ -85,7 +84,6 @@ func PreflightHostFunctions(hzClient *horizonclient.Client,
 		V:           1,
 		SorobanData: &transactionData,
 	}
-	log.Println("function: ", function)
 	var funAuth []xdr.SorobanAuthorizationEntry
 	for _, res := range result.Results {
 		var decodedRes xdr.ScVal
@@ -176,10 +174,8 @@ func simulateTransaction(hzClient *horizonclient.Client,
 	ch := jhttp.NewChannel(sorobanRPCLink, nil)
 	sorobanRPCClient := jrpc2.NewClient(ch, nil)
 	txParams := GetBaseTransactionParamsWithFee(sourceAccount, txnbuild.MinBaseFee, op)
-	log.Println("txParams2: ", txParams)
 	txParams.IncrementSequenceNum = false
 	tx, err := txnbuild.NewTransaction(txParams)
-	log.Println("tx: ", tx, err)
 	if err != nil {
 		return RPCSimulateTxResponse{}, xdr.SorobanTransactionData{}, err
 	}

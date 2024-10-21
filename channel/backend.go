@@ -55,7 +55,11 @@ func (b backend) Sign(account wallet.Account, state *channel.State) (wallet.Sig,
 	if err != nil {
 		return nil, err
 	}
-	return account.SignData(bytes)
+	sig, err := account.SignData(bytes)
+	if err != nil {
+		return nil, err
+	}
+	return sig, err
 }
 
 func (b backend) Verify(addr wallet.Address, state *channel.State, sig wallet.Sig) (bool, error) {
