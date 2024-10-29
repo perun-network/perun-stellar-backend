@@ -16,8 +16,10 @@ package wire
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	xdr3 "github.com/stellar/go-xdr/xdr3"
 	"github.com/stellar/go/xdr"
 	"log"
@@ -308,10 +310,23 @@ func MakeTokens(assets []channel.Asset) ([]Asset, error) {
 				return nil, err
 			}
 
-			tokenStellarAddrVal = xdr.ScAddress{}
+			tokenStellarAddrVal, err = randomScAddress()
+			if err != nil {
+				return nil, err
+			}
 
 		default:
-			return nil, errors.New("unexpected asset type")
+			// Assume that Asset it an ethereum asset
+			ethAddress := asset.Address()
+			// Check if the string is a valid length (20 byte)
+			if len(ethAddress) != 20 {
+				return nil, errors.New("unexpected asset type")
+			}
+			tokenEthAddrVal = ethAddress
+			tokenStellarAddrVal, err = randomScAddress()
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		token := Asset{
@@ -439,4 +454,28 @@ func makeAllocationMulti(assets []channel.Asset, balsA, balsB []*big.Int) (*chan
 	}
 
 	return alloc, nil
+}
+
+// Generates a random 32-byte slice
+func random32Bytes() ([32]byte, error) {
+	var b [32]byte
+	_, err := rand.Read(b[:])
+	if err != nil {
+		return [32]byte{}, fmt.Errorf("error generating random bytes: %v", err)
+	}
+	return b, nil
+}
+
+// randomScAddress generates a random Stellar address as sending an uninitialized address fails.
+func randomScAddress() (xdr.ScAddress, error) {
+	contractIDBytes, err := random32Bytes()
+	if err != nil {
+		return xdr.ScAddress{}, fmt.Errorf("error generating random contract ID: %v", err)
+	}
+
+	// Return the random xdr.ScAddress for a contract
+	return xdr.ScAddress{
+		Type:       xdr.ScAddressTypeScAddressTypeContract,
+		ContractId: (*xdr.Hash)(&contractIDBytes),
+	}, nil
 }

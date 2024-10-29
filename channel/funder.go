@@ -17,7 +17,6 @@ package channel
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/stellar/go/xdr"
 	"log"
 	pchannel "perun.network/go-perun/channel"
@@ -25,22 +24,23 @@ import (
 	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/wallet"
 	wtypes "perun.network/perun-stellar-backend/wallet/types"
+	"perun.network/perun-stellar-backend/wire"
 
 	"time"
 )
 
 const MaxIterationsUntilAbort = 30
-const DefaultPollingInterval = time.Duration(6) * time.Second
+const DefaultPollingInterval = time.Duration(4) * time.Second
 
 type Funder struct {
 	cb              *client.ContractBackend
 	perunAddr       xdr.ScAddress
-	assetAddrs      []xdr.ScVec
+	assetAddrs      []xdr.ScVal
 	maxIters        int
 	pollingInterval time.Duration
 }
 
-func NewFunder(acc *wallet.Account, contractBackend *client.ContractBackend, perunAddr xdr.ScAddress, assetAddrs []xdr.ScVec) *Funder {
+func NewFunder(acc *wallet.Account, contractBackend *client.ContractBackend, perunAddr xdr.ScAddress, assetAddrs []xdr.ScVal) *Funder {
 	return &Funder{
 		cb:              contractBackend,
 		perunAddr:       perunAddr,
@@ -54,7 +54,7 @@ func (f *Funder) GetPerunAddr() xdr.ScAddress {
 	return f.perunAddr
 }
 
-func (f *Funder) GetAssetAddrs() []xdr.ScVec {
+func (f *Funder) GetAssetAddrs() []xdr.ScVal {
 	return f.assetAddrs
 }
 
@@ -110,36 +110,36 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 				if err != nil {
 					return err
 				}
+				bal0 := "bal0"
+				bal1 := "bal1"
 				t0, ok := req.State.Assets[0].(*types.StellarAsset)
-				if !ok {
-					return fmt.Errorf("expected StellarAsset at index 0, got %T", req.State.Assets[0])
+				if ok {
+					cAdd0, err := types.MakeContractAddress(t0.Asset.ContractID())
+					if err != nil {
+						return err
+					}
+					for {
+						bal0, err = f.cb.GetBalance(cAdd0)
+						if err != nil {
+							log.Println("Error while getting balance: ", err)
+						}
+						if bal0 != "" {
+							break
+						}
+						time.Sleep(1 * time.Second) // Wait for a second before retrying
+					}
 				}
-				cAdd0, err := types.MakeContractAddress(t0.Asset.ContractID())
-				if err != nil {
-					return err
-				}
-				var bal0 string
-				for {
-					bal0, err = f.cb.GetBalance(cAdd0)
+				t1, ok := req.State.Assets[1].(*types.StellarAsset)
+				if ok {
+					cAdd1, err := types.MakeContractAddress(t1.Asset.ContractID())
+					if err != nil {
+						return err
+					}
+					bal1, err = f.cb.GetBalance(cAdd1)
 					if err != nil {
 						log.Println("Error while getting balance: ", err)
 					}
-					if bal0 != "" {
-						break
-					}
-					time.Sleep(1 * time.Second) // Wait for a second before retrying
-				}
-				t1, ok := req.State.Assets[1].(*types.StellarAsset)
-				if !ok {
-					return fmt.Errorf("expected StellarAsset at index 1, got %T", req.State.Assets[1])
-				}
-				cAdd1, err := types.MakeContractAddress(t1.Asset.ContractID())
-				if err != nil {
-					return err
-				}
-				bal1, err := f.cb.GetBalance(cAdd1)
-				if err != nil {
-					log.Println("Error while getting balance: ", err)
+					continue
 				}
 				log.Println("Balance A: ", bal0, bal1, " after funding amount: ", req.State.Balances, req.State.Assets)
 				continue
@@ -150,29 +150,29 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 				if err != nil {
 					return err
 				}
+				bal0 := "bal0"
+				bal1 := "bal1"
 				t0, ok := req.State.Assets[0].(*types.StellarAsset)
-				if !ok {
-					return fmt.Errorf("expected StellarAsset at index 0, got %T", req.State.Assets[0])
-				}
-				cAdd0, err := types.MakeContractAddress(t0.Asset.ContractID())
-				if err != nil {
-					return err
-				}
-				bal0, err := f.cb.GetBalance(cAdd0)
-				if err != nil {
-					log.Println("Error while getting balance: ", err)
+				if ok {
+					cAdd0, err := types.MakeContractAddress(t0.Asset.ContractID())
+					if err != nil {
+						return err
+					}
+					bal0, err = f.cb.GetBalance(cAdd0)
+					if err != nil {
+						log.Println("Error while getting balance: ", err)
+					}
 				}
 				t1, ok := req.State.Assets[1].(*types.StellarAsset)
-				if !ok {
-					return fmt.Errorf("expected StellarAsset at index 1, got %T", req.State.Assets[1])
-				}
-				cAdd1, err := types.MakeContractAddress(t1.Asset.ContractID())
-				if err != nil {
-					return err
-				}
-				bal1, err := f.cb.GetBalance(cAdd1)
-				if err != nil {
-					log.Println("Error while getting balance: ", err)
+				if ok {
+					cAdd1, err := types.MakeContractAddress(t1.Asset.ContractID())
+					if err != nil {
+						return err
+					}
+					bal1, err = f.cb.GetBalance(cAdd1)
+					if err != nil {
+						log.Println("Error while getting balance: ", err)
+					}
 				}
 				log.Println("Balance B: ", bal0, bal1, " after funding amount: ", req.State.Balances, req.State.Assets)
 				continue
@@ -196,14 +196,14 @@ func (f *Funder) openChannel(ctx context.Context, req pchannel.FundingReq) error
 
 func (f *Funder) FundChannel(ctx context.Context, state *pchannel.State, funderIdx bool) error {
 
-	/*balsStellar, err := wire.MakeBalances(state.Allocation)
+	balsStellar, err := wire.MakeBalances(state.Allocation)
 	if err != nil {
 		return errors.New("error while making balances")
 	}
 
 	if !containsAllAssets(balsStellar.Tokens, f.assetAddrs) {
 		return errors.New("asset address is not equal to the address stored in the state")
-	}*/
+	}
 
 	return f.cb.Fund(ctx, f.perunAddr, state.ID[wtypes.StellarBackendID], funderIdx)
 }
@@ -234,20 +234,24 @@ func makeTimeoutErr(remains []pchannel.Index, assetIdx int) error {
 }
 
 // Function to check if all assets in state.Allocation are present in f.assetAddrs
-func containsAllAssets(stateAssets xdr.ScVec, fAssets xdr.ScVec) bool {
+func containsAllAssets(stateAssets []wire.Asset, fAssets []xdr.ScVal) bool {
 	fAssetSet := assetSliceToSet(fAssets)
 
 	for _, asset := range stateAssets {
-		if _, found := fAssetSet[asset.String()]; !found {
+		assetVal, err := asset.ToScVal()
+		if err != nil {
 			return false
+		}
+		if _, found := fAssetSet[assetVal.String()]; found { // if just one Asset was found, we continue
+			return true
 		}
 	}
 
-	return true
+	return false
 }
 
 // Helper function to convert a slice of xdr.Asset to a set (map for fast lookup)
-func assetSliceToSet(assets xdr.ScVec) map[string]struct{} {
+func assetSliceToSet(assets []xdr.ScVal) map[string]struct{} {
 	assetSet := make(map[string]struct{})
 	for _, asset := range assets {
 		assetSet[asset.String()] = struct{}{}

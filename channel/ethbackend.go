@@ -108,10 +108,12 @@ func assetToEthAsset(asset channel.Asset) ChannelAsset {
 	if !ok {
 		log.Panicf("Error: Failed to parse string into big.Int")
 	}
+	ethAddress := common.Address{}
+	ethAddress.SetBytes(multiAsset.Address())
 	return ChannelAsset{
 		ChainID:  id,
-		EthAsset: common.HexToAddress(multiAsset.Address()),
-		CCAsset:  make([]byte, 0),
+		EthAsset: ethAddress,
+		CCAsset:  make([]byte, 32),
 	}
 }
 

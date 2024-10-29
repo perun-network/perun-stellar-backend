@@ -128,7 +128,7 @@ func NewTestSetup(t *testing.T) *Setup {
 	tokenAddressTwo, _ := Deploy(t, depTokenTwoKp, relPathAsset)
 
 	tokenAddresses := []xdr.ScAddress{tokenAddressOne, tokenAddressTwo}
-	tokenVector, err := makeCrossAssetVector(tokenAddresses)
+	tokenVector, err := MakeCrossAssetVector(tokenAddresses)
 	require.NoError(t, err)
 
 	require.NoError(t, InitTokenContract(depTokenOneKp, tokenAddressOne))
@@ -193,7 +193,7 @@ func SetupAccountsAndContracts(t *testing.T, deployerKps []*keypair.Full, kps []
 		}
 	}
 }
-func CreateFundersAndAdjudicators(accs []*wallet.Account, cbs []*client.ContractBackend, perunAddress xdr.ScAddress, tokenScAddresses []xdr.ScVec) ([]*channel.Funder, []*channel.Adjudicator) {
+func CreateFundersAndAdjudicators(accs []*wallet.Account, cbs []*client.ContractBackend, perunAddress xdr.ScAddress, tokenScAddresses []xdr.ScVal) ([]*channel.Funder, []*channel.Adjudicator) {
 	funders := make([]*channel.Funder, len(accs))
 	adjs := make([]*channel.Adjudicator, len(accs))
 
@@ -373,49 +373,52 @@ func (s *Setup) NewCtx(testTimeout float64) context.Context {
 	return ctx
 }
 
-func makeCrossAssetVector(addresses []xdr.ScAddress) ([]xdr.ScVec, error) {
-	var vec []xdr.ScVec
-	for _, addr := range addresses {
-		tokenAddrSymbol := "Stellar"
-		tokenAddrSymVal := scval.MustWrapScSymbol(xdr.ScSymbol(tokenAddrSymbol))
-		tokenAddrVal, err := scval.MustWrapScAddress(addr)
-		if err != nil {
-			return nil, err
-		}
-		tokenAddrVecVal, err := scval.WrapVec(xdr.ScVec{tokenAddrSymVal, tokenAddrVal})
-		if err != nil {
-			return nil, err
-		}
-		lidvalXdrValue := xdr.Uint64(2)
-		tokenChainVal, err := scval.MustWrapScUint64(lidvalXdrValue)
-		if err != nil {
-			return nil, err
-		}
+const (
+	SymbolTokensStellarAddress xdr.ScSymbol = "stellar_address"
+	SymbolTokensEthAddress     xdr.ScSymbol = "eth_address"
+	SymbolTokensChain          xdr.ScSymbol = "chain"
+)
 
-		tokenMap, err := wire.MakeSymbolScMap(
-			[]xdr.ScSymbol{"address", "chain"},
-			[]xdr.ScVal{tokenAddrVecVal, tokenChainVal},
+func MakeCrossAssetVector(addresses []xdr.ScAddress) ([]xdr.ScVal, error) {
+	var vec []xdr.ScVal
+	lidvalXdrValue := xdr.Uint64(2)
+	lidval, err := scval.WrapUint64(lidvalXdrValue)
+	if err != nil {
+		return nil, err
+	}
+	lidvec := xdr.ScVec{lidval}
+	for _, addr := range addresses {
+		var err error
+		chain, err := scval.WrapVec(lidvec)
+		if err != nil {
+			return nil, err
+		}
+		stellarAddr, err := scval.WrapScAddress(addr)
+		if err != nil {
+			return nil, err
+		}
+		defAddr := make([]byte, 20)
+		ethAddr, err := scval.WrapScBytes(defAddr)
+		if err != nil {
+			return nil, err
+		}
+		m, err := wire.MakeSymbolScMap(
+			[]xdr.ScSymbol{
+				SymbolTokensChain,
+				SymbolTokensStellarAddress,
+				SymbolTokensEthAddress,
+			},
+			[]xdr.ScVal{chain, stellarAddr, ethAddr},
 		)
 		if err != nil {
 			return nil, err
 		}
-
-		tokenMapVal, err := scval.WrapScMap(tokenMap)
+		tokensVecVal, err := scval.WrapScMap(m)
 		if err != nil {
 			return nil, err
 		}
 
-		tokenMapVec := xdr.ScVec{tokenMapVal}
-
-		tokenCrossSym := xdr.ScSymbol("Cross")
-		tokenCrossSymVal := scval.MustWrapScSymbol(tokenCrossSym)
-
-		tokensVecVal, err := scval.WrapVec(tokenMapVec)
-		if err != nil {
-			return nil, err
-		}
-
-		vec = append(vec, xdr.ScVec{tokenCrossSymVal, tokensVecVal})
+		vec = append(vec, tokensVecVal)
 	}
 	return vec, nil
 }

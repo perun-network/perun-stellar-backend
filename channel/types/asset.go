@@ -131,12 +131,12 @@ func (a Asset) Equal(asset channel.Asset) bool {
 	return ok
 }
 
-func (s StellarAsset) Address() string {
+func (s StellarAsset) Address() []byte {
 	return s.Asset.Address()
 }
 
-func (a Asset) Address() string {
-	return a.contractID.HexString()
+func (a Asset) Address() []byte {
+	return a.contractID[:]
 
 }
 
@@ -208,6 +208,14 @@ func ToStellarAsset(asset channel.Asset) (*StellarAsset, error) {
 
 func MakeAccountAddress(kp keypair.KP) (xdr.ScAddress, error) {
 	accountId, err := xdr.AddressToAccountId(kp.Address())
+	if err != nil {
+		return xdr.ScAddress{}, err
+	}
+	return xdr.NewScAddress(xdr.ScAddressTypeScAddressTypeAccount, accountId)
+}
+
+func AccountAddressFromAddress(addr keypair.FromAddress) (xdr.ScAddress, error) {
+	accountId, err := xdr.AddressToAccountId(addr.Address())
 	if err != nil {
 		return xdr.ScAddress{}, err
 	}

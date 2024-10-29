@@ -37,14 +37,14 @@ type Adjudicator struct {
 	log               log.Embedding
 	CB                *client.ContractBackend
 	acc               *wallet.Account
-	assetAddrs        []xdr.ScVec //xdr.ScAddress
+	assetAddrs        []xdr.ScVal //xdr.ScAddress
 	perunAddr         xdr.ScAddress
 	maxIters          int
 	pollingInterval   time.Duration
 }
 
 // NewAdjudicator returns a new Adjudicator.
-func NewAdjudicator(acc *wallet.Account, cb *client.ContractBackend, perunID xdr.ScAddress, assetIDs []xdr.ScVec) *Adjudicator {
+func NewAdjudicator(acc *wallet.Account, cb *client.ContractBackend, perunID xdr.ScAddress, assetIDs []xdr.ScVal) *Adjudicator {
 	return &Adjudicator{
 		challengeDuration: &DefaultChallengeDuration,
 		CB:                cb,
@@ -61,14 +61,7 @@ func (a *Adjudicator) GetPerunAddr() xdr.ScAddress {
 	return a.perunAddr
 }
 
-func (a *Adjudicator) GetAssetAddrs() []xdr.ScVec {
-	/*var addrs []xdr.ScAddress
-	for _, addrScVal := range a.assetAddrs {
-		addr := addrScVal.MustAddress()
-		addrs = append(addrs, addr)
-	}
-
-	return addrs*/
+func (a *Adjudicator) GetAssetAddrs() []xdr.ScVal {
 	return a.assetAddrs
 }
 

@@ -17,6 +17,8 @@ package types
 import (
 	"bytes"
 	"errors"
+	"fmt"
+	"github.com/ethereum/go-ethereum/common"
 	"math/big"
 	"perun.network/go-perun/wallet"
 
@@ -30,6 +32,65 @@ var _ channel.Asset = new(EthAsset)
 // ChainID identifies a specific Ethereum backend.
 type ChainID struct {
 	*big.Int
+}
+type EthAddress common.Address
+
+// BackendID returns the official identifier for the eth-backend.
+func (a *EthAddress) BackendID() wallet.BackendID {
+	return 1
+}
+
+// bytes returns the address as a byte slice.
+func (a *EthAddress) bytes() []byte {
+	return (*common.Address)(a).Bytes()
+}
+
+// MarshalBinary marshals the address into its binary representation.
+// Error will always be nil, it is for implementing BinaryMarshaler.
+func (a *EthAddress) MarshalBinary() ([]byte, error) {
+	return (*common.Address)(a).Bytes(), nil
+}
+
+// UnmarshalBinary unmarshals the address from its binary representation.
+func (a *EthAddress) UnmarshalBinary(data []byte) error {
+	if len(data) != 20 {
+		return fmt.Errorf("unexpected address length %d, want %d", len(data), 20) //nolint: goerr113
+	}
+
+	(*common.Address)(a).SetBytes(data)
+	return nil
+}
+
+// String converts this address to a string.
+func (a *EthAddress) String() string {
+	return (*common.Address)(a).String()
+}
+
+// Equal checks the equality of two addresses. The implementation must be
+// equivalent to checking `Address.Cmp(Address) == 0`.
+func (a *EthAddress) Equal(addr wallet.Address) bool {
+	addrTyped, ok := addr.(*EthAddress)
+	if !ok {
+		return false
+	}
+	return bytes.Equal(a.bytes(), addrTyped.bytes())
+}
+
+// Cmp checks ordering of two addresses.
+//
+//	0 if a==b,
+//
+// -1 if a < b,
+// +1 if a > b.
+// https://godoc.org/bytes#Compare
+//
+// Panics if the input is not of the same type as the receiver.
+func (a *EthAddress) Cmp(addr wallet.Address) int {
+	addrTyped, ok := addr.(*EthAddress)
+	if !ok {
+		panic(fmt.Sprintf("wrong type: expected %T, got %T", a, addr))
+	}
+	return bytes.Compare(a.bytes(), addrTyped.bytes())
 }
 
 // MakeChainID makes a ChainID for the given id.
@@ -141,6 +202,7 @@ func (a EthAsset) Equal(b channel.Asset) bool {
 }
 
 // Address returns the address of the asset.
-func (a EthAsset) Address() string {
-	return a.AssetHolder.String()
+func (a EthAsset) Address() []byte {
+	data, _ := a.AssetHolder.MarshalBinary()
+	return data
 }

@@ -250,7 +250,7 @@ func BytesToPublicKey(data []byte) (*big.Int, *big.Int, error) {
 }
 
 func MakeParticipant(participant types.Participant) (Participant, error) {
-	stellarAddr, err := assettypes.MakeAccountAddress(&participant.StellarAddress)
+	stellarAddr, err := assettypes.AccountAddressFromAddress(participant.StellarAddress)
 	if err != nil {
 		return Participant{}, err
 	}

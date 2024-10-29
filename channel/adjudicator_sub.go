@@ -38,7 +38,7 @@ type AdjEventSub struct {
 	chanControl       wire.Control
 	cid               pchannel.ID
 	perunAddr         xdr.ScAddress
-	assetAddrs        []xdr.ScVec
+	assetAddrs        []xdr.ScVal
 	events            chan event.PerunEvent
 	subErrors         chan error
 	err               error
@@ -48,7 +48,7 @@ type AdjEventSub struct {
 	log               log.Embedding
 }
 
-func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, cb *client.ContractBackend, perunAddr xdr.ScAddress, assetAddrs []xdr.ScVec, challengeDuration *time.Duration) (pchannel.AdjudicatorSubscription, error) {
+func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, cb *client.ContractBackend, perunAddr xdr.ScAddress, assetAddrs []xdr.ScVal, challengeDuration *time.Duration) (pchannel.AdjudicatorSubscription, error) {
 
 	sub := &AdjEventSub{
 		challengeDuration: challengeDuration,
