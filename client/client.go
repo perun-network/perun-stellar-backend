@@ -41,14 +41,13 @@ type keyHolder struct {
 }
 
 func (cb *ContractBackend) Open(ctx context.Context, perunAddr xdr.ScAddress, params *pchannel.Params, state *pchannel.State) error {
-	log.Println("Open called: ", params)
+	log.Println("Open called")
 	openTxArgs, err := buildOpenTxArgs(*params, *state)
 	if err != nil {
-		log.Println(err)
 		return errors.New("error while building open tx")
 	}
-
 	txMeta, err := cb.InvokeSignedTx("open", openTxArgs, perunAddr)
+
 	if err != nil {
 		return errors.Join(errors.New("error while invoking and processing host function: open"), err)
 	}
@@ -126,8 +125,10 @@ func (cb *ContractBackend) Fund(ctx context.Context, perunAddr xdr.ScAddress, ch
 }
 
 func (cb *ContractBackend) Close(ctx context.Context, perunAddr xdr.ScAddress, state *pchannel.State, sigs []pwallet.Sig) error {
+
 	log.Println("Close called by ContractBackend")
 	closeTxArgs, err := buildSignedStateTxArgs(*state, sigs)
+	log.Println("Close: ", closeTxArgs)
 	if err != nil {
 		return errors.New("error while building fund tx")
 	}
@@ -156,7 +157,8 @@ func (cb *ContractBackend) Close(ctx context.Context, perunAddr xdr.ScAddress, s
 }
 
 func (cb *ContractBackend) ForceClose(ctx context.Context, perunAddr xdr.ScAddress, chanId pchannel.ID) error {
-	log.Println("ForceClose called by ContractBackend")
+	log.Println("ForceClose called")
+
 	forceCloseTxArgs, err := buildChanIdTxArgs(chanId)
 	if err != nil {
 		return errors.New("error while building fund tx")
@@ -190,7 +192,6 @@ func (cb *ContractBackend) ForceClose(ctx context.Context, perunAddr xdr.ScAddre
 }
 
 func (cb *ContractBackend) Dispute(ctx context.Context, perunAddr xdr.ScAddress, state *pchannel.State, sigs []pwallet.Sig) error {
-	log.Println("Dispute called by ContractBackend")
 	disputeTxArgs, err := buildSignedStateTxArgs(*state, sigs)
 	if err != nil {
 		return errors.Join(errors.New("error while building dispute tx"), err)
@@ -220,16 +221,12 @@ func (cb *ContractBackend) Dispute(ctx context.Context, perunAddr xdr.ScAddress,
 
 	return nil
 }
-func (cb *ContractBackend) Withdraw(ctx context.Context, perunAddr xdr.ScAddress, req pchannel.AdjudicatorReq) error {
+func (cb *ContractBackend) Withdraw(ctx context.Context, perunAddr xdr.ScAddress, req pchannel.AdjudicatorReq, withdrawerIdx bool, oneWithdrawer bool) error {
 	log.Println("Withdraw called by ContractBackend")
 
-	chanID, partyIdx := req.Tx.State.ID, req.Idx
-	withdrawerIdx := partyIdx == 1
-	if partyIdx > 1 {
-		return errors.New("invalid party index for withdrawal")
-	}
+	chanID := req.Tx.State.ID
 
-	withdrawTxArgs, err := buildChanIdxTxArgs(chanID[wtypes.StellarBackendID], withdrawerIdx)
+	withdrawTxArgs, err := buildWithdrawTxArgs(chanID[wtypes.StellarBackendID], withdrawerIdx, oneWithdrawer)
 	if err != nil {
 		return errors.New("error building fund tx")
 	}
@@ -272,19 +269,22 @@ func (cb *ContractBackend) Withdraw(ctx context.Context, perunAddr xdr.ScAddress
 		return err
 	}
 
-	err = event.AssertWithdrawEvent(evs)
+	finished, err := event.AssertWithdrawEvent(evs)
 	if err != event.ErrNoWithdrawEvent {
 		return err
 	}
 
-	chanInfo, err := cb.GetChannelInfo(ctx, perunAddr, chanID[wtypes.StellarBackendID])
-	if err != nil {
-		return err
-	}
-	if (withdrawerIdx && chanInfo.Control.WithdrawnB) || (!withdrawerIdx && chanInfo.Control.WithdrawnA) {
+	if !finished {
+		chanInfo, err := cb.GetChannelInfo(ctx, perunAddr, chanID[wtypes.StellarBackendID])
+		if err != nil {
+			return err
+		}
+		if (withdrawerIdx && chanInfo.Control.WithdrawnB) || (!withdrawerIdx && chanInfo.Control.WithdrawnA) {
+			return nil
+		}
+	} else {
 		return nil
 	}
-
 	return event.ErrNoWithdrawEvent
 }
 
@@ -295,8 +295,7 @@ func (cb *ContractBackend) GetChannelInfo(ctx context.Context, perunAddr xdr.ScA
 	}
 	chanInfo, _, err := cb.InvokeUnsignedTx("get_channel", getchTxArgs, perunAddr)
 	if err != nil {
-		log.Println(err)
-		return wire.Channel{}, errors.New("error while processing and submitting get_channel tx")
+		return wire.Channel{}, errors.Join(errors.New("error while processing and submitting get_channel tx"), err)
 	}
 
 	return chanInfo, nil

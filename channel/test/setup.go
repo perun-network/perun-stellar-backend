@@ -46,7 +46,7 @@ const (
 	PerunContractPath        = "testdata/perun_soroban_contract.wasm"
 	StellarAssetContractPath = "testdata/perun_soroban_token.wasm"
 	initLumensBalance        = "10000000"
-	initTokenBalance         = uint64(20000000)
+	initTokenBalance         = uint64(2000000)
 	DefaultTestTimeout       = 30
 )
 
@@ -103,7 +103,13 @@ func getDataFilePath(filename string) (string, error) {
 	return fp, nil
 }
 
-func NewTestSetup(t *testing.T) *Setup {
+func NewTestSetup(t *testing.T, options ...bool) *Setup {
+
+	oneWithdrawer := false
+
+	if len(options) > 0 {
+		oneWithdrawer = options[0]
+	}
 
 	_, kpsToFund, _ := MakeRandPerunAccsWallets(5)
 	// kpsToFund[2], _ = keypair.ParseFull("SD4XPDWFDY25V7NRMF47QE4WT6WOFWUJIZGFRMMCRHGVINJ3RMMDG6WS")
@@ -139,9 +145,15 @@ func NewTestSetup(t *testing.T) *Setup {
 	acc0, err := wallet.NewRandomAccountWithAddress(mathrand.New(mathrand.NewSource(0)), kpsToFund[0].FromAddress())
 	acc1, err := wallet.NewRandomAccountWithAddress(mathrand.New(mathrand.NewSource(0)), kpsToFund[1].FromAddress())
 	w0 := wallet.NewEphemeralWallet()
-	w0.AddAccount(acc0)
+	err = w0.AddAccount(acc0)
+	if err != nil {
+		return nil
+	}
 	w1 := wallet.NewEphemeralWallet()
-	w1.AddAccount(acc1)
+	err = w1.AddAccount(acc1)
+	if err != nil {
+		return nil
+	}
 
 	SetupAccountsAndContracts(t, depTokenKps, kpsToFund[:2], tokenAddresses, initTokenBalance)
 
@@ -165,7 +177,7 @@ func NewTestSetup(t *testing.T) *Setup {
 	channelCBs := []*client.ContractBackend{aliceCB, bobCB}
 	channelWallets := []*wallet.EphemeralWallet{aliceWallet, bobWallet}
 
-	funders, adjs := CreateFundersAndAdjudicators(channelAccs, cbs, perunAddress, tokenVector)
+	funders, adjs := CreateFundersAndAdjudicators(channelAccs, cbs, perunAddress, tokenVector, oneWithdrawer)
 
 	setup := Setup{
 		t:        t,
@@ -184,7 +196,7 @@ func SetupAccountsAndContracts(t *testing.T, deployerKps []*keypair.Full, kps []
 
 	require.Equal(t, len(deployerKps), len(tokenAddresses))
 
-	for i, _ := range deployerKps {
+	for i := range deployerKps {
 		for _, kp := range kps {
 			addr, err := types.MakeAccountAddress(kp)
 			require.NoError(t, err)
@@ -193,13 +205,13 @@ func SetupAccountsAndContracts(t *testing.T, deployerKps []*keypair.Full, kps []
 		}
 	}
 }
-func CreateFundersAndAdjudicators(accs []*wallet.Account, cbs []*client.ContractBackend, perunAddress xdr.ScAddress, tokenScAddresses []xdr.ScVal) ([]*channel.Funder, []*channel.Adjudicator) {
+func CreateFundersAndAdjudicators(accs []*wallet.Account, cbs []*client.ContractBackend, perunAddress xdr.ScAddress, tokenScAddresses []xdr.ScVal, oneWithdrawer bool) ([]*channel.Funder, []*channel.Adjudicator) {
 	funders := make([]*channel.Funder, len(accs))
 	adjs := make([]*channel.Adjudicator, len(accs))
 
 	for i, acc := range accs {
 		funders[i] = channel.NewFunder(acc, cbs[i], perunAddress, tokenScAddresses)
-		adjs[i] = channel.NewAdjudicator(acc, cbs[i], perunAddress, tokenScAddresses)
+		adjs[i] = channel.NewAdjudicator(acc, cbs[i], perunAddress, tokenScAddresses, oneWithdrawer)
 	}
 	return funders, adjs
 }

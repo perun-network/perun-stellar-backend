@@ -490,21 +490,23 @@ func AssertCloseEvent(perunEvents []PerunEvent) error {
 	return nil
 }
 
-func AssertWithdrawEvent(perunEvents []PerunEvent) error {
+func AssertWithdrawEvent(perunEvents []PerunEvent) (bool, error) {
 	for _, ev := range perunEvents {
 		eventType, err := ev.GetType()
 		if err != nil {
-			return err
+			return false, err
 		}
 		switch eventType {
-		case EventTypeWithdrawing, EventTypeWithdrawn:
-			return nil
+		case EventTypeWithdrawing:
+			return false, nil
+		case EventTypeWithdrawn:
+			return true, nil
 		default:
-			return ErrNoWithdrawEvent
+			return false, ErrNoWithdrawEvent
 		}
 	}
 
-	return nil
+	return false, nil
 }
 func AssertForceCloseEvent(perunEvents []PerunEvent) error {
 	for _, ev := range perunEvents {

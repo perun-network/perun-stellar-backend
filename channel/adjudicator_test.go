@@ -18,10 +18,13 @@ package channel_test
 
 import (
 	"github.com/stretchr/testify/require"
+	"log"
 	pchannel "perun.network/go-perun/channel"
 	pwallet "perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/channel"
 	chtest "perun.network/perun-stellar-backend/channel/test"
+	"perun.network/perun-stellar-backend/channel/types"
+	wtypes "perun.network/perun-stellar-backend/wallet/types"
 	"testing"
 )
 
@@ -84,14 +87,96 @@ func TestHappyChannel(t *testing.T) {
 
 		_, err = adjAlice.Subscribe(ctx, next.ID)
 		require.NoError(t, err)
+
+		_, err = adjBob.Subscribe(ctx, next.ID)
+
+		require.NoError(t, err)
 		require.NoError(t, adjAlice.Withdraw(ctxAliceWithdraw, reqAlice, nil))
 
 		perunAddrAlice := adjAlice.GetPerunAddr()
 		stellarChanAlice, err := adjAlice.CB.GetChannelInfo(ctx, perunAddrAlice, next.ID[2])
 		require.True(t, stellarChanAlice.Control.WithdrawnA)
+		require.NoError(t, err)
+		require.NoError(t, adjBob.Withdraw(ctx, reqBob, nil))
+
+	}
+
+}
+
+func TestHappyChannelOneWithdrawer(t *testing.T) {
+	setup := chtest.NewTestSetup(t, true)
+	stellarAsset := setup.GetTokenAsset()
+	accs := setup.GetAccounts()
+	addrAlice := accs[0].Address()
+	addrBob := accs[1].Address()
+	addrList := []pwallet.Address{addrAlice, addrBob}
+	perunParams, perunState := chtest.NewParamsWithAddressStateWithAsset(t, addrList, stellarAsset)
+
+	freqAlice := pchannel.NewFundingReq(perunParams, perunState, 0, perunState.Balances)
+	freqBob := pchannel.NewFundingReq(perunParams, perunState, 1, perunState.Balances)
+
+	freqs := []*pchannel.FundingReq{freqAlice, freqBob}
+
+	funders := setup.GetFunders()
+	ctx := setup.NewCtx(chtest.DefaultTestTimeout)
+	err := chtest.FundAll(ctx, funders, freqs)
+	require.NoError(t, err)
+
+	// funding complete
+
+	// Withdrawal
+	{
+		adjAlice := setup.GetAdjudicators()[0]
+		adjBob := setup.GetAdjudicators()[1]
+
+		adjState := perunState
+		next := adjState.Clone()
+		next.Version++
+		next.IsFinal = true
+		ethState := channel.ToEthState(next)
+		encodedState, err := channel.EncodeEthState(&ethState)
+		require.NoError(t, err)
+		signAlice, err := accs[0].SignData(encodedState)
+		require.NoError(t, err)
+		signBob, err := accs[1].SignData(encodedState)
+		require.NoError(t, err)
+		sigs := []pwallet.Sig{signAlice, signBob}
+		tx := pchannel.Transaction{State: next, Sigs: sigs}
+
+		reqBob := pchannel.AdjudicatorReq{
+			Params:    perunParams,
+			Tx:        tx,
+			Acc:       map[pwallet.BackendID]pwallet.Account{wtypes.StellarBackendID: accs[1]},
+			Idx:       pchannel.Index(1),
+			Secondary: false}
+
+		// Bob withdraws for both, himself and Alice
 
 		require.NoError(t, err)
 		require.NoError(t, adjBob.Withdraw(ctx, reqBob, nil))
+		cb := adjAlice.CB
+		tr := cb.GetTransactor()
+		clientAddress, err := tr.GetAddress()
+		if err != nil {
+			log.Println("Error while getting client address: ", err)
+		}
+		tokenAddr0, ok := reqBob.Tx.State.Assets[0].(*types.StellarAsset)
+		bal0 := "bal0"
+		bal1 := "bal1"
+		if ok {
+			cAdd0, err := types.MakeContractAddress(tokenAddr0.Asset.ContractID())
+			require.NoError(t, err)
+			bal0, err = cb.GetBalance(cAdd0)
+			require.NoError(t, err)
+		}
+		tokenAddr1, ok := reqBob.Tx.State.Assets[1].(*types.StellarAsset)
+		if ok {
+			cAdd1, err := types.MakeContractAddress(tokenAddr1.Asset.ContractID())
+			require.NoError(t, err)
+			bal1, err = cb.GetBalance(cAdd1)
+			require.NoError(t, err)
+		}
+		log.Println("Balance: ", bal0, bal1, " after withdrawing: ", clientAddress, reqBob.Tx.State.Assets)
 
 	}
 

@@ -45,6 +45,24 @@ func buildChanIdTxArgs(chanID pchannel.ID) (xdr.ScVec, error) {
 	return getChannelArgs, nil
 }
 
+func buildWithdrawTxArgs(chanID pchannel.ID, withdrawerIdx bool, oneWithdrawer bool) (xdr.ScVec, error) {
+
+	withdrawerXdrIdx, _ := scval.MustWrapBool(withdrawerIdx)
+	oneWithdrawerXdr, _ := scval.MustWrapBool(oneWithdrawer)
+
+	channelIDXdr, err := scval.WrapScBytes(chanID[:])
+	if err != nil {
+		return xdr.ScVec{}, err
+	}
+
+	withdrawArgs := xdr.ScVec{
+		channelIDXdr,
+		withdrawerXdrIdx,
+		oneWithdrawerXdr,
+	}
+	return withdrawArgs, nil
+}
+
 func buildChanIdxTxArgs(chanID pchannel.ID, withdrawerIdx bool) (xdr.ScVec, error) {
 
 	withdrawerXdrIdx, err := scval.MustWrapBool(withdrawerIdx)

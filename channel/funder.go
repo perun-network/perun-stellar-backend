@@ -139,7 +139,6 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 					if err != nil {
 						log.Println("Error while getting balance: ", err)
 					}
-					continue
 				}
 				log.Println("Balance A: ", bal0, bal1, " after funding amount: ", req.State.Balances, req.State.Assets)
 				continue
