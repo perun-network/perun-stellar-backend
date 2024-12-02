@@ -7,7 +7,7 @@ import (
 	"github.com/stellar/go/xdr"
 )
 
-func CreateSignedTransactionWithParams(signers []*keypair.Full, txParams txnbuild.TransactionParams,
+func CreateSignedTransactionWithParams(signers []*keypair.Full, txParams txnbuild.TransactionParams, passphrase string,
 ) (*txnbuild.Transaction, error) {
 	tx, err := txnbuild.NewTransaction(txParams)
 	if err != nil {
@@ -15,7 +15,7 @@ func CreateSignedTransactionWithParams(signers []*keypair.Full, txParams txnbuil
 	}
 
 	for _, signer := range signers {
-		tx, err = tx.Sign(NETWORK_PASSPHRASE, signer)
+		tx, err = tx.Sign(passphrase, signer)
 		if err != nil {
 			return nil, err
 		}
@@ -28,13 +28,20 @@ type TxSender struct {
 	hzClient *horizonclient.Client
 }
 
-func NewSender(kp *keypair.Full) Sender {
-	return &TxSender{kp: kp}
+func NewSender(kp *keypair.Full, hzClient *horizonclient.Client) Sender {
+	return &TxSender{kp: kp, hzClient: hzClient}
 
 }
 
 func (s *TxSender) SignSendTx(txUnsigned txnbuild.Transaction) (xdr.TransactionMeta, error) {
-	tx, err := txUnsigned.Sign(NETWORK_PASSPHRASE, s.kp)
+	passphrase := ""
+	if s.hzClient.HorizonURL == "http://localhost:8000/" {
+		passphrase = NETWORK_PASSPHRASE
+	} else {
+		passphrase = NETWORK_PASSPHRASETestNet
+
+	}
+	tx, err := txUnsigned.Sign(passphrase, s.kp)
 	if err != nil {
 		return xdr.TransactionMeta{}, err
 
@@ -44,7 +51,7 @@ func (s *TxSender) SignSendTx(txUnsigned txnbuild.Transaction) (xdr.TransactionM
 	if err != nil {
 		return xdr.TransactionMeta{}, err
 	}
-	txMeta, err := DecodeTxMeta(txSent)
+	txMeta, err := DecodeTxMeta(txSent, s.hzClient)
 	if err != nil {
 		return xdr.TransactionMeta{}, ErrCouldNotDecodeTxMeta
 	}

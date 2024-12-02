@@ -53,6 +53,7 @@ type TransactorConfig struct {
 	participant *types.Participant
 	account     *wallet.Account
 	sender      Sender
+	horizonURL  string
 }
 
 func (tc *TransactorConfig) SetKeyPair(kp *keypair.Full) {
@@ -69,6 +70,10 @@ func (tc *TransactorConfig) SetAccount(account wallet.Account) {
 
 func (tc *TransactorConfig) SetSender(sender Sender) {
 	tc.sender = sender
+}
+
+func (tc *TransactorConfig) SetHorizonURL(url string) {
+	tc.horizonURL = url
 }
 
 func NewTransactor(cfg TransactorConfig) *StellarSigner {
@@ -93,7 +98,12 @@ func NewTransactor(cfg TransactorConfig) *StellarSigner {
 		st.account = cfg.account
 	}
 
-	st.hzClient = NewHorizonClient()
+	if cfg.horizonURL != "" {
+		st.hzClient = NewHorizonClient(cfg.horizonURL)
+	} else {
+		st.hzClient = NewHorizonClient(HorizonURL)
+
+	}
 
 	return st
 }

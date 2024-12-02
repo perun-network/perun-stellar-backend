@@ -7,19 +7,21 @@ import (
 
 const HorizonURL = "http://localhost:8000"
 const NETWORK_PASSPHRASE = "Standalone Network ; February 2017"
+const HorizonURLTestNet = "https://horizon-testnet.stellar.org"
+const NETWORK_PASSPHRASETestNet = "Test SDF Network ; September 2015"
 
-func NewHorizonClient() *horizonclient.Client {
-	return &horizonclient.Client{HorizonURL: HorizonURL}
+func NewHorizonClient(url string) *horizonclient.Client {
+	return &horizonclient.Client{HorizonURL: url}
 }
 
 func newKeyHolder(kp *keypair.Full) keyHolder {
 	return keyHolder{kp}
 }
 
-func NewHorizonMasterClient() *Client {
-	sourceKey := keypair.Root(NETWORK_PASSPHRASE)
+func NewHorizonMasterClient(passphrase string, url string) *Client {
+	sourceKey := keypair.Root(passphrase)
 	return &Client{
-		hzClient:  &horizonclient.Client{HorizonURL: HorizonURL},
+		hzClient:  &horizonclient.Client{HorizonURL: url},
 		keyHolder: newKeyHolder(sourceKey),
 	}
 }

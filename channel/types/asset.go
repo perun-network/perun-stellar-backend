@@ -41,7 +41,7 @@ type (
 		ledgerId  ContractLID
 	}
 
-	ContractLID struct{ *string }
+	ContractLID struct{ string }
 )
 
 func (c CCID) BackendID() uint32 {
@@ -54,7 +54,7 @@ func (c CCID) LedgerId() multi.LedgerID {
 
 // MakeContractID makes a ChainID for the given id.
 func MakeContractID(id string) ContractLID {
-	return ContractLID{&id}
+	return ContractLID{id}
 }
 
 // MakeCCID makes a CCID for the given id.
@@ -65,23 +65,23 @@ func MakeCCID(ledgerID ContractLID) CCID {
 // UnmarshalBinary unmarshals the contractID from its binary representation.
 func (id *ContractLID) UnmarshalBinary(data []byte) error {
 	str := hex.EncodeToString(data) // Convert binary data to hex string
-	id.string = &str
+	id.string = str
 	return nil
 }
 
 // MarshalBinary marshals the contractID into its binary representation.
 func (id ContractLID) MarshalBinary() ([]byte, error) {
-	if id.string == nil {
+	if id.string == "" {
 		return nil, errors.New("nil ContractID")
 	}
-	return hex.DecodeString(*id.string)
+	return hex.DecodeString(id.string)
 }
 
 func (id ContractLID) MapKey() multi.LedgerIDMapKey {
-	if id.string == nil {
+	if id.string == "" {
 		return ""
 	}
-	return multi.LedgerIDMapKey(*id.string)
+	return multi.LedgerIDMapKey(id.string)
 }
 
 func (a Asset) ContractID() xdr.Hash {

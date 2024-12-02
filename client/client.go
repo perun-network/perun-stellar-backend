@@ -47,7 +47,6 @@ func (cb *ContractBackend) Open(ctx context.Context, perunAddr xdr.ScAddress, pa
 		return errors.New("error while building open tx")
 	}
 	txMeta, err := cb.InvokeSignedTx("open", openTxArgs, perunAddr)
-
 	if err != nil {
 		return errors.Join(errors.New("error while invoking and processing host function: open"), err)
 	}

@@ -90,9 +90,9 @@ func BuildInitTokenArgs(adminAddr xdr.ScAddress, decimals uint32, tokenName stri
 	return initTokenArgs, nil
 }
 
-func InitTokenContract(kp *keypair.Full, contractIDAddress xdr.ScAddress) error {
+func InitTokenContract(kp *keypair.Full, contractIDAddress xdr.ScAddress, url string) error {
 
-	cb := NewContractBackendFromKey(kp, nil)
+	cb := NewContractBackendFromKey(kp, nil, url)
 
 	adminScAddr, err := types.MakeAccountAddress(kp)
 	if err != nil {
@@ -122,9 +122,9 @@ func InitTokenContract(kp *keypair.Full, contractIDAddress xdr.ScAddress) error 
 	return nil
 }
 
-func GetTokenName(kp *keypair.Full, contractAddress xdr.ScAddress) error {
+func GetTokenName(kp *keypair.Full, contractAddress xdr.ScAddress, url string) error {
 
-	cb := NewContractBackendFromKey(kp, nil)
+	cb := NewContractBackendFromKey(kp, nil, url)
 	TokenNameArgs := xdr.ScVec{}
 
 	_, err := cb.InvokeSignedTx("name", TokenNameArgs, contractAddress)
@@ -175,8 +175,8 @@ func BuildTransferTokenArgs(from xdr.ScAddress, to xdr.ScAddress, amount xdr.Int
 	return GetTokenBalanceArgs, nil
 }
 
-func Deploy(t *testing.T, kp *keypair.Full, contractPath string) (xdr.ScAddress, xdr.Hash) {
-	deployerCB := NewContractBackendFromKey(kp, nil)
+func Deploy(t *testing.T, kp *keypair.Full, contractPath string, url string) (xdr.ScAddress, xdr.Hash) {
+	deployerCB := NewContractBackendFromKey(kp, nil, url)
 	tr := deployerCB.GetTransactor()
 	hzClient := tr.GetHorizonClient()
 	deployerAccReq := horizonclient.AccountRequest{AccountID: kp.Address()}
@@ -190,7 +190,7 @@ func Deploy(t *testing.T, kp *keypair.Full, contractPath string) (xdr.ScAddress,
 	require.NoError(t, err)
 
 	txParamsInstall := client.GetBaseTransactionParamsWithFee(&deployerAcc, int64(100)+minFeeInstall, &preFlightOp)
-	txSignedInstall, err := client.CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParamsInstall)
+	txSignedInstall, err := client.CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParamsInstall, client.NETWORK_PASSPHRASE)
 	require.NoError(t, err)
 
 	_, err = hzClient.SubmitTransaction(txSignedInstall)
@@ -205,7 +205,7 @@ func Deploy(t *testing.T, kp *keypair.Full, contractPath string) (xdr.ScAddress,
 	preFlightOpCreate, minFeeDeploy, err := client.PreflightHostFunctions(hzClient, &deployerAcc, *createContractOp)
 	require.NoError(t, err)
 	txParamsCreate := client.GetBaseTransactionParamsWithFee(&deployerAcc, int64(100)+minFeeDeploy, &preFlightOpCreate)
-	txSignedCreate, err := client.CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParamsCreate)
+	txSignedCreate, err := client.CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParamsCreate, client.NETWORK_PASSPHRASE)
 
 	require.NoError(t, err)
 
@@ -222,8 +222,8 @@ func Deploy(t *testing.T, kp *keypair.Full, contractPath string) (xdr.ScAddress,
 	return contractIDAddress, contractHash
 }
 
-func MintToken(kp *keypair.Full, contractAddr xdr.ScAddress, amount uint64, recipientAddr xdr.ScAddress) error {
-	cb := NewContractBackendFromKey(kp, nil)
+func MintToken(kp *keypair.Full, contractAddr xdr.ScAddress, amount uint64, recipientAddr xdr.ScAddress, url string) error {
+	cb := NewContractBackendFromKey(kp, nil, url)
 
 	if amount > math.MaxInt64 {
 		return errors.New("amount represents negative number")

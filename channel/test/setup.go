@@ -48,6 +48,8 @@ const (
 	initLumensBalance        = "10000000"
 	initTokenBalance         = uint64(2000000)
 	DefaultTestTimeout       = 30
+	HorizonURL               = "http://localhost:8000"
+	NETWORK_PASSPHRASE       = "Standalone Network ; February 2017"
 )
 
 type Setup struct {
@@ -128,17 +130,17 @@ func NewTestSetup(t *testing.T, options ...bool) *Setup {
 	relPathAsset, err := getDataFilePath(StellarAssetContractPath)
 	require.NoError(t, err)
 
-	perunAddress, _ := Deploy(t, depPerunKp, relPathPerun)
+	perunAddress, _ := Deploy(t, depPerunKp, relPathPerun, HorizonURL)
 
-	tokenAddressOne, _ := Deploy(t, depTokenOneKp, relPathAsset)
-	tokenAddressTwo, _ := Deploy(t, depTokenTwoKp, relPathAsset)
+	tokenAddressOne, _ := Deploy(t, depTokenOneKp, relPathAsset, HorizonURL)
+	tokenAddressTwo, _ := Deploy(t, depTokenTwoKp, relPathAsset, HorizonURL)
 
 	tokenAddresses := []xdr.ScAddress{tokenAddressOne, tokenAddressTwo}
 	tokenVector, err := MakeCrossAssetVector(tokenAddresses)
 	require.NoError(t, err)
 
-	require.NoError(t, InitTokenContract(depTokenOneKp, tokenAddressOne))
-	require.NoError(t, InitTokenContract(depTokenTwoKp, tokenAddressTwo))
+	require.NoError(t, InitTokenContract(depTokenOneKp, tokenAddressOne, HorizonURL))
+	require.NoError(t, InitTokenContract(depTokenTwoKp, tokenAddressTwo, HorizonURL))
 
 	// acc0 := wallet.NewAccount("5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a", *kpsToFund[0].FromAddress(), [20]byte([]byte{86, 253, 40, 156, 238, 113, 74, 94, 71, 28, 65, 132, 54, 239, 166, 62, 120, 13, 122, 135}))
 	// acc1 := wallet.NewAccount("7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6", *kpsToFund[0].FromAddress(), [20]byte([]byte{101, 54, 66, 91, 233, 90, 102, 97, 246, 198, 246, 141, 112, 155, 107, 225, 82, 120, 93, 246}))
@@ -165,7 +167,7 @@ func NewTestSetup(t *testing.T, options ...bool) *Setup {
 		assetContractIDs = append(assetContractIDs, assetContractID)
 	}
 
-	cbs := NewContractBackendsFromKeys(kpsToFund[:2], []pwallet.Account{acc0, acc1})
+	cbs := NewContractBackendsFromKeys(kpsToFund[:2], []pwallet.Account{acc0, acc1}, HorizonURL)
 
 	aliceCB := cbs[0]
 	aliceWallet := w0
@@ -200,7 +202,7 @@ func SetupAccountsAndContracts(t *testing.T, deployerKps []*keypair.Full, kps []
 		for _, kp := range kps {
 			addr, err := types.MakeAccountAddress(kp)
 			require.NoError(t, err)
-			require.NoError(t, MintToken(deployerKps[i], tokenAddresses[i], tokenBalance, addr))
+			require.NoError(t, MintToken(deployerKps[i], tokenAddresses[i], tokenBalance, addr, HorizonURL))
 
 		}
 	}
@@ -216,18 +218,19 @@ func CreateFundersAndAdjudicators(accs []*wallet.Account, cbs []*client.Contract
 	return funders, adjs
 }
 
-func NewContractBackendsFromKeys(kps []*keypair.Full, acc []pwallet.Account) []*client.ContractBackend {
+func NewContractBackendsFromKeys(kps []*keypair.Full, acc []pwallet.Account, url string) []*client.ContractBackend {
 	cbs := make([]*client.ContractBackend, len(kps))
 	// generate Configs
 	for i, kp := range kps {
-		cbs[i] = NewContractBackendFromKey(kp, &acc[i])
+		cbs[i] = NewContractBackendFromKey(kp, &acc[i], url)
 	}
 	return cbs
 }
 
-func NewContractBackendFromKey(kp *keypair.Full, acc *pwallet.Account) *client.ContractBackend {
+func NewContractBackendFromKey(kp *keypair.Full, acc *pwallet.Account, url string) *client.ContractBackend {
 	trConfig := client.TransactorConfig{}
 	trConfig.SetKeyPair(kp)
+	trConfig.SetHorizonURL(url)
 	if acc != nil {
 		trConfig.SetAccount(*acc)
 	}
@@ -292,11 +295,11 @@ func CreateFundStellarAccounts(pairs []*keypair.Full, initialBalance string) err
 
 	numKps := len(pairs)
 
-	masterClient := client.NewHorizonMasterClient()
+	masterClient := client.NewHorizonMasterClient(NETWORK_PASSPHRASE, HorizonURL)
 	masterHzClient := masterClient.GetHorizonClient()
-	sourceKey := keypair.Root(client.NETWORK_PASSPHRASE)
+	sourceKey := keypair.Root(NETWORK_PASSPHRASE)
 
-	hzClient := client.NewHorizonClient()
+	hzClient := client.NewHorizonClient(HorizonURL)
 
 	ops := make([]txnbuild.Operation, numKps)
 
@@ -323,7 +326,7 @@ func CreateFundStellarAccounts(pairs []*keypair.Full, initialBalance string) err
 
 	txParams := client.GetBaseTransactionParamsWithFee(&masterAccount, txnbuild.MinBaseFee+100, ops...)
 
-	txSigned, err := client.CreateSignedTransactionWithParams([]*keypair.Full{sourceKey}, txParams)
+	txSigned, err := client.CreateSignedTransactionWithParams([]*keypair.Full{sourceKey}, txParams, NETWORK_PASSPHRASE)
 
 	if err != nil {
 		panic(err)

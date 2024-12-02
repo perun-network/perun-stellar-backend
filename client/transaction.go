@@ -20,6 +20,13 @@ const (
 	sorobanTestnet = "https://soroban-testnet.stellar.org"
 )
 
+type RPCGetTxResponse struct {
+	Error         string `json:"error,omitempty"`
+	EnvelopeXdr   string `json:"envelopeXdr"`
+	ResultXdr     string `json:"resultXdr"`
+	ResultMetaXdr string `json:"resultMetaXdr"`
+}
+
 func (st *StellarSigner) createSignedTxFromParams(txParams txnbuild.TransactionParams) (*txnbuild.Transaction, error) {
 
 	txUnsigned, err := txnbuild.NewTransaction(txParams)
@@ -27,7 +34,14 @@ func (st *StellarSigner) createSignedTxFromParams(txParams txnbuild.TransactionP
 		return nil, err
 	}
 
-	tx, err := txUnsigned.Sign(NETWORK_PASSPHRASE, st.keyPair)
+	passphrase := ""
+	if st.hzClient.HorizonURL == "http://localhost:8000/" {
+		passphrase = NETWORK_PASSPHRASE
+	} else {
+		passphrase = NETWORK_PASSPHRASETestNet
+
+	}
+	tx, err := txUnsigned.Sign(passphrase, st.keyPair)
 	if err != nil {
 		return nil, err
 	}
@@ -35,13 +49,49 @@ func (st *StellarSigner) createSignedTxFromParams(txParams txnbuild.TransactionP
 	return tx, nil
 }
 
-func DecodeTxMeta(tx horizon.Transaction) (xdr.TransactionMeta, error) {
-	var transactionMeta xdr.TransactionMeta
+func DecodeTxMeta(tx horizon.Transaction, hzClient *horizonclient.Client) (xdr.TransactionMeta, error) {
+	/*var transactionMeta xdr.TransactionMeta
 	err := xdr.SafeUnmarshalBase64(tx.ResultMetaXdr, &transactionMeta)
 	if err != nil {
 		return xdr.TransactionMeta{}, err
 	}
 
+	return transactionMeta, nil*/
+	// Before preflighting, make sure soroban-rpc is in sync with Horizon
+	root, err := hzClient.Root()
+	if err != nil {
+		log.Println("Error getting root", err)
+		return xdr.TransactionMeta{}, err
+	}
+
+	var link string
+	if hzClient.HorizonURL == "http://localhost:8000/" {
+		link = sorobanRPCLink
+	} else {
+		link = sorobanTestnet
+	}
+	err = syncWithSorobanRPC(uint32(root.HorizonSequence), link)
+	if err != nil {
+		log.Println("Error syncing with soroban-rpc", err)
+		return xdr.TransactionMeta{}, err
+	}
+
+	ch := jhttp.NewChannel(link, nil)
+	sorobanRPCClient := jrpc2.NewClient(ch, nil)
+
+	result := RPCGetTxResponse{}
+	err = sorobanRPCClient.CallResult(context.Background(), "getTransaction", struct {
+		Hash string `json:"hash"`
+	}{tx.Hash}, &result)
+	if err != nil {
+		log.Println("Error calling getTransaction", err)
+		return xdr.TransactionMeta{}, err
+	}
+	var transactionMeta xdr.TransactionMeta
+	err = xdr.SafeUnmarshalBase64(result.ResultMetaXdr, &transactionMeta)
+	if err != nil {
+		return xdr.TransactionMeta{}, err
+	}
 	return transactionMeta, nil
 }
 
@@ -165,13 +215,20 @@ func simulateTransaction(hzClient *horizonclient.Client,
 		log.Println("Error getting root", err)
 		return RPCSimulateTxResponse{}, xdr.SorobanTransactionData{}, err
 	}
-	err = syncWithSorobanRPC(uint32(root.HorizonSequence))
+
+	var link string
+	if hzClient.HorizonURL == "http://localhost:8000/" {
+		link = sorobanRPCLink
+	} else {
+		link = sorobanTestnet
+	}
+	err = syncWithSorobanRPC(uint32(root.HorizonSequence), link)
 	if err != nil {
 		log.Println("Error syncing with soroban-rpc", err)
 		return RPCSimulateTxResponse{}, xdr.SorobanTransactionData{}, err
 	}
 
-	ch := jhttp.NewChannel(sorobanRPCLink, nil)
+	ch := jhttp.NewChannel(link, nil)
 	sorobanRPCClient := jrpc2.NewClient(ch, nil)
 	txParams := GetBaseTransactionParamsWithFee(sourceAccount, txnbuild.MinBaseFee, op)
 	txParams.IncrementSequenceNum = false
@@ -200,12 +257,12 @@ func simulateTransaction(hzClient *horizonclient.Client,
 	}
 	return result, transactionData, nil
 }
-func syncWithSorobanRPC(ledgerToWaitFor uint32) error {
+func syncWithSorobanRPC(ledgerToWaitFor uint32, url string) error {
 	for j := 0; j < 20; j++ {
 		result := struct {
 			Sequence uint32 `json:"sequence"`
 		}{}
-		ch := jhttp.NewChannel(sorobanRPCLink, nil)
+		ch := jhttp.NewChannel(url, nil)
 		sorobanRPCClient := jrpc2.NewClient(ch, nil)
 		err := sorobanRPCClient.CallResult(context.Background(), "getLatestLedger", nil, &result)
 		if err != nil {

@@ -219,7 +219,7 @@ func MakeState(state channel.State) (State, error) {
 
 	chanIDStellar := state.ID[wtypes.StellarBackendID]
 	var ethID [types.HashLenXdr]byte
-	if id, ok := state.ID[1]; ok {
+	if id, ok := state.ID[wtypes.EthBackendID]; ok {
 		ethID = id // Assign the value from state.ID[1] if it exists
 	} else {
 		ethID = [types.HashLenXdr]byte{} // Default to zeroed array if no ethID exists
