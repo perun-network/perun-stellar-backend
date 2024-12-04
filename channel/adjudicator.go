@@ -87,27 +87,31 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 		return errChanState
 	}
 	if chanControl.Control.Closed {
-		if chanControl.Control.WithdrawnA && (chanControl.Control.WithdrawnB || a.oneWithdrawer || req.Idx == 0) {
+		log.Println("Channel is already closed")
+		if ((chanControl.Control.WithdrawnA || a.oneWithdrawer) && req.Idx == 0) || (req.Idx == 1 && chanControl.Control.WithdrawnB) {
+			log.Println("Channel is already withdrawn")
 			return nil
 		}
-		if !a.oneWithdrawer && req.Idx == 1 && chanControl.Control.WithdrawnB {
-			return nil
-
-		}
+		return a.handleWithdrawal(ctx, req)
 	}
 	if req.Tx.State.IsFinal {
-		if err := a.Close(ctx, req.Tx.State, req.Tx.Sigs); err != nil {
+		log.Println("Channel is final, closing now")
+		err := a.Close(ctx, req.Tx.State, req.Tx.Sigs)
+		if err != nil {
 			chanControl, errChanState = a.CB.GetChannelInfo(ctx, a.perunAddr, req.Tx.State.ID[wtypes.StellarBackendID])
 			if errChanState != nil {
 				return errChanState
 			}
 
 			if chanControl.Control.Closed {
+				if a.oneWithdrawer && req.Idx == 0 {
+					return nil
+				}
 				return a.handleWithdrawal(ctx, req)
 			}
 			return err
 		}
-		return a.handleWithdrawal(ctx, req)
+		return err
 	}
 
 	if err := a.ForceClose(ctx, req.Tx.State, req.Tx.Sigs); err != nil {

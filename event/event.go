@@ -288,7 +288,7 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 
 		switch sev.GetType() {
 		case EventTypeOpen:
-
+			log.Println("Open Event received", sev)
 			openEventchanStellar, err := GetChannelFromEvents(ev.Body.V0.Data)
 			if err != nil {
 				return nil, err

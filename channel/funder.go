@@ -19,6 +19,7 @@ import (
 	"errors"
 	"github.com/stellar/go/xdr"
 	"log"
+	"math/big"
 	pchannel "perun.network/go-perun/channel"
 	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/client"
@@ -106,6 +107,11 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 			}
 
 			if req.Idx == pchannel.Index(0) && !chanState.Control.FundedA {
+				shouldFund := need_funding(req.State.Balances[0], req.State.Assets)
+				if !shouldFund {
+					log.Println("Party A does not need to fund")
+					return nil
+				}
 				err := f.FundChannel(ctx, req.State, false)
 				if err != nil {
 					return err
@@ -143,8 +149,13 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 				log.Println("Balance A: ", bal0, bal1, " after funding amount: ", req.State.Balances, req.State.Assets)
 				continue
 			}
-			if req.Idx == pchannel.Index(1) && !chanState.Control.FundedB && chanState.Control.FundedA {
+			if req.Idx == pchannel.Index(1) && !chanState.Control.FundedB { // If party A has funded or does not need to fund, party B funds
 				log.Println("Funding party B")
+				shouldFund := need_funding(req.State.Balances[1], req.State.Assets)
+				if !shouldFund {
+					log.Println("Party B does not need to fund", req.State.Balances[1], req.State.Assets)
+					return nil
+				}
 				err := f.FundChannel(ctx, req.State, true)
 				if err != nil {
 					return err
@@ -188,6 +199,7 @@ func (f *Funder) openChannel(ctx context.Context, req pchannel.FundingReq) error
 	}
 	_, err = f.cb.GetChannelInfo(ctx, f.perunAddr, req.State.ID[wtypes.StellarBackendID])
 	if err != nil {
+		log.Println("Error while getting channel info: ", err)
 		return err
 	}
 	return nil
@@ -256,4 +268,14 @@ func assetSliceToSet(assets []xdr.ScVal) map[string]struct{} {
 		assetSet[asset.String()] = struct{}{}
 	}
 	return assetSet
+}
+
+func need_funding(balances []pchannel.Bal, assets []pchannel.Asset) bool {
+	for i, bal := range balances {
+		_, ok := assets[i].(*types.StellarAsset)
+		if bal.Cmp(big.NewInt(0)) != 0 && ok { // if balance is 0 or asset is not stellar asset, participant does not need to fund
+			return true
+		}
+	}
+	return false
 }

@@ -197,7 +197,7 @@ func (c *ContractBackend) InvokeSignedTx(fname string, callTxArgs xdr.ScVec, con
 	fnameXdr := xdr.ScSymbol(fname)
 	hzAcc, err := c.tr.GetHorizonAccount()
 	if err != nil {
-		return xdr.TransactionMeta{}, err
+		return xdr.TransactionMeta{}, errors.Join(errors.New("failed to get horizon account"), err)
 	}
 
 	hzClient := c.tr.GetHorizonClient()
@@ -212,11 +212,11 @@ func (c *ContractBackend) InvokeSignedTx(fname string, callTxArgs xdr.ScVec, con
 	txParams := GetBaseTransactionParamsWithFee(&hzAcc, minFee+minFeeCustom, &preFlightOp)
 	txUnsigned, err := txnbuild.NewTransaction(txParams)
 	if err != nil {
-		return xdr.TransactionMeta{}, err
+		return xdr.TransactionMeta{}, errors.Join(errors.New("error building Transaction"), err)
 	}
 	txMeta, err := c.tr.sender.SignSendTx(*txUnsigned)
 	if err != nil {
-		return xdr.TransactionMeta{}, err
+		return xdr.TransactionMeta{}, errors.Join(errors.New("sending tx"), err)
 	}
 
 	return txMeta, nil
