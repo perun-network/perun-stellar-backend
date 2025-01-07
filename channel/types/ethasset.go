@@ -129,7 +129,7 @@ type (
 
 	AssetID struct {
 		backendID uint32
-		LedgerID  ChainID
+		ledgerID  ChainID
 	}
 
 	// AssetMapKey is the map key representation of an asset.
@@ -137,15 +137,15 @@ type (
 )
 
 func MakeEthAsset(id *big.Int, holder wallet.Address) EthAsset {
-	return EthAsset{assetID: AssetID{backendID: 1, LedgerID: MakeChainID(id)}, AssetHolder: holder}
+	return EthAsset{assetID: AssetID{backendID: 1, ledgerID: MakeChainID(id)}, AssetHolder: holder}
 }
 
 func (id AssetID) BackendID() uint32 {
 	return id.backendID
 }
 
-func (id AssetID) LedgerId() multi.LedgerID {
-	return &id.LedgerID
+func (id AssetID) LedgerID() multi.LedgerID {
+	return &id.ledgerID
 }
 
 // MakeAssetID makes a AssetID for the given id.
@@ -153,7 +153,7 @@ func MakeAssetID(id *big.Int) multi.AssetID {
 	if id.Sign() < 0 {
 		panic("must not be smaller than zero")
 	}
-	return AssetID{backendID: 1, LedgerID: MakeChainID(id)}
+	return AssetID{backendID: 1, ledgerID: MakeChainID(id)}
 }
 
 // MapKey returns the asset's map key representation.
@@ -179,15 +179,15 @@ func (a EthAsset) MarshalBinary() ([]byte, error) {
 // UnmarshalBinary unmarshals the asset from its binary representation.
 func (a *EthAsset) UnmarshalBinary(data []byte) error {
 	buf := bytes.NewBuffer(data)
-	return perunio.Decode(buf, &a.assetID.LedgerID, &a.assetID.backendID, &a.AssetHolder)
+	return perunio.Decode(buf, &a.assetID.ledgerID, &a.assetID.backendID, &a.AssetHolder)
 }
 
 // LedgerID returns the ledger ID the asset lives on.
 func (a EthAsset) LedgerID() multi.LedgerID {
-	return a.AssetID().LedgerId()
+	return a.AssetID().LedgerID()
 }
 
-// LedgerID returns the ledger ID the asset lives on.
+// AssetID returns the ledger ID the asset lives on.
 func (a EthAsset) AssetID() multi.AssetID {
 	return a.assetID
 }
@@ -198,7 +198,7 @@ func (a EthAsset) Equal(b channel.Asset) bool {
 	if !ok {
 		return false
 	}
-	return a.assetID.LedgerID.MapKey() == ethAsset.assetID.LedgerID.MapKey() && a.AssetHolder.Equal(ethAsset.AssetHolder)
+	return a.assetID.ledgerID.MapKey() == ethAsset.assetID.ledgerID.MapKey() && a.AssetHolder.Equal(ethAsset.AssetHolder)
 }
 
 // Address returns the address of the asset.

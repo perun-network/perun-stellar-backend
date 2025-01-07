@@ -149,7 +149,7 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 				log.Println("Balance A: ", bal0, bal1, " after funding amount: ", req.State.Balances, req.State.Assets)
 				continue
 			}
-			if req.Idx == pchannel.Index(1) && !chanState.Control.FundedB { // If party A has funded or does not need to fund, party B funds
+			if req.Idx == pchannel.Index(1) && !chanState.Control.FundedB && (chanState.Control.FundedA || !need_funding(req.State.Balances[0], req.State.Assets)) { // If party A has funded or does not need to fund, party B funds
 				log.Println("Funding party B")
 				shouldFund := need_funding(req.State.Balances[1], req.State.Assets)
 				if !shouldFund {

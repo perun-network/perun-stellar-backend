@@ -104,7 +104,7 @@ func assetToEthAsset(asset channel.Asset) ChannelAsset {
 		log.Panicf("expected asset of type MultiLedgerAsset, but got wrong asset type: %T", asset)
 	}
 	id := new(big.Int)
-	_, ok = id.SetString(string(multiAsset.AssetID().LedgerId().MapKey()), 10) // base 10 for decimal numbers
+	_, ok = id.SetString(string(multiAsset.AssetID().LedgerID().MapKey()), 10) // base 10 for decimal numbers
 	if !ok {
 		log.Panicf("Error: Failed to parse string into big.Int")
 	}
@@ -139,7 +139,7 @@ func assetToStellarAsset(asset channel.Asset) ChannelAsset {
 	}
 }
 
-// EncodeState encodes the state as with abi.encode() in the smart contracts.
+// EncodeEthState encodes the state as with abi.encode() in the smart contracts.
 func EncodeEthState(state *EthChannelState) ([]byte, error) {
 
 	// Define the top-level ABI type for the state struct.
@@ -267,7 +267,7 @@ func EncodeEthState(state *EthChannelState) ([]byte, error) {
 
 // here we have ethereum methods
 
-// ChannelState is an auto generated low-level Go binding around an user-defined struct.
+// EthChannelState is an auto generated low-level Go binding around a user-defined struct.
 type EthChannelState struct {
 	ChannelID [][32]byte
 	Version   uint64
@@ -276,6 +276,7 @@ type EthChannelState struct {
 	IsFinal   bool
 }
 
+// ChannelAllocation is an auto generated low-level Go binding around a user-defined struct.
 type ChannelAllocation struct {
 	Assets   []ChannelAsset
 	Backends []*big.Int
@@ -283,12 +284,14 @@ type ChannelAllocation struct {
 	Locked   []ChannelSubAlloc
 }
 
+// ChannelAsset is an auto generated low-level Go binding around a user-defined struct.
 type ChannelAsset struct {
 	ChainID  *big.Int
 	EthAsset common.Address
 	CCAsset  []byte
 }
 
+// ChannelSubAlloc is an auto generated low-level Go binding around a user-defined struct.
 type ChannelSubAlloc struct {
 	ID       [][32]byte
 	Balances []*big.Int

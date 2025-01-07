@@ -256,7 +256,7 @@ func extractAndConvertLedgerID(asset channel.Asset) (uint64, error) {
 	if !ok {
 		return 0, errors.New("invalid Asset format")
 	}
-	id := multiAsset.AssetID().LedgerId()
+	id := multiAsset.AssetID().LedgerID()
 	if id == nil {
 		return 0, errors.New("invalid LedgerID")
 	}

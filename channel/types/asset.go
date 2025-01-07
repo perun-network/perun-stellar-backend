@@ -44,11 +44,13 @@ type (
 	ContractLID struct{ string }
 )
 
+// BackendID returns the backend ID of the asset.
 func (c CCID) BackendID() uint32 {
 	return c.backendID
 }
 
-func (c CCID) LedgerId() multi.LedgerID {
+// LedgerID returns the ledger ID of the asset.
+func (c CCID) LedgerID() multi.LedgerID {
 	return c.ledgerId
 }
 
@@ -77,6 +79,7 @@ func (id ContractLID) MarshalBinary() ([]byte, error) {
 	return hex.DecodeString(id.string)
 }
 
+// MapKey returns the asset's map key representation.
 func (id ContractLID) MapKey() multi.LedgerIDMapKey {
 	if id.string == "" {
 		return ""
@@ -84,18 +87,22 @@ func (id ContractLID) MapKey() multi.LedgerIDMapKey {
 	return multi.LedgerIDMapKey(id.string)
 }
 
+// ContractID returns the contract ID of the asset.
 func (a Asset) ContractID() xdr.Hash {
 	return a.contractID
 }
 
+// NewStellarAsset creates a new Stellar asset with the given contract ID.
 func NewStellarAsset(contractID xdr.Hash) *StellarAsset {
 	return &StellarAsset{Asset: Asset{contractID}, id: MakeCCID(MakeContractID("2"))}
 }
 
+// MarshalBinary marshals the Stellar asset into its binary representation.
 func (s StellarAsset) MarshalBinary() (data []byte, err error) {
 	return s.Asset.MarshalBinary()
 }
 
+// UnmarshalBinary unmarshals the Stellar asset from its binary representation.
 func (s *StellarAsset) UnmarshalBinary(data []byte) error {
 	var addr [HashLenXdr]byte
 	copy(addr[:], data)
@@ -107,10 +114,12 @@ func (s *StellarAsset) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
+// MarshalBinary marshals the asset into its binary representation.
 func (a Asset) MarshalBinary() (data []byte, err error) {
 	return a.contractID.MarshalBinary()
 }
 
+// UnmarshalBinary unmarshals the asset from its binary representation.
 func (a *Asset) UnmarshalBinary(data []byte) error {
 	var addr [HashLenXdr]byte
 	copy(addr[:], data)
@@ -121,32 +130,37 @@ func (a *Asset) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
+// Equal checks if the given asset is equal to the Stellar asset.
 func (s StellarAsset) Equal(asset channel.Asset) bool {
 	_, ok := asset.(*StellarAsset)
 	return ok
 }
 
+// Equal checks if the given asset is equal to the asset.
 func (a Asset) Equal(asset channel.Asset) bool {
 	_, ok := asset.(*Asset)
 	return ok
 }
 
+// Address returns the address of the Stellar asset.
 func (s StellarAsset) Address() []byte {
 	return s.Asset.Address()
 }
 
+// Address returns the address of the asset.
 func (a Asset) Address() []byte {
 	return a.contractID[:]
 
 }
 
-func (a StellarAsset) AssetID() multi.AssetID {
-	return a.id
+// AssetID returns the asset ID of the Stellar asset.
+func (s StellarAsset) AssetID() multi.AssetID {
+	return s.id
 }
 
 // MapKey returns the asset's map key representation.
-func (a StellarAsset) MapKey() AssetMapKey {
-	d, err := a.MarshalBinary()
+func (s StellarAsset) MapKey() AssetMapKey {
+	d, err := s.MarshalBinary()
 	if err != nil {
 		log.Fatalf("could not marshal asset: %v", err)
 		return ""
@@ -156,10 +170,11 @@ func (a StellarAsset) MapKey() AssetMapKey {
 }
 
 // LedgerID returns the ledger ID the asset lives on.
-func (a StellarAsset) LedgerID() multi.LedgerID {
-	return a.id.LedgerId()
+func (s StellarAsset) LedgerID() multi.LedgerID {
+	return s.id.LedgerID()
 }
 
+// MakeScAddress generates a ScAddress from the Stellar asset.
 func (s StellarAsset) MakeScAddress() (xdr.ScAddress, error) {
 	hash := s.Asset.contractID
 	scvAddr, err := MakeContractAddress(hash)
@@ -169,6 +184,7 @@ func (s StellarAsset) MakeScAddress() (xdr.ScAddress, error) {
 	return scvAddr, nil
 }
 
+// FromScAddress generates a Stellar asset from the given ScAddress.
 func (s *StellarAsset) FromScAddress(address xdr.ScAddress) error {
 	addrType := address.Type
 	if addrType != xdr.ScAddressTypeScAddressTypeContract {
@@ -180,6 +196,7 @@ func (s *StellarAsset) FromScAddress(address xdr.ScAddress) error {
 	return nil
 }
 
+// NewStellarAssetFromScAddress creates a new Stellar asset from the given ScAddress.
 func NewStellarAssetFromScAddress(address xdr.ScAddress) (*StellarAsset, error) {
 	s := &StellarAsset{}
 	err := s.FromScAddress(address)
@@ -190,6 +207,7 @@ func NewStellarAssetFromScAddress(address xdr.ScAddress) (*StellarAsset, error) 
 	return s, nil
 }
 
+// MustStellarAsset panics if the given asset is not a Stellar asset.
 func MustStellarAsset(asset channel.Asset) *StellarAsset {
 	p, ok := asset.(*StellarAsset)
 	if !ok {
@@ -198,6 +216,7 @@ func MustStellarAsset(asset channel.Asset) *StellarAsset {
 	return p
 }
 
+// ToStellarAsset converts the given asset to a Stellar asset.
 func ToStellarAsset(asset channel.Asset) (*StellarAsset, error) {
 	p, ok := asset.(*StellarAsset)
 	if !ok {
@@ -206,6 +225,7 @@ func ToStellarAsset(asset channel.Asset) (*StellarAsset, error) {
 	return p, nil
 }
 
+// MakeAccountAddress generates an account address from the given keypair.
 func MakeAccountAddress(kp keypair.KP) (xdr.ScAddress, error) {
 	accountId, err := xdr.AddressToAccountId(kp.Address())
 	if err != nil {
@@ -214,6 +234,7 @@ func MakeAccountAddress(kp keypair.KP) (xdr.ScAddress, error) {
 	return xdr.NewScAddress(xdr.ScAddressTypeScAddressTypeAccount, accountId)
 }
 
+// AccountAddressFromAddress generates an account address from the given address.
 func AccountAddressFromAddress(addr keypair.FromAddress) (xdr.ScAddress, error) {
 	accountId, err := xdr.AddressToAccountId(addr.Address())
 	if err != nil {
@@ -222,10 +243,12 @@ func AccountAddressFromAddress(addr keypair.FromAddress) (xdr.ScAddress, error) 
 	return xdr.NewScAddress(xdr.ScAddressTypeScAddressTypeAccount, accountId)
 }
 
+// MakeContractAddress generates a contract address from the given contract ID.
 func MakeContractAddress(contractID xdr.Hash) (xdr.ScAddress, error) {
 	return xdr.NewScAddress(xdr.ScAddressTypeScAddressTypeContract, contractID)
 }
 
+// ToAccountAddress converts the given ScAddress to an account address.
 func ToAccountAddress(address xdr.ScAddress) (keypair.FromAddress, error) {
 	if address.Type != xdr.ScAddressTypeScAddressTypeAccount {
 		return keypair.FromAddress{}, errors.New("invalid address type")
