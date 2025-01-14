@@ -24,7 +24,6 @@ import (
 	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/wallet"
-	wtypes "perun.network/perun-stellar-backend/wallet/types"
 	"perun.network/perun-stellar-backend/wire"
 
 	"time"
@@ -95,7 +94,7 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 		case <-time.After(f.pollingInterval):
 
 			log.Printf("%s: Polling for opened channel...", party)
-			chanState, err := f.cb.GetChannelInfo(ctx, f.perunAddr, req.State.ID[wtypes.StellarBackendID])
+			chanState, err := f.cb.GetChannelInfo(ctx, f.perunAddr, req.State.ID)
 			if err != nil {
 				log.Printf("%s: Error while polling for opened channel: %v", party, err)
 				continue
@@ -197,7 +196,7 @@ func (f *Funder) openChannel(ctx context.Context, req pchannel.FundingReq) error
 	if err != nil {
 		return errors.Join(errors.New("error while opening channel in party A"), err)
 	}
-	_, err = f.cb.GetChannelInfo(ctx, f.perunAddr, req.State.ID[wtypes.StellarBackendID])
+	_, err = f.cb.GetChannelInfo(ctx, f.perunAddr, req.State.ID)
 	if err != nil {
 		log.Println("Error while getting channel info: ", err)
 		return err
@@ -216,7 +215,7 @@ func (f *Funder) FundChannel(ctx context.Context, state *pchannel.State, funderI
 		return errors.New("asset address is not equal to the address stored in the state")
 	}
 
-	return f.cb.Fund(ctx, f.perunAddr, state.ID[wtypes.StellarBackendID], funderIdx)
+	return f.cb.Fund(ctx, f.perunAddr, state.ID, funderIdx)
 }
 
 func (f *Funder) AbortChannel(ctx context.Context, state *pchannel.State) error {

@@ -94,7 +94,7 @@ func TestHappyChannel(t *testing.T) {
 		require.NoError(t, adjAlice.Withdraw(ctxAliceWithdraw, reqAlice, nil))
 
 		perunAddrAlice := adjAlice.GetPerunAddr()
-		stellarChanAlice, err := adjAlice.CB.GetChannelInfo(ctx, perunAddrAlice, next.ID[2])
+		stellarChanAlice, err := adjAlice.CB.GetChannelInfo(ctx, perunAddrAlice, next.ID)
 		require.True(t, stellarChanAlice.Control.WithdrawnA)
 		require.NoError(t, err)
 		require.NoError(t, adjBob.Withdraw(ctx, reqBob, nil))
@@ -235,7 +235,7 @@ func TestChannel_RegisterFinal(t *testing.T) {
 		require.NoError(t, adjAlice.Register(ctxAliceRegister, reqAlice, nil))
 
 		perunAddrAlice := adjAlice.GetPerunAddr()
-		stellarChanAlice, err := adjAlice.CB.GetChannelInfo(ctx, perunAddrAlice, next.ID[2])
+		stellarChanAlice, err := adjAlice.CB.GetChannelInfo(ctx, perunAddrAlice, next.ID)
 
 		require.True(t, stellarChanAlice.Control.Disputed)
 

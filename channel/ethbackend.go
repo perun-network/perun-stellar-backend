@@ -17,6 +17,7 @@ package channel
 import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
 	"log"
 	"math/big"
 	"perun.network/go-perun/channel"
@@ -30,17 +31,11 @@ import (
 // ToEthState converts a channel.State to a ChannelState struct.
 func ToEthState(s *channel.State) EthChannelState {
 	backends := make([]*big.Int, len(s.Allocation.Assets))
-	channelIDs := make([]channel.ID, len(s.Allocation.Assets))
 	for i := range s.Allocation.Assets { // we assume that for each asset there is an element in backends corresponding to the backendID the asset belongs to.
 		backends[i] = big.NewInt(int64(s.Allocation.Backends[i]))
-		channelIDs[i] = s.ID[s.Allocation.Backends[i]]
 	}
 	locked := make([]ChannelSubAlloc, len(s.Locked))
 	for i, sub := range s.Locked {
-		subIDs := make([]channel.ID, len(backends))
-		for j := range subIDs {
-			subIDs[j] = sub.ID[s.Allocation.Backends[j]]
-		}
 		// Create index map.
 		indexMap := make([]uint16, s.NumParts())
 		if len(sub.IndexMap) == 0 {
@@ -53,7 +48,7 @@ func ToEthState(s *channel.State) EthChannelState {
 			}
 		}
 
-		locked[i] = ChannelSubAlloc{ID: subIDs, Balances: sub.Bals, IndexMap: indexMap}
+		locked[i] = ChannelSubAlloc{ID: sub.ID, Balances: sub.Bals, IndexMap: indexMap}
 	}
 
 	// iterate over s.Allocation.Backends and check if they are of type EthAsset
@@ -90,7 +85,7 @@ func ToEthState(s *channel.State) EthChannelState {
 		log.Panicf("error encoding app data: %v", err)
 	}
 	return EthChannelState{
-		ChannelID: channelIDs,
+		ChannelID: s.ID,
 		Version:   s.Version,
 		Outcome:   outcome,
 		AppData:   appData,
@@ -139,12 +134,55 @@ func assetToStellarAsset(asset channel.Asset) ChannelAsset {
 	}
 }
 
+func ToEthParams(params *channel.Params) (ChannelParams, error) {
+	participants := make([]ChannelParticipant, len(params.Parts))
+	for i, p := range params.Parts {
+		ethAddress := common.Address{}
+		if add, ok := p[EthBackendID]; ok {
+			ethBytes, err := add.MarshalBinary()
+			if err != nil {
+				return ChannelParams{}, errors.WithMessage(err, "could not encode eth address")
+			}
+			ethAddress.SetBytes(ethBytes)
+		}
+		ccAddress := make([]byte, 32)
+		if add, ok := p[wtypes.StellarBackendID]; ok {
+			ccBytes, err := add.MarshalBinary()
+			if err != nil {
+				return ChannelParams{}, errors.WithMessage(err, "error encoding cc address")
+			}
+			ccAddress = ccBytes
+		}
+		participants[i] = ChannelParticipant{EthAddress: ethAddress, CcAddress: ccAddress}
+	}
+	var app common.Address
+	if params.App != nil && !channel.IsNoApp(params.App) {
+		appDef, ok := params.App.Def().(*AppID)
+		if !ok {
+			return ChannelParams{}, errors.New("appDef is not of type *AppID")
+		}
+		appBytes, err := appDef.Address.MarshalBinary()
+		if err != nil {
+			log.Panicf("error encoding app address: %v", err)
+		}
+		app.SetBytes(appBytes)
+	}
+	return ChannelParams{
+		ChallengeDuration: new(big.Int).SetUint64(params.ChallengeDuration),
+		Nonce:             params.Nonce,
+		Participants:      participants,
+		App:               app,
+		LedgerChannel:     params.LedgerChannel,
+		VirtualChannel:    params.VirtualChannel,
+	}, nil
+}
+
 // EncodeEthState encodes the state as with abi.encode() in the smart contracts.
 func EncodeEthState(state *EthChannelState) ([]byte, error) {
 
 	// Define the top-level ABI type for the state struct.
 	stateType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
-		{Name: "channelID", Type: "bytes32[]"},
+		{Name: "channelID", Type: "bytes32"},
 		{Name: "version", Type: "uint64"},
 		{Name: "outcome", Type: "tuple", Components: []abi.ArgumentMarshaling{
 			{Name: "assets", Type: "tuple[]", Components: []abi.ArgumentMarshaling{
@@ -155,7 +193,7 @@ func EncodeEthState(state *EthChannelState) ([]byte, error) {
 			{Name: "backends", Type: "uint256[]"},
 			{Name: "balances", Type: "uint256[][]"},
 			{Name: "locked", Type: "tuple[]", Components: []abi.ArgumentMarshaling{
-				{Name: "ID", Type: "bytes32[]"},
+				{Name: "ID", Type: "bytes32"},
 				{Name: "balances", Type: "uint256[]"},
 				{Name: "indexMap", Type: "uint16[]"},
 			}},
@@ -175,7 +213,7 @@ func EncodeEthState(state *EthChannelState) ([]byte, error) {
 	// Pack the data for encoding.
 	return args.Pack(
 		struct {
-			ChannelID [][32]byte
+			ChannelID [32]byte
 			Version   uint64
 			Outcome   struct {
 				Assets []struct {
@@ -186,7 +224,7 @@ func EncodeEthState(state *EthChannelState) ([]byte, error) {
 				Backends []*big.Int
 				Balances [][]*big.Int
 				Locked   []struct {
-					ID       [][32]byte
+					ID       [32]byte
 					Balances []*big.Int
 					IndexMap []uint16
 				}
@@ -205,7 +243,7 @@ func EncodeEthState(state *EthChannelState) ([]byte, error) {
 				Backends []*big.Int
 				Balances [][]*big.Int
 				Locked   []struct {
-					ID       [][32]byte
+					ID       [32]byte
 					Balances []*big.Int
 					IndexMap []uint16
 				}
@@ -236,18 +274,18 @@ func EncodeEthState(state *EthChannelState) ([]byte, error) {
 				Backends: state.Outcome.Backends,
 				Balances: state.Outcome.Balances,
 				Locked: func() []struct {
-					ID       [][32]byte
+					ID       [32]byte
 					Balances []*big.Int
 					IndexMap []uint16
 				} {
 					var locked []struct {
-						ID       [][32]byte
+						ID       [32]byte
 						Balances []*big.Int
 						IndexMap []uint16
 					}
 					for _, lock := range state.Outcome.Locked {
 						locked = append(locked, struct {
-							ID       [][32]byte
+							ID       [32]byte
 							Balances []*big.Int
 							IndexMap []uint16
 						}{
@@ -269,7 +307,7 @@ func EncodeEthState(state *EthChannelState) ([]byte, error) {
 
 // EthChannelState is an auto generated low-level Go binding around a user-defined struct.
 type EthChannelState struct {
-	ChannelID [][32]byte
+	ChannelID [32]byte
 	Version   uint64
 	Outcome   ChannelAllocation
 	AppData   []byte
@@ -293,7 +331,87 @@ type ChannelAsset struct {
 
 // ChannelSubAlloc is an auto generated low-level Go binding around a user-defined struct.
 type ChannelSubAlloc struct {
-	ID       [][32]byte
+	ID       [32]byte
 	Balances []*big.Int
 	IndexMap []uint16
+}
+
+// EncodeChannelParams encodes the ChannelParams struct using the ABI encoding.
+func EncodeChannelParams(params *ChannelParams) ([]byte, error) {
+	// Define the top-level ABI type for the ChannelParams struct.
+	paramsType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
+		{Name: "challengeDuration", Type: "uint256"},
+		{Name: "nonce", Type: "uint256"},
+		{Name: "participants", Type: "tuple[]", Components: []abi.ArgumentMarshaling{
+			{Name: "ethAddress", Type: "address"},
+			{Name: "ccAddress", Type: "bytes"},
+		}},
+		{Name: "app", Type: "address"},
+		{Name: "ledgerChannel", Type: "bool"},
+		{Name: "virtualChannel", Type: "bool"},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Define the Arguments.
+	args := abi.Arguments{
+		{Type: paramsType},
+	}
+
+	// Pack the data for encoding.
+	return args.Pack(
+		struct {
+			ChallengeDuration *big.Int
+			Nonce             *big.Int
+			Participants      []struct {
+				EthAddress common.Address
+				CcAddress  []byte
+			}
+			App            common.Address
+			LedgerChannel  bool
+			VirtualChannel bool
+		}{
+			ChallengeDuration: params.ChallengeDuration,
+			Nonce:             params.Nonce,
+			Participants: func() []struct {
+				EthAddress common.Address
+				CcAddress  []byte
+			} {
+				var participants []struct {
+					EthAddress common.Address
+					CcAddress  []byte
+				}
+				for _, participant := range params.Participants {
+					participants = append(participants, struct {
+						EthAddress common.Address
+						CcAddress  []byte
+					}{
+						EthAddress: participant.EthAddress,
+						CcAddress:  participant.CcAddress,
+					})
+				}
+				return participants
+			}(),
+			App:            params.App,
+			LedgerChannel:  params.LedgerChannel,
+			VirtualChannel: params.VirtualChannel,
+		},
+	)
+}
+
+// ChannelParams is an auto generated low-level Go binding around an user-defined struct.
+type ChannelParams struct {
+	ChallengeDuration *big.Int
+	Nonce             *big.Int
+	Participants      []ChannelParticipant
+	App               common.Address
+	LedgerChannel     bool
+	VirtualChannel    bool
+}
+
+// ChannelParticipant is an auto generated low-level Go binding around an user-defined struct.
+type ChannelParticipant struct {
+	EthAddress common.Address
+	CcAddress  []byte
 }

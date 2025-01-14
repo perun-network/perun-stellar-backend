@@ -22,7 +22,6 @@ import (
 	ptest "perun.network/go-perun/channel/test"
 	schannel "perun.network/perun-stellar-backend/channel"
 	_ "perun.network/perun-stellar-backend/channel/test"
-	"perun.network/perun-stellar-backend/wallet/types"
 	"perun.network/perun-stellar-backend/wire"
 
 	pkgtest "polycry.pt/poly-go/test"
@@ -75,7 +74,7 @@ func TestParamsConversion(t *testing.T) {
 func checkPerunParamsEquality(t *testing.T, first, last channel.Params, numParts int) {
 	lastChanID, err := schannel.Backend.CalcID(&last)
 	require.NoError(t, err)
-	require.Equal(t, first.ID()[types.StellarBackendID], lastChanID)
+	require.Equal(t, first.ID(), lastChanID)
 
 	for i := 0; i < numParts; i++ {
 		for backendID := range last.Parts[i] {

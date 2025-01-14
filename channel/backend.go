@@ -15,8 +15,8 @@
 package channel
 
 import (
-	"crypto/sha256"
-	"errors"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/pkg/errors"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/channel/types"
@@ -35,12 +35,16 @@ func init() {
 }
 
 func (b backend) CalcID(params *channel.Params) (channel.ID, error) {
-	wp, _ := wire.MustMakeParams(*params)
-	bytes, err := wp.MarshalBinary()
+	p, err := ToEthParams(params)
 	if err != nil {
-		return channel.ID{}, err
+		return channel.ID{}, errors.WithMessage(err, "stellar could not convert params")
 	}
-	return sha256.Sum256(bytes), nil
+	bytes, err := EncodeChannelParams(&p)
+	if err != nil {
+		return channel.ID{}, errors.WithMessage(err, "stellar could not encode params")
+	}
+	// Hash encoded params.
+	return crypto.Keccak256Hash(bytes), nil
 }
 
 func (b backend) Sign(account wallet.Account, state *channel.State) (wallet.Sig, error) {
