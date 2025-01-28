@@ -99,7 +99,7 @@ func assetToEthAsset(asset channel.Asset) ChannelAsset {
 		log.Panicf("expected asset of type MultiLedgerAsset, but got wrong asset type: %T", asset)
 	}
 	id := new(big.Int)
-	_, ok = id.SetString(string(multiAsset.AssetID().LedgerID().MapKey()), 10) // base 10 for decimal numbers
+	_, ok = id.SetString(string(multiAsset.LedgerBackendID().LedgerID().MapKey()), 10) // base 10 for decimal numbers
 	if !ok {
 		log.Panicf("Error: Failed to parse string into big.Int")
 	}
