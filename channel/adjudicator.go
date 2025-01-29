@@ -92,8 +92,9 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 	if req.Tx.State.IsFinal {
 		log.Println("Channel is final, closing now")
 		withdrawSelf := needWithdraw([]pchannel.Bal{req.Tx.State.Balances[0][req.Idx], req.Tx.State.Balances[1][req.Idx]}, req.Tx.State.Assets)
-		if req.Idx == 0 && (a.oneWithdrawer || !withdrawSelf) {
-			log.Println("A only closes when A also has to withdraw")
+		withdrawOther := needWithdraw([]pchannel.Bal{req.Tx.State.Balances[0][1-req.Idx], req.Tx.State.Balances[1][1-req.Idx]}, req.Tx.State.Assets)
+		if req.Idx == 0 && a.oneWithdrawer && (!withdrawSelf || !withdrawOther) { // If one participant does not need to withdraw, the swap is cross-chain which means A does not need to close
+			log.Println("A only closes when A & B have to withdraw")
 			return nil
 		}
 		err := a.Close(ctx, req.Tx.State, req.Tx.Sigs)
