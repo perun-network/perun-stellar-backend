@@ -24,7 +24,6 @@ import (
 	"perun.network/go-perun/wallet"
 	"perun.network/perun-stellar-backend/wallet/types"
 	"perun.network/perun-stellar-backend/wire/scval"
-	"strconv"
 )
 
 const NonceLength = 32
@@ -205,20 +204,6 @@ func MakeParams(params channel.Params) (Params, error) {
 		Nonce:             nonce,
 		ChallengeDuration: xdr.Uint64(params.ChallengeDuration),
 	}, nil
-}
-
-func MakeChannelId(state *channel.State) (xdr.ScMap, error) {
-	keys := make([]xdr.ScSymbol, 0, len(state.ID))
-	values := make([]xdr.ScVal, 0, len(state.ID))
-
-	for backendID, idArray := range state.ID {
-		key := xdr.ScSymbol(strconv.Itoa(int(backendID)))
-		keys = append(keys, key)
-		val, _ := scval.MustWrapScBytes(idArray[:])
-		values = append(values, val)
-	}
-
-	return MakeSymbolScMap(keys, values)
 }
 
 func MustMakeParams(params channel.Params) (Params, error) {

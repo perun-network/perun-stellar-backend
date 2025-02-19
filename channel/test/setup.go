@@ -1,4 +1,4 @@
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -114,8 +114,6 @@ func NewTestSetup(t *testing.T, options ...bool) *Setup {
 	}
 
 	_, kpsToFund, _ := MakeRandPerunAccsWallets(5)
-	// kpsToFund[2], _ = keypair.ParseFull("SD4XPDWFDY25V7NRMF47QE4WT6WOFWUJIZGFRMMCRHGVINJ3RMMDG6WS")
-	// kpsToFund[3], _ = keypair.ParseFull("SDHDGJMVERIXSN5LQ5KDLW3F2QIVM2D6CLP3BDHSKWBAYX53YDEY3FND")
 	require.NoError(t, CreateFundStellarAccounts(kpsToFund, initLumensBalance))
 
 	depTokenOneKp := kpsToFund[2]
@@ -142,8 +140,6 @@ func NewTestSetup(t *testing.T, options ...bool) *Setup {
 	require.NoError(t, InitTokenContract(depTokenOneKp, tokenAddressOne, HorizonURL))
 	require.NoError(t, InitTokenContract(depTokenTwoKp, tokenAddressTwo, HorizonURL))
 
-	// acc0 := wallet.NewAccount("5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a", *kpsToFund[0].FromAddress(), [20]byte([]byte{86, 253, 40, 156, 238, 113, 74, 94, 71, 28, 65, 132, 54, 239, 166, 62, 120, 13, 122, 135}))
-	// acc1 := wallet.NewAccount("7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6", *kpsToFund[0].FromAddress(), [20]byte([]byte{101, 54, 66, 91, 233, 90, 102, 97, 246, 198, 246, 141, 112, 155, 107, 225, 82, 120, 93, 246}))
 	acc0, err := wallet.NewRandomAccountWithAddress(mathrand.New(mathrand.NewSource(0)), kpsToFund[0].FromAddress())
 	acc1, err := wallet.NewRandomAccountWithAddress(mathrand.New(mathrand.NewSource(0)), kpsToFund[1].FromAddress())
 	w0 := wallet.NewEphemeralWallet()

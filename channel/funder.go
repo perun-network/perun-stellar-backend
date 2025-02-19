@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ import (
 	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/wallet"
-	wtypes "perun.network/perun-stellar-backend/wallet/types"
 	"perun.network/perun-stellar-backend/wire"
 
 	"time"
@@ -95,7 +94,7 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 		case <-time.After(f.pollingInterval):
 
 			log.Printf("%s: Polling for opened channel...", party)
-			chanState, err := f.cb.GetChannelInfo(ctx, f.perunAddr, req.State.ID[wtypes.StellarBackendID])
+			chanState, err := f.cb.GetChannelInfo(ctx, f.perunAddr, req.State.ID)
 			if err != nil {
 				log.Printf("%s: Error while polling for opened channel: %v", party, err)
 				continue
@@ -107,7 +106,7 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 			}
 
 			if req.Idx == pchannel.Index(0) && !chanState.Control.FundedA {
-				shouldFund := need_funding(req.State.Balances[0], req.State.Assets)
+				shouldFund := needFunding(req.State.Balances[0], req.State.Assets)
 				if !shouldFund {
 					log.Println("Party A does not need to fund")
 					return nil
@@ -149,9 +148,9 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 				log.Println("Balance A: ", bal0, bal1, " after funding amount: ", req.State.Balances, req.State.Assets)
 				continue
 			}
-			if req.Idx == pchannel.Index(1) && !chanState.Control.FundedB && (chanState.Control.FundedA || !need_funding(req.State.Balances[0], req.State.Assets)) { // If party A has funded or does not need to fund, party B funds
+			if req.Idx == pchannel.Index(1) && !chanState.Control.FundedB && (chanState.Control.FundedA || !needFunding(req.State.Balances[0], req.State.Assets)) { // If party A has funded or does not need to fund, party B funds
 				log.Println("Funding party B")
-				shouldFund := need_funding(req.State.Balances[1], req.State.Assets)
+				shouldFund := needFunding(req.State.Balances[1], req.State.Assets)
 				if !shouldFund {
 					log.Println("Party B does not need to fund", req.State.Balances[1], req.State.Assets)
 					return nil
@@ -197,7 +196,7 @@ func (f *Funder) openChannel(ctx context.Context, req pchannel.FundingReq) error
 	if err != nil {
 		return errors.Join(errors.New("error while opening channel in party A"), err)
 	}
-	_, err = f.cb.GetChannelInfo(ctx, f.perunAddr, req.State.ID[wtypes.StellarBackendID])
+	_, err = f.cb.GetChannelInfo(ctx, f.perunAddr, req.State.ID)
 	if err != nil {
 		log.Println("Error while getting channel info: ", err)
 		return err
@@ -216,7 +215,7 @@ func (f *Funder) FundChannel(ctx context.Context, state *pchannel.State, funderI
 		return errors.New("asset address is not equal to the address stored in the state")
 	}
 
-	return f.cb.Fund(ctx, f.perunAddr, state.ID[wtypes.StellarBackendID], funderIdx)
+	return f.cb.Fund(ctx, f.perunAddr, state.ID, funderIdx)
 }
 
 func (f *Funder) AbortChannel(ctx context.Context, state *pchannel.State) error {
@@ -270,7 +269,7 @@ func assetSliceToSet(assets []xdr.ScVal) map[string]struct{} {
 	return assetSet
 }
 
-func need_funding(balances []pchannel.Bal, assets []pchannel.Asset) bool {
+func needFunding(balances []pchannel.Bal, assets []pchannel.Asset) bool {
 	for i, bal := range balances {
 		_, ok := assets[i].(*types.StellarAsset)
 		if bal.Cmp(big.NewInt(0)) != 0 && ok { // if balance is 0 or asset is not stellar asset, participant does not need to fund

@@ -318,7 +318,7 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 			}
 			fundEvent := FundEvent{
 				channel: fundEventchanStellar,
-				idv:     pState.ID[2],
+				idv:     pState.ID,
 			}
 			log.Println("Funding Event received")
 			evs = append(evs, &fundEvent)
@@ -333,7 +333,7 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 			}
 			closeEvent := CloseEvent{
 				channel: closedEventchanStellar,
-				idv:     pState.ID[2],
+				idv:     pState.ID,
 			}
 			log.Println("Close Event received")
 			evs = append(evs, &closeEvent)
@@ -349,7 +349,7 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 			log.Println("Withdrawn Event received")
 			withdrawnEvent := WithdrawnEvent{
 				channel: withdrawnEventchanStellar,
-				idv:     pState.ID[2],
+				idv:     pState.ID,
 			}
 			evs = append(evs, &withdrawnEvent)
 
