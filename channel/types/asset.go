@@ -153,8 +153,8 @@ func (a Asset) Address() []byte {
 
 }
 
-// AssetID returns the asset ID of the Stellar asset.
-func (s StellarAsset) AssetID() multi.AssetID {
+// LedgerBackendID returns the asset ID of the Stellar asset.
+func (s StellarAsset) LedgerBackendID() multi.LedgerBackendID {
 	return s.id
 }
 

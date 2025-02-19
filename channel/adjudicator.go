@@ -1,4 +1,4 @@
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,9 +19,11 @@ import (
 	"errors"
 	"fmt"
 	"github.com/stellar/go/xdr"
+	"math/big"
 	pchannel "perun.network/go-perun/channel"
 	"perun.network/go-perun/log"
 	pwallet "perun.network/go-perun/wallet"
+	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/wallet"
 	"time"
@@ -89,6 +91,12 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 	}
 	if req.Tx.State.IsFinal {
 		log.Println("Channel is final, closing now")
+		withdrawSelf := needWithdraw([]pchannel.Bal{req.Tx.State.Balances[0][req.Idx], req.Tx.State.Balances[1][req.Idx]}, req.Tx.State.Assets)
+		withdrawOther := needWithdraw([]pchannel.Bal{req.Tx.State.Balances[0][1-req.Idx], req.Tx.State.Balances[1][1-req.Idx]}, req.Tx.State.Assets)
+		if req.Idx == 0 && a.oneWithdrawer && (!withdrawSelf || !withdrawOther) { // If one participant does not need to withdraw, the swap is cross-chain which means A does not need to close
+			log.Println("A only closes when A & B have to withdraw")
+			return nil
+		}
 		err := a.Close(ctx, req.Tx.State, req.Tx.Sigs)
 		if err != nil {
 			chanControl, errChanState = a.CB.GetChannelInfo(ctx, a.perunAddr, req.Tx.State.ID)
@@ -119,12 +127,19 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 }
 
 func (a *Adjudicator) handleWithdrawal(ctx context.Context, req pchannel.AdjudicatorReq) error {
-	if a.oneWithdrawer {
+	withdrawOther := needWithdraw([]pchannel.Bal{req.Tx.State.Balances[0][1-req.Idx], req.Tx.State.Balances[1][1-req.Idx]}, req.Tx.State.Assets)
+	if a.oneWithdrawer && withdrawOther {
+		log.Println("Withdrawing other", req.Idx)
 		if err := a.withdrawOther(ctx, req); err != nil {
 			return err
 		}
 	}
-	return a.withdraw(ctx, req)
+	withdrawSelf := needWithdraw([]pchannel.Bal{req.Tx.State.Balances[0][req.Idx], req.Tx.State.Balances[1][req.Idx]}, req.Tx.State.Assets)
+	if withdrawSelf {
+		log.Println("Withdrawing self", req.Idx)
+		return a.withdraw(ctx, req)
+	}
+	return nil
 }
 
 func (a *Adjudicator) withdraw(ctx context.Context, req pchannel.AdjudicatorReq) error {
@@ -172,4 +187,14 @@ func (a *Adjudicator) ForceClose(ctx context.Context, state *pchannel.State, sig
 func (a Adjudicator) Progress(ctx context.Context, req pchannel.ProgressReq) error {
 	// only relevant for AppChannels
 	return nil
+}
+
+func needWithdraw(balances []pchannel.Bal, assets []pchannel.Asset) bool {
+	for i, bal := range balances {
+		_, ok := assets[i].(*types.StellarAsset)
+		if bal.Cmp(big.NewInt(0)) != 0 && ok { // if balance is 0 or asset is not stellar asset, participant does not need to withdraw
+			return true
+		}
+	}
+	return false
 }

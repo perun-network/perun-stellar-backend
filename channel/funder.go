@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -106,7 +106,7 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 			}
 
 			if req.Idx == pchannel.Index(0) && !chanState.Control.FundedA {
-				shouldFund := need_funding(req.State.Balances[0], req.State.Assets)
+				shouldFund := needFunding(req.State.Balances[0], req.State.Assets)
 				if !shouldFund {
 					log.Println("Party A does not need to fund")
 					return nil
@@ -148,9 +148,9 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 				log.Println("Balance A: ", bal0, bal1, " after funding amount: ", req.State.Balances, req.State.Assets)
 				continue
 			}
-			if req.Idx == pchannel.Index(1) && !chanState.Control.FundedB && (chanState.Control.FundedA || !need_funding(req.State.Balances[0], req.State.Assets)) { // If party A has funded or does not need to fund, party B funds
+			if req.Idx == pchannel.Index(1) && !chanState.Control.FundedB && (chanState.Control.FundedA || !needFunding(req.State.Balances[0], req.State.Assets)) { // If party A has funded or does not need to fund, party B funds
 				log.Println("Funding party B")
-				shouldFund := need_funding(req.State.Balances[1], req.State.Assets)
+				shouldFund := needFunding(req.State.Balances[1], req.State.Assets)
 				if !shouldFund {
 					log.Println("Party B does not need to fund", req.State.Balances[1], req.State.Assets)
 					return nil
@@ -269,7 +269,7 @@ func assetSliceToSet(assets []xdr.ScVal) map[string]struct{} {
 	return assetSet
 }
 
-func need_funding(balances []pchannel.Bal, assets []pchannel.Asset) bool {
+func needFunding(balances []pchannel.Bal, assets []pchannel.Asset) bool {
 	for i, bal := range balances {
 		_, ok := assets[i].(*types.StellarAsset)
 		if bal.Cmp(big.NewInt(0)) != 0 && ok { // if balance is 0 or asset is not stellar asset, participant does not need to fund

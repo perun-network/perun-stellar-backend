@@ -123,11 +123,11 @@ func (id ChainID) MapKey() multi.LedgerIDMapKey {
 type (
 	// Asset is an Ethereum asset.
 	EthAsset struct {
-		assetID     AssetID
+		assetID     LedgerBackendID
 		AssetHolder wallet.Address
 	}
-
-	AssetID struct {
+	// LedherBackendID holds the ChainID and BackendID of an Asset.
+	LedgerBackendID struct {
 		backendID uint32
 		ledgerID  ChainID
 	}
@@ -137,23 +137,23 @@ type (
 )
 
 func MakeEthAsset(id *big.Int, holder wallet.Address) EthAsset {
-	return EthAsset{assetID: AssetID{backendID: 1, ledgerID: MakeChainID(id)}, AssetHolder: holder}
+	return EthAsset{assetID: LedgerBackendID{backendID: 1, ledgerID: MakeChainID(id)}, AssetHolder: holder}
 }
 
-func (id AssetID) BackendID() uint32 {
+func (id LedgerBackendID) BackendID() uint32 {
 	return id.backendID
 }
 
-func (id AssetID) LedgerID() multi.LedgerID {
+func (id LedgerBackendID) LedgerID() multi.LedgerID {
 	return &id.ledgerID
 }
 
-// MakeAssetID makes a AssetID for the given id.
-func MakeAssetID(id *big.Int) multi.AssetID {
+// MakeAssetID makes a LedgerBackendID for the given id.
+func MakeLedgerBackendID(id *big.Int) multi.LedgerBackendID {
 	if id.Sign() < 0 {
 		panic("must not be smaller than zero")
 	}
-	return AssetID{backendID: 1, ledgerID: MakeChainID(id)}
+	return LedgerBackendID{backendID: 1, ledgerID: MakeChainID(id)}
 }
 
 // MapKey returns the asset's map key representation.
@@ -184,11 +184,11 @@ func (a *EthAsset) UnmarshalBinary(data []byte) error {
 
 // LedgerID returns the ledger ID the asset lives on.
 func (a EthAsset) LedgerID() multi.LedgerID {
-	return a.AssetID().LedgerID()
+	return a.LedgerBackendID().LedgerID()
 }
 
-// AssetID returns the ledger ID the asset lives on.
-func (a EthAsset) AssetID() multi.AssetID {
+// LedgerBackendID returns the ledger ID the asset lives on.
+func (a EthAsset) LedgerBackendID() multi.LedgerBackendID {
 	return a.assetID
 }
 
