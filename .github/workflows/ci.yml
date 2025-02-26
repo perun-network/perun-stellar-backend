@@ -48,4 +48,7 @@ jobs:
       run: sleep 50
 
     - name: Run integration tests
-      run: go test -tags=integration ./...
+      run: go test -tags=integration -p 1 ./channel ./payment
+
+    - name: Stop local chain
+      run: docker stop stellar
