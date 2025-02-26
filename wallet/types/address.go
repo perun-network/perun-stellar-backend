@@ -1,4 +1,4 @@
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,16 +21,19 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"fmt"
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/strkey"
-	"math/big"
 	"perun.network/go-perun/wallet"
 )
 
-const StellarBackendID = 2
-const CCAddressLength = 20
-const StellarAddressLength = 32
+const (
+	StellarBackendID     = 2
+	CCAddressLength      = 20
+	StellarAddressLength = 32
+)
 
 // Participant is the backend's version of the on-chain participant in the Perun smart contract on stellar.
 type Participant struct {
@@ -53,6 +56,7 @@ func NewParticipant(addr keypair.FromAddress, pk *ecdsa.PublicKey, ccAddr [CCAdd
 // MarshalBinary encodes the participant into binary form.
 func (p Participant) MarshalBinary() (data []byte, err error) {
 	// Marshal the Stellar public key using secp256k1's raw byte format (uncompressed)
+	//nolint:staticcheck
 	pubKeyBytes := elliptic.Marshal(p.StellarPubKey.Curve, p.StellarPubKey.X, p.StellarPubKey.Y)
 
 	binAddr, err := p.StellarAddress.MarshalBinary()
@@ -71,11 +75,12 @@ func (p Participant) MarshalBinary() (data []byte, err error) {
 // UnmarshalBinary decodes the participant from binary form.
 func (p *Participant) UnmarshalBinary(data []byte) error {
 	// Check the minimum length required for the public key
-	if len(data) < 65 { // 65 bytes is the length of an uncompressed secp256k1 public key
+	if len(data) < 65 { //nolint:gomnd
 		return fmt.Errorf("invalid data size for public key")
 	}
 
 	// Unmarshal the public key (first 65 bytes)
+	//nolint:staticcheck
 	x, y := elliptic.Unmarshal(secp256k1.S256(), data[:65])
 	if x == nil || y == nil {
 		return fmt.Errorf("failed to unmarshal ECDSA public key")

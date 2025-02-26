@@ -1,4 +1,4 @@
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,30 +20,34 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	xdr3 "github.com/stellar/go-xdr/xdr3"
-	"github.com/stellar/go/xdr"
 	"log"
 	"math/big"
+	"strconv"
+
+	xdr3 "github.com/stellar/go-xdr/xdr3"
+	"github.com/stellar/go/xdr"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/channel/multi"
 	"perun.network/go-perun/wallet"
+
 	"perun.network/perun-stellar-backend/channel/types"
 	wtypes "perun.network/perun-stellar-backend/wallet/types"
 	"perun.network/perun-stellar-backend/wire/scval"
-	"strconv"
 )
 
-var MaxBalance = new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 127), big.NewInt(1))
+var MaxBalance = new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 127), big.NewInt(1)) //nolint:gomnd
 
+// Balances represents the balances of a channel.
 type Balances struct {
-	BalA   xdr.ScVec //{xdr.Int128Parts, xdr.Int128Parts}
-	BalB   xdr.ScVec //{xdr.Int128Parts, xdr.Int128Parts}
+	BalA   xdr.ScVec // {xdr.Int128Parts, xdr.Int128Parts}
+	BalB   xdr.ScVec // {xdr.Int128Parts, xdr.Int128Parts}
 	Tokens []Asset
 }
 
+// Asset represents an Asset in the soroban-contract.
 type Asset struct {
-	Chain          xdr.ScVec     //{xdr.Int128Parts, xdr.Int128Parts}
-	StellarAddress xdr.ScAddress //{xdr.Int128Parts, xdr.Int128Parts}
+	Chain          xdr.ScVec     // {xdr.Int128Parts, xdr.Int128Parts}
+	StellarAddress xdr.ScAddress // {xdr.Int128Parts, xdr.Int128Parts}
 	EthAddress     xdr.ScBytes
 }
 
@@ -57,6 +61,7 @@ const (
 	SymbolTokensChain          xdr.ScSymbol = "chain"
 )
 
+// ToScVal encodes a Asset struct to a xdr.ScVal.
 func (a Asset) ToScVal() (xdr.ScVal, error) {
 	var err error
 	chain, err := scval.WrapVec(a.Chain)
@@ -85,12 +90,13 @@ func (a Asset) ToScVal() (xdr.ScVal, error) {
 	return scval.WrapScMap(m)
 }
 
+// FromScVal decodes a Asset struct from a xdr.ScVal.
 func (a *Asset) FromScVal(v xdr.ScVal) error {
 	m, ok := v.GetMap()
 	if !ok {
 		return errors.New("expected map")
 	}
-	if len(*m) != 3 {
+	if len(*m) != 3 { //nolint:gomnd
 		return errors.New("expected map of length 3")
 	}
 	chainVal, err := GetMapValue(scval.MustWrapScSymbol(SymbolTokensChain), *m)
@@ -125,6 +131,7 @@ func (a *Asset) FromScVal(v xdr.ScVal) error {
 	return nil
 }
 
+// ToScVal encodes a Balances struct to a xdr.ScVal.
 func (b Balances) ToScVal() (xdr.ScVal, error) {
 	var err error
 	balA, err := scval.WrapVec(b.BalA)
@@ -161,12 +168,13 @@ func (b Balances) ToScVal() (xdr.ScVal, error) {
 	return scval.WrapScMap(m)
 }
 
+// FromScVal decodes a Balances struct from a xdr.ScVal.
 func (b *Balances) FromScVal(v xdr.ScVal) error {
 	m, ok := v.GetMap()
 	if !ok {
 		return errors.New("expected map")
 	}
-	if len(*m) != 3 {
+	if len(*m) != 3 { //nolint:gomnd
 		return errors.New("expected map of length 3")
 	}
 	balAVal, err := GetMapValue(scval.MustWrapScSymbol(SymbolBalancesBalA), *m)
@@ -213,12 +221,14 @@ func (b *Balances) FromScVal(v xdr.ScVal) error {
 	return nil
 }
 
+// BalancesFromScVal decodes a Balances struct from a xdr.ScVal.
 func BalancesFromScVal(v xdr.ScVal) (Balances, error) {
 	var b Balances
 	err := (&b).FromScVal(v)
 	return b, err
 }
 
+// EncodeTo encodes the Balances struct to a xdr.Encoder.
 func (b Balances) EncodeTo(e *xdr3.Encoder) error {
 	v, err := b.ToScVal()
 	if err != nil {
@@ -228,6 +238,7 @@ func (b Balances) EncodeTo(e *xdr3.Encoder) error {
 	return err
 }
 
+// DecodeFrom decodes the Balances struct from a xdr.Decoder.
 func (b *Balances) DecodeFrom(d *xdr3.Decoder) (int, error) {
 	var v xdr.ScVal
 	n, err := d.Decode(&v)
@@ -245,6 +256,7 @@ func (b Balances) MarshalBinary() ([]byte, error) {
 	return buf.Bytes(), err
 }
 
+// UnmarshalBinary implements encoding.BinaryUnmarshaler.
 func (b *Balances) UnmarshalBinary(data []byte) error {
 	d := xdr3.NewDecoder(bytes.NewReader(data))
 	_, err := b.DecodeFrom(d)
@@ -270,6 +282,9 @@ func extractAndConvertLedgerID(asset channel.Asset) (uint64, error) {
 	return lidval, nil
 }
 
+// MakeTokens converts a list of channel.Assets to a list of wire.Assets.
+//
+//nolint:funlen
 func MakeTokens(assets []channel.Asset) ([]Asset, error) {
 	var tokens []Asset
 
@@ -298,7 +313,7 @@ func MakeTokens(assets []channel.Asset) ([]Asset, error) {
 			if err != nil {
 				return nil, err
 			}
-			defAddr := make([]byte, 20)
+			defAddr := make([]byte, 20) //nolint:gomnd
 			tokenEthAddrVal = defAddr
 			if err != nil {
 				return nil, err
@@ -319,7 +334,7 @@ func MakeTokens(assets []channel.Asset) ([]Asset, error) {
 			// Assume that Asset it an ethereum asset
 			ethAddress := asset.Address()
 			// Check if the string is a valid length (20 byte)
-			if len(ethAddress) != 20 {
+			if len(ethAddress) != 20 { //nolint:gomnd
 				return nil, errors.New("unexpected asset type")
 			}
 			tokenEthAddrVal = ethAddress
@@ -340,6 +355,7 @@ func MakeTokens(assets []channel.Asset) ([]Asset, error) {
 	return tokens, nil
 }
 
+// MakeBalances converts a channel.Allocation to a Balances.
 func MakeBalances(alloc channel.Allocation) (Balances, error) {
 	if err := alloc.Valid(); err != nil {
 		return Balances{}, err
@@ -354,7 +370,7 @@ func MakeBalances(alloc channel.Allocation) (Balances, error) {
 	}
 
 	numParts := alloc.NumParts()
-	if numParts < 2 {
+	if numParts < 2 { //nolint:gomnd
 		return Balances{}, errors.New("expected at least two parts")
 	}
 
@@ -402,6 +418,8 @@ func MakeBalances(alloc channel.Allocation) (Balances, error) {
 
 // MakeInt128Parts converts a big.Int to xdr.Int128Parts.
 // It returns an error if the big.Int is negative or too large.
+//
+//nolint:gomnd
 func MakeInt128Parts(i *big.Int) (xdr.Int128Parts, error) {
 	if i.Sign() < 0 {
 		return xdr.Int128Parts{}, errors.New("expected non-negative balance")
@@ -419,6 +437,9 @@ func MakeInt128Parts(i *big.Int) (xdr.Int128Parts, error) {
 	}, nil
 }
 
+// ToBigInt converts xdr.Int128Parts to a big.Int.
+//
+//nolint:gomnd
 func ToBigInt(i xdr.Int128Parts) (*big.Int, error) {
 	b := make([]byte, 16)
 	binary.BigEndian.PutUint64(b[:8], uint64(i.Hi))
@@ -427,7 +448,6 @@ func ToBigInt(i xdr.Int128Parts) (*big.Int, error) {
 }
 
 func makeAllocationMulti(assets []channel.Asset, balsA, balsB []*big.Int) (*channel.Allocation, error) {
-
 	if len(balsA) != len(balsB) {
 		return nil, errors.New("expected equal number of balances")
 	}
@@ -438,12 +458,11 @@ func makeAllocationMulti(assets []channel.Asset, balsA, balsB []*big.Int) (*chan
 
 	numParts := 2
 
-	// TODO might be mixed backends
 	backendIDs := make([]wallet.BackendID, wtypes.StellarBackendID)
 
 	alloc := channel.NewAllocation(numParts, backendIDs, assets...)
 
-	for i, _ := range assets {
+	for i := range assets {
 		alloc.Balances[i] = []*big.Int{balsA[i], balsB[i]}
 	}
 
@@ -456,12 +475,11 @@ func makeAllocationMulti(assets []channel.Asset, balsA, balsB []*big.Int) (*chan
 	return alloc, nil
 }
 
-// Generates a random 32-byte slice
+// Generates a random 32-byte slice.
 func random32Bytes() ([32]byte, error) {
 	var b [32]byte
-	_, err := rand.Read(b[:])
-	if err != nil {
-		return [32]byte{}, fmt.Errorf("error generating random bytes: %v", err)
+	if _, err := rand.Read(b[:]); err != nil {
+		return [32]byte{}, fmt.Errorf("error generating random bytes: %w", err)
 	}
 	return b, nil
 }
@@ -470,7 +488,7 @@ func random32Bytes() ([32]byte, error) {
 func randomScAddress() (xdr.ScAddress, error) {
 	contractIDBytes, err := random32Bytes()
 	if err != nil {
-		return xdr.ScAddress{}, fmt.Errorf("error generating random contract ID: %v", err)
+		return xdr.ScAddress{}, fmt.Errorf("error generating random contract ID: %w", err)
 	}
 
 	// Return the random xdr.ScAddress for a contract

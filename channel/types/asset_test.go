@@ -1,4 +1,4 @@
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,11 +15,13 @@
 package types_test
 
 import (
+	"testing"
+
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/xdr"
 	"github.com/stretchr/testify/require"
+
 	"perun.network/perun-stellar-backend/channel/types"
-	"testing"
 )
 
 func TestAssetMarshalAndUnmarshalBinary(t *testing.T) {

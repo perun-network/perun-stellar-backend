@@ -3,21 +3,24 @@ package client
 import (
 	"context"
 	"errors"
+	"log"
+	"math/big"
+	"time"
+
 	"github.com/creachadair/jrpc2"
 	"github.com/creachadair/jrpc2/jhttp"
 	"github.com/stellar/go/clients/horizonclient"
 	"github.com/stellar/go/protocols/horizon"
 	"github.com/stellar/go/txnbuild"
 	"github.com/stellar/go/xdr"
-	"log"
-	"math/big"
+
 	"perun.network/perun-stellar-backend/wire"
-	"time"
 )
 
 const (
-	sorobanRPCLink = "http://localhost:8000/soroban/rpc"
-	sorobanTestnet = "https://soroban-testnet.stellar.org"
+	sorobanRPCLink   = "http://localhost:8000/soroban/rpc"
+	sorobanTestnet   = "https://soroban-testnet.stellar.org"
+	horizonClientURL = "http://localhost:8000/"
 )
 
 type RPCGetTxResponse struct {
@@ -27,19 +30,18 @@ type RPCGetTxResponse struct {
 	ResultMetaXdr string `json:"resultMetaXdr"`
 }
 
+//nolint:unused
 func (st *StellarSigner) createSignedTxFromParams(txParams txnbuild.TransactionParams) (*txnbuild.Transaction, error) {
-
 	txUnsigned, err := txnbuild.NewTransaction(txParams)
 	if err != nil {
 		return nil, err
 	}
 
-	passphrase := ""
-	if st.hzClient.HorizonURL == "http://localhost:8000/" {
+	var passphrase string
+	if st.hzClient.HorizonURL == horizonClientURL {
 		passphrase = NETWORK_PASSPHRASE
 	} else {
 		passphrase = NETWORK_PASSPHRASETestNet
-
 	}
 	tx, err := txUnsigned.Sign(passphrase, st.keyPair)
 	if err != nil {
@@ -49,14 +51,8 @@ func (st *StellarSigner) createSignedTxFromParams(txParams txnbuild.TransactionP
 	return tx, nil
 }
 
+// DecodeTxMeta decodes the transaction meta from the transaction hash.
 func DecodeTxMeta(tx horizon.Transaction, hzClient *horizonclient.Client) (xdr.TransactionMeta, error) {
-	/*var transactionMeta xdr.TransactionMeta
-	err := xdr.SafeUnmarshalBase64(tx.ResultMetaXdr, &transactionMeta)
-	if err != nil {
-		return xdr.TransactionMeta{}, err
-	}
-
-	return transactionMeta, nil*/
 	// Before preflighting, make sure soroban-rpc is in sync with Horizon
 	root, err := hzClient.Root()
 	if err != nil {
@@ -65,7 +61,7 @@ func DecodeTxMeta(tx horizon.Transaction, hzClient *horizonclient.Client) (xdr.T
 	}
 
 	var link string
-	if hzClient.HorizonURL == "http://localhost:8000/" {
+	if hzClient.HorizonURL == horizonClientURL {
 		link = sorobanRPCLink
 	} else {
 		link = sorobanTestnet
@@ -95,13 +91,13 @@ func DecodeTxMeta(tx horizon.Transaction, hzClient *horizonclient.Client) (xdr.T
 	return transactionMeta, nil
 }
 
-func BuildContractCallOp(caller horizon.Account, fName xdr.ScSymbol, callArgs xdr.ScVec, contractIdAddress xdr.ScAddress) *txnbuild.InvokeHostFunction {
-
+// BuildContractCallOp creates a txnbuild.InvokeHostFunction operation.
+func BuildContractCallOp(caller horizon.Account, fName xdr.ScSymbol, callArgs xdr.ScVec, contractIDAddress xdr.ScAddress) *txnbuild.InvokeHostFunction {
 	return &txnbuild.InvokeHostFunction{
 		HostFunction: xdr.HostFunction{
 			Type: xdr.HostFunctionTypeHostFunctionTypeInvokeContract,
 			InvokeContract: &xdr.InvokeContractArgs{
-				ContractAddress: contractIdAddress,
+				ContractAddress: contractIDAddress,
 				FunctionName:    fName,
 				Args:            callArgs,
 			},
@@ -117,11 +113,13 @@ type RPCSimulateTxResponse struct {
 	MinResourceFee  int64                           `json:"minResourceFee,string"`
 }
 
+// RPCSimulateHostFunctionResult represents the return value of RPCSimulateHostFunctionResult.
 type RPCSimulateHostFunctionResult struct {
 	Auth []string `json:"auth"`
 	XDR  string   `json:"xdr"`
 }
 
+// PreflightHostFunctions creates the fills the functions and calculates the minimal resource fee.
 func PreflightHostFunctions(hzClient *horizonclient.Client,
 	sourceAccount txnbuild.Account, function txnbuild.InvokeHostFunction,
 ) (txnbuild.InvokeHostFunction, int64, error) {
@@ -157,6 +155,7 @@ func PreflightHostFunctions(hzClient *horizonclient.Client,
 	return function, result.MinResourceFee, nil
 }
 
+// PreflightHostFunctionsResult simulates a transaction to get the minimum fee and result for a host function.
 func PreflightHostFunctionsResult(hzClient *horizonclient.Client,
 	sourceAccount txnbuild.Account, function txnbuild.InvokeHostFunction, chInfo bool,
 ) (wire.Channel, string, txnbuild.InvokeHostFunction, int64, error) {
@@ -172,7 +171,7 @@ func PreflightHostFunctionsResult(hzClient *horizonclient.Client,
 	var getChan wire.Channel
 
 	if len(result.Results) != 1 {
-		return wire.Channel{}, "", function, result.MinResourceFee, errors.New("Invalid number of results")
+		return wire.Channel{}, "", function, result.MinResourceFee, errors.New("invalid number of results")
 	}
 
 	var decodedXdr xdr.ScVal
@@ -185,7 +184,7 @@ func PreflightHostFunctionsResult(hzClient *horizonclient.Client,
 
 		if decChanInfo.Type != xdr.ScValTypeScvMap {
 			log.Println("info: ", decChanInfo, decChanInfo.Type)
-			return getChan, "", function, result.MinResourceFee, errors.New("Invalid channel info type")
+			return getChan, "", function, result.MinResourceFee, errors.New("invalid channel info type")
 		}
 
 		err = getChan.FromScVal(decChanInfo)
@@ -194,16 +193,14 @@ func PreflightHostFunctionsResult(hzClient *horizonclient.Client,
 		}
 
 		return getChan, "", function, result.MinResourceFee, nil
-	} else {
-		i128 := decodedXdr.MustI128()
-		hi := big.NewInt(int64(i128.Hi))
-		lo := big.NewInt(int64(i128.Lo))
-
-		// Combine hi and lo into a single big.Int
-		combined := hi.Lsh(hi, 64).Or(hi, lo)
-		return wire.Channel{}, combined.String(), function, result.MinResourceFee, nil
 	}
+	i128 := decodedXdr.MustI128()
+	hi := big.NewInt(int64(i128.Hi))
+	lo := big.NewInt(int64(i128.Lo))
 
+	// Combine hi and lo into a single big.Int
+	combined := hi.Lsh(hi, 64).Or(hi, lo) //nolint:gomnd
+	return wire.Channel{}, combined.String(), function, result.MinResourceFee, nil
 }
 
 func simulateTransaction(hzClient *horizonclient.Client,
@@ -217,7 +214,7 @@ func simulateTransaction(hzClient *horizonclient.Client,
 	}
 
 	var link string
-	if hzClient.HorizonURL == "http://localhost:8000/" {
+	if hzClient.HorizonURL == horizonClientURL {
 		link = sorobanRPCLink
 	} else {
 		link = sorobanTestnet
@@ -257,6 +254,7 @@ func simulateTransaction(hzClient *horizonclient.Client,
 	}
 	return result, transactionData, nil
 }
+
 func syncWithSorobanRPC(ledgerToWaitFor uint32, url string) error {
 	for j := 0; j < 20; j++ {
 		result := struct {
@@ -271,11 +269,12 @@ func syncWithSorobanRPC(ledgerToWaitFor uint32, url string) error {
 		if result.Sequence >= ledgerToWaitFor {
 			return nil
 		}
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond) //nolint:gomnd
 	}
-	return errors.New("Time out waiting for soroban-rpc to sync")
+	return errors.New("time out waiting for soroban-rpc to sync")
 }
 
+// GetBaseTransactionParamsWithFee returns a txnbuild.TransactionParams with the given source account, fee, and operations.
 func GetBaseTransactionParamsWithFee(source txnbuild.Account, fee int64, ops ...txnbuild.Operation) txnbuild.TransactionParams {
 	return txnbuild.TransactionParams{
 		SourceAccount:        source,

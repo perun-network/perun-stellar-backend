@@ -4,19 +4,21 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sync"
+
 	"github.com/stellar/go/clients/horizonclient"
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/protocols/horizon"
 	"github.com/stellar/go/txnbuild"
 	"github.com/stellar/go/xdr"
 	"perun.network/go-perun/wallet"
+
 	chTypes "perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/wallet/types"
 	"perun.network/perun-stellar-backend/wire"
-	"sync"
 )
 
-const stellarDefaultChainId = 1
+const stellarDefaultChainID = 1
 
 type Sender interface {
 	SignSendTx(txnbuild.Transaction) (xdr.TransactionMeta, error)
@@ -34,10 +36,9 @@ func NewContractBackend(trConfig *TransactorConfig) *ContractBackend {
 	transactor := NewTransactor(*trConfig)
 	return &ContractBackend{
 		tr:      *transactor,
-		chainID: stellarDefaultChainId,
+		chainID: stellarDefaultChainID,
 		cbMutex: sync.Mutex{},
 	}
-
 }
 
 type StellarSigner struct {
@@ -102,27 +103,26 @@ func NewTransactor(cfg TransactorConfig) *StellarSigner {
 		st.hzClient = NewHorizonClient(cfg.horizonURL)
 	} else {
 		st.hzClient = NewHorizonClient(HorizonURL)
-
 	}
 
 	return st
 }
 
-func (cb *ContractBackend) GetTransactor() *StellarSigner {
-	return &cb.tr
+func (c *ContractBackend) GetTransactor() *StellarSigner {
+	return &c.tr
 }
 
-func (cb *ContractBackend) GetBalance(cID xdr.ScAddress) (string, error) {
-	tr := cb.GetTransactor()
+func (c *ContractBackend) GetBalance(cID xdr.ScAddress) (string, error) {
+	tr := c.GetTransactor()
 	add, err := tr.GetAddress()
 	if err != nil {
 		return "", err
 	}
-	accountId, err := xdr.AddressToAccountId(add)
+	accountID, err := xdr.AddressToAccountId(add)
 	if err != nil {
 		return "", err
 	}
-	scAdd, err := xdr.NewScAddress(xdr.ScAddressTypeScAddressTypeAccount, accountId)
+	scAdd, err := xdr.NewScAddress(xdr.ScAddressTypeScAddressTypeAccount, accountID)
 	if err != nil {
 		return "", err
 	}
@@ -130,7 +130,7 @@ func (cb *ContractBackend) GetBalance(cID xdr.ScAddress) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	_, bal, err := cb.InvokeUnsignedTx("balance", TokenNameArgs, cID)
+	_, bal, err := c.InvokeUnsignedTx("balance", TokenNameArgs, cID)
 	if err != nil {
 		return "", err
 	}
@@ -168,7 +168,7 @@ func (st *StellarSigner) GetHorizonClient() *horizonclient.Client {
 	return st.hzClient
 }
 
-func (c *ContractBackend) InvokeUnsignedTx(fname string, callTxArgs xdr.ScVec, contractAddr xdr.ScAddress) (wire.Channel, string, error) { //xdr.TransactionMeta, error
+func (c *ContractBackend) InvokeUnsignedTx(fname string, callTxArgs xdr.ScVec, contractAddr xdr.ScAddress) (wire.Channel, string, error) { // xdr.TransactionMeta, error
 	c.cbMutex.Lock()
 	defer c.cbMutex.Unlock()
 	fnameXdr := xdr.ScSymbol(fname)
@@ -208,7 +208,7 @@ func (c *ContractBackend) InvokeSignedTx(fname string, callTxArgs xdr.ScVec, con
 	if err != nil {
 		return xdr.TransactionMeta{}, err
 	}
-	minFeeCustom := int64(100)
+	minFeeCustom := int64(100) //nolint:gomnd
 	txParams := GetBaseTransactionParamsWithFee(&hzAcc, minFee+minFeeCustom, &preFlightOp)
 	txUnsigned, err := txnbuild.NewTransaction(txParams)
 	if err != nil {

@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,11 +17,13 @@ package wire
 import (
 	"bytes"
 	"errors"
+	"log"
+
 	xdr3 "github.com/stellar/go-xdr/xdr3"
 	"github.com/stellar/go/xdr"
-	"log"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/wallet"
+
 	"perun.network/perun-stellar-backend/wallet/types"
 	"perun.network/perun-stellar-backend/wire/scval"
 )
@@ -81,7 +83,7 @@ func (p *Params) FromScVal(v xdr.ScVal) error {
 	if !ok {
 		return errors.New("expected map decoding Params")
 	}
-	if len(*m) != 4 {
+	if len(*m) != 4 { //nolint:gomnd
 		return errors.New("expected map of length 4")
 	}
 	aVal, err := GetMapValue(scval.MustWrapScSymbol(SymbolParamsA), *m)
@@ -173,7 +175,7 @@ func MakeParams(params channel.Params) (Params, error) {
 		return Params{}, errors.New("expected no app")
 	}
 
-	if len(params.Parts) != 2 {
+	if len(params.Parts) != 2 { //nolint:gomnd
 		return Params{}, errors.New("expected exactly two participants")
 	}
 

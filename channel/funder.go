@@ -17,20 +17,23 @@ package channel
 import (
 	"context"
 	"errors"
-	"github.com/stellar/go/xdr"
 	"log"
 	"math/big"
+	"time"
+
+	"github.com/stellar/go/xdr"
 	pchannel "perun.network/go-perun/channel"
+
 	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/wallet"
 	"perun.network/perun-stellar-backend/wire"
-
-	"time"
 )
 
-const MaxIterationsUntilAbort = 30
-const DefaultPollingInterval = time.Duration(4) * time.Second
+const (
+	MaxIterationsUntilAbort = 30
+	DefaultPollingInterval  = time.Duration(4) * time.Second
+)
 
 type Funder struct {
 	cb              *client.ContractBackend
@@ -58,6 +61,7 @@ func (f *Funder) GetAssetAddrs() []xdr.ScVal {
 	return f.assetAddrs
 }
 
+// Fund first calls open if the channel is not opened and then funds the channel.
 func (f *Funder) Fund(ctx context.Context, req pchannel.FundingReq) error {
 	log.Println("Fund called")
 
@@ -74,8 +78,9 @@ func (f *Funder) Fund(ctx context.Context, req pchannel.FundingReq) error {
 
 	return f.fundParty(ctx, req)
 }
-func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 
+//nolint:funlen,gocyclo
+func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 	party := getPartyByIndex(req.Idx)
 
 	log.Printf("%s: Funding channel...", party)
@@ -105,7 +110,7 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 				return nil
 			}
 
-			if req.Idx == pchannel.Index(0) && !chanState.Control.FundedA {
+			if req.Idx == pchannel.Index(0) && !chanState.Control.FundedA { //nolint:nestif
 				shouldFund := needFunding(req.State.Balances[0], req.State.Assets)
 				if !shouldFund {
 					log.Println("Party A does not need to fund")
@@ -148,6 +153,7 @@ func (f *Funder) fundParty(ctx context.Context, req pchannel.FundingReq) error {
 				log.Println("Balance A: ", bal0, bal1, " after funding amount: ", req.State.Balances, req.State.Assets)
 				continue
 			}
+			//nolint:nestif
 			if req.Idx == pchannel.Index(1) && !chanState.Control.FundedB && (chanState.Control.FundedA || !needFunding(req.State.Balances[0], req.State.Assets)) { // If party A has funded or does not need to fund, party B funds
 				log.Println("Funding party B")
 				shouldFund := needFunding(req.State.Balances[1], req.State.Assets)
@@ -205,7 +211,6 @@ func (f *Funder) openChannel(ctx context.Context, req pchannel.FundingReq) error
 }
 
 func (f *Funder) FundChannel(ctx context.Context, state *pchannel.State, funderIdx bool) error {
-
 	balsStellar, err := wire.MakeBalances(state.Allocation)
 	if err != nil {
 		return errors.New("error while making balances")
@@ -243,7 +248,7 @@ func makeTimeoutErr(remains []pchannel.Index, assetIdx int) error {
 	)
 }
 
-// Function to check if all assets in state.Allocation are present in f.assetAddrs
+// Function to check if all assets in state.Allocation are present in f.assetAddrs.
 func containsAllAssets(stateAssets []wire.Asset, fAssets []xdr.ScVal) bool {
 	fAssetSet := assetSliceToSet(fAssets)
 
@@ -260,7 +265,7 @@ func containsAllAssets(stateAssets []wire.Asset, fAssets []xdr.ScVal) bool {
 	return false
 }
 
-// Helper function to convert a slice of xdr.Asset to a set (map for fast lookup)
+// Helper function to convert a slice of xdr.Asset to a set (map for fast lookup).
 func assetSliceToSet(assets []xdr.ScVal) map[string]struct{} {
 	assetSet := make(map[string]struct{})
 	for _, asset := range assets {

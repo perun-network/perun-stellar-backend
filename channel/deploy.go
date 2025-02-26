@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,9 +16,10 @@ package channel
 
 import (
 	"crypto/sha256"
+	"os"
+
 	"github.com/stellar/go/txnbuild"
 	"github.com/stellar/go/xdr"
-	"os"
 )
 
 const PerunContractPath = "../testdata/perun_soroban_multi_contract.wasm"
@@ -53,7 +54,7 @@ func AssembleCreateContractOp(sourceAccount string, wasmFileName string, contrac
 	salt := sha256.Sum256([]byte(contractSalt))
 	saltParameter := xdr.Uint256(salt)
 
-	accountId := xdr.MustAddress(sourceAccount)
+	accountID := xdr.MustAddress(sourceAccount)
 	contractHash := xdr.Hash(sha256.Sum256(contract))
 
 	return &txnbuild.InvokeHostFunction{
@@ -65,7 +66,7 @@ func AssembleCreateContractOp(sourceAccount string, wasmFileName string, contrac
 					FromAddress: &xdr.ContractIdPreimageFromAddress{
 						Address: xdr.ScAddress{
 							Type:      xdr.ScAddressTypeScAddressTypeAccount,
-							AccountId: &accountId,
+							AccountId: &accountID,
 						},
 						Salt: saltParameter,
 					},

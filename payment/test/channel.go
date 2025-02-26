@@ -2,22 +2,28 @@ package test
 
 import (
 	"context"
+
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 )
 
+// PaymentChannel represents a payment channel.
 type PaymentChannel struct {
 	ch         *client.Channel
 	currencies []channel.Asset
 }
 
+// GetChannel returns the channel.
 func (c *PaymentChannel) GetChannel() *client.Channel {
 	return c.ch
 }
+
+// GetChannelParams returns the channel parameters.
 func (c *PaymentChannel) GetChannelParams() *channel.Params {
 	return c.ch.Params()
 }
 
+// GetChannelState returns the channel state.
 func (c *PaymentChannel) GetChannelState() *channel.State {
 	return c.ch.State()
 }
@@ -28,21 +34,6 @@ func newPaymentChannel(ch *client.Channel, currencies []channel.Asset) *PaymentC
 		currencies: currencies,
 	}
 }
-
-// // SendPayment sends a payment to the channel peer.
-// func (c PaymentChannel) SendPayment(amount int64, assetIdx int) {
-// 	// Transfer the given amount from us to peer.
-// 	// Use UpdateBy to update the channel state.
-// 	err := c.ch.Update(context.TODO(), func(state *channel.State) {
-// 		icp := big.NewInt(amount)
-// 		actor := c.ch.Idx()
-// 		peer := 1 - actor
-// 		state.Allocation.TransferBalance(actor, peer, c.currencies[assetIdx], icp)
-// 	})
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// }
 
 // PerformSwap performs a swap by "swapping" the balances of the two
 // participants for both assets.

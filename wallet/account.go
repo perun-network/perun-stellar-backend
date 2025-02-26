@@ -1,4 +1,4 @@
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,12 +16,14 @@ package wallet
 
 import (
 	"crypto/ecdsa"
+	"math/rand"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/pkg/errors"
 	"github.com/stellar/go/keypair"
-	"math/rand"
 	"perun.network/go-perun/wallet"
+
 	"perun.network/perun-stellar-backend/wallet/types"
 )
 

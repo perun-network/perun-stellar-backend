@@ -19,7 +19,8 @@ esac
 
 # this is set to the quickstart `soroban-dev` image annointed as the release 
 # for a given Soroban Release, it is captured on Soroban Releases - https://soroban.stellar.org/docs/reference/releases 
-QUICKSTART_SOROBAN_DOCKER_SHA=stellar/quickstart:latest@sha256:274395daab6fa8033b9213f152d56699358917fb01d7c7e95392a37fc00c9d01
+# QUICKSTART_SOROBAN_DOCKER_SHA=stellar/quickstart:soroban-dev
+QUICKSTART_SOROBAN_DOCKER_SHA=stellar/quickstart:testing@sha256:274395daab6fa8033b9213f152d56699358917fb01d7c7e95392a37fc00c9d01
 
 shift
 
@@ -44,6 +45,8 @@ fi
 currentDir=$(pwd)
 docker run -d \
   --volume ${currentDir}:/workspace \
+  --memory="2g" \
+  --cpus="2.0" \
   --name soroban-preview \
   -p 8001:8000 \
   --ipc=host \

@@ -1,4 +1,4 @@
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,9 +17,10 @@ package types
 import (
 	"encoding/hex"
 	"errors"
+	"log"
+
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/xdr"
-	"log"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/channel/multi"
 )
@@ -38,7 +39,7 @@ type (
 	}
 	CCID struct {
 		backendID uint32
-		ledgerId  ContractLID
+		ledgerID  ContractLID
 	}
 
 	ContractLID struct{ string }
@@ -51,7 +52,7 @@ func (c CCID) BackendID() uint32 {
 
 // LedgerID returns the ledger ID of the asset.
 func (c CCID) LedgerID() multi.LedgerID {
-	return c.ledgerId
+	return c.ledgerID
 }
 
 // MakeContractID makes a ChainID for the given id.
@@ -150,7 +151,6 @@ func (s StellarAsset) Address() []byte {
 // Address returns the address of the asset.
 func (a Asset) Address() []byte {
 	return a.contractID[:]
-
 }
 
 // LedgerBackendID returns the asset ID of the Stellar asset.
@@ -186,8 +186,7 @@ func (s StellarAsset) MakeScAddress() (xdr.ScAddress, error) {
 
 // FromScAddress generates a Stellar asset from the given ScAddress.
 func (s *StellarAsset) FromScAddress(address xdr.ScAddress) error {
-	addrType := address.Type
-	if addrType != xdr.ScAddressTypeScAddressTypeContract {
+	if addrType := address.Type; addrType != xdr.ScAddressTypeScAddressTypeContract {
 		return errors.New("invalid address type")
 	}
 
@@ -227,20 +226,20 @@ func ToStellarAsset(asset channel.Asset) (*StellarAsset, error) {
 
 // MakeAccountAddress generates an account address from the given keypair.
 func MakeAccountAddress(kp keypair.KP) (xdr.ScAddress, error) {
-	accountId, err := xdr.AddressToAccountId(kp.Address())
+	accountID, err := xdr.AddressToAccountId(kp.Address())
 	if err != nil {
 		return xdr.ScAddress{}, err
 	}
-	return xdr.NewScAddress(xdr.ScAddressTypeScAddressTypeAccount, accountId)
+	return xdr.NewScAddress(xdr.ScAddressTypeScAddressTypeAccount, accountID)
 }
 
 // AccountAddressFromAddress generates an account address from the given address.
 func AccountAddressFromAddress(addr keypair.FromAddress) (xdr.ScAddress, error) {
-	accountId, err := xdr.AddressToAccountId(addr.Address())
+	accountID, err := xdr.AddressToAccountId(addr.Address())
 	if err != nil {
 		return xdr.ScAddress{}, err
 	}
-	return xdr.NewScAddress(xdr.ScAddressTypeScAddressTypeAccount, accountId)
+	return xdr.NewScAddress(xdr.ScAddressTypeScAddressTypeAccount, accountID)
 }
 
 // MakeContractAddress generates a contract address from the given contract ID.

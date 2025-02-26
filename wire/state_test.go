@@ -1,4 +1,4 @@
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,14 +16,16 @@ package wire_test
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"math/big"
+	"testing"
+
+	"github.com/stretchr/testify/require"
 	"perun.network/go-perun/channel"
 	ptest "perun.network/go-perun/channel/test"
+	polytest "polycry.pt/poly-go/test"
+
 	_ "perun.network/perun-stellar-backend/channel/test"
 	"perun.network/perun-stellar-backend/wire"
-	polytest "polycry.pt/poly-go/test"
-	"testing"
 )
 
 func TestState(t *testing.T) {

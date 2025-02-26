@@ -1,4 +1,4 @@
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,16 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//nolint:golint
 package channel
 
 import (
+	"log"
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
-	"log"
-	"math/big"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/channel/multi"
+
 	"perun.network/perun-stellar-backend/channel/types"
 	wtypes "perun.network/perun-stellar-backend/wallet/types"
 )
@@ -67,7 +70,6 @@ func ToEthState(s *channel.State) EthChannelState {
 		default:
 			log.Panicf("wrong backend ID: %d", backendID)
 		}
-
 	}
 
 	outcome := ChannelAllocation{
@@ -99,7 +101,7 @@ func assetToEthAsset(asset channel.Asset) ChannelAsset {
 		log.Panicf("expected asset of type MultiLedgerAsset, but got wrong asset type: %T", asset)
 	}
 	id := new(big.Int)
-	_, ok = id.SetString(string(multiAsset.LedgerBackendID().LedgerID().MapKey()), 10) // base 10 for decimal numbers
+	_, ok = id.SetString(string(multiAsset.LedgerBackendID().LedgerID().MapKey()), 10) //nolint:gomnd
 	if !ok {
 		log.Panicf("Error: Failed to parse string into big.Int")
 	}
@@ -108,7 +110,7 @@ func assetToEthAsset(asset channel.Asset) ChannelAsset {
 	return ChannelAsset{
 		ChainID:  id,
 		EthAsset: ethAddress,
-		CCAsset:  make([]byte, 32),
+		CCAsset:  make([]byte, 32), //nolint:gomnd
 	}
 }
 
@@ -145,7 +147,7 @@ func ToEthParams(params *channel.Params) (ChannelParams, error) {
 			}
 			ethAddress.SetBytes(ethBytes)
 		}
-		ccAddress := make([]byte, 32)
+		ccAddress := make([]byte, 32) //nolint:gomnd
 		if add, ok := p[wtypes.StellarBackendID]; ok {
 			ccBytes, err := add.MarshalBinary()
 			if err != nil {
@@ -178,8 +180,9 @@ func ToEthParams(params *channel.Params) (ChannelParams, error) {
 }
 
 // EncodeEthState encodes the state as with abi.encode() in the smart contracts.
+//
+//nolint:funlen
 func EncodeEthState(state *EthChannelState) ([]byte, error) {
-
 	// Define the top-level ABI type for the state struct.
 	stateType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
 		{Name: "channelID", Type: "bytes32"},

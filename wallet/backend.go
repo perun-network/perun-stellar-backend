@@ -1,4 +1,4 @@
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,11 +15,13 @@
 package wallet
 
 import (
+	"io"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
-	"io"
 	"perun.network/go-perun/wallet"
 	"perun.network/go-perun/wire/perunio"
+
 	"perun.network/perun-stellar-backend/wallet/types"
 )
 
@@ -40,7 +42,7 @@ func (b backend) NewAddress() wallet.Address {
 
 // DecodeSig decodes a signature of length SignatureLength from the reader.
 func (b backend) DecodeSig(reader io.Reader) (wallet.Sig, error) {
-	buf := make(wallet.Sig, 65)
+	buf := make(wallet.Sig, 65) //nolint:gomnd
 	return buf, perunio.Decode(reader, &buf)
 }
 
@@ -52,9 +54,9 @@ func (b backend) VerifySignature(msg []byte, sig wallet.Sig, a wallet.Address) (
 	hash := crypto.Keccak256(msg)
 	prefix := []byte("\x19Ethereum Signed Message:\n32")
 	hash = crypto.Keccak256(prefix, hash)
-	sigCopy := make([]byte, 65)
+	sigCopy := make([]byte, 65) //nolint:gomnd
 	copy(sigCopy, sig)
-	if len(sigCopy) == 65 && (sigCopy[65-1] >= 27) {
+	if len(sigCopy) == 65 && (sigCopy[65-1] >= 27) { //nolint:gomnd
 		sigCopy[65-1] -= 27
 	}
 	pk, err := crypto.SigToPub(hash, sigCopy)

@@ -18,28 +18,31 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/binary"
+	"log"
+	"math/big"
+	mathrand "math/rand"
+	"path/filepath"
+	"runtime"
+	"testing"
+	"time"
+
 	"github.com/stellar/go/clients/horizonclient"
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/txnbuild"
 	"github.com/stellar/go/xdr"
 	"github.com/stretchr/testify/require"
-	"log"
-	"math/big"
-	mathrand "math/rand"
-	"path/filepath"
 	pchannel "perun.network/go-perun/channel"
 	ptest "perun.network/go-perun/channel/test"
 	pwallet "perun.network/go-perun/wallet"
+	pkgtest "polycry.pt/poly-go/test"
+
 	"perun.network/perun-stellar-backend/channel"
 	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/client"
+	"perun.network/perun-stellar-backend/payment/test"
 	"perun.network/perun-stellar-backend/wallet"
 	"perun.network/perun-stellar-backend/wire"
 	"perun.network/perun-stellar-backend/wire/scval"
-	pkgtest "polycry.pt/poly-go/test"
-	"runtime"
-	"testing"
-	"time"
 )
 
 const (
@@ -49,7 +52,7 @@ const (
 	initTokenBalance         = uint64(2000000)
 	DefaultTestTimeout       = 30
 	HorizonURL               = "http://localhost:8000"
-	NETWORK_PASSPHRASE       = "Standalone Network ; February 2017"
+	NETWORK_PASSPHRASE       = "Standalone Network ; February 2017" //nolint:golint,stylecheck
 )
 
 type Setup struct {
@@ -91,7 +94,7 @@ func getProjectRoot() (string, error) {
 	_, b, _, _ := runtime.Caller(1)
 	basepath := filepath.Dir(b)
 
-	fp, err := filepath.Abs(filepath.Join(basepath, "../..")) //filepath.Abs(filepath.Join(basepath, "../.."))
+	fp, err := filepath.Abs(filepath.Join(basepath, "../..")) // filepath.Abs(filepath.Join(basepath, "../.."))
 	return fp, err
 }
 
@@ -105,15 +108,17 @@ func getDataFilePath(filename string) (string, error) {
 	return fp, nil
 }
 
+// NewTestSetup creates a new setup for testing.
+//
+//nolint:funlen
 func NewTestSetup(t *testing.T, options ...bool) *Setup {
-
 	oneWithdrawer := false
 
 	if len(options) > 0 {
 		oneWithdrawer = options[0]
 	}
 
-	_, kpsToFund, _ := MakeRandPerunAccsWallets(5)
+	_, kpsToFund, _ := MakeRandPerunAccsWallets(5) //nolint:gomnd
 	require.NoError(t, CreateFundStellarAccounts(kpsToFund, initLumensBalance))
 
 	depTokenOneKp := kpsToFund[2]
@@ -141,17 +146,15 @@ func NewTestSetup(t *testing.T, options ...bool) *Setup {
 	require.NoError(t, InitTokenContract(depTokenTwoKp, tokenAddressTwo, HorizonURL))
 
 	acc0, err := wallet.NewRandomAccountWithAddress(mathrand.New(mathrand.NewSource(0)), kpsToFund[0].FromAddress())
+	require.NoError(t, err)
 	acc1, err := wallet.NewRandomAccountWithAddress(mathrand.New(mathrand.NewSource(0)), kpsToFund[1].FromAddress())
+	require.NoError(t, err)
 	w0 := wallet.NewEphemeralWallet()
 	err = w0.AddAccount(acc0)
-	if err != nil {
-		return nil
-	}
+	require.NoError(t, err)
 	w1 := wallet.NewEphemeralWallet()
 	err = w1.AddAccount(acc1)
-	if err != nil {
-		return nil
-	}
+	require.NoError(t, err)
 
 	SetupAccountsAndContracts(t, depTokenKps, kpsToFund[:2], tokenAddresses, initTokenBalance)
 
@@ -191,7 +194,6 @@ func NewTestSetup(t *testing.T, options ...bool) *Setup {
 }
 
 func SetupAccountsAndContracts(t *testing.T, deployerKps []*keypair.Full, kps []*keypair.Full, tokenAddresses []xdr.ScAddress, tokenBalance uint64) {
-
 	require.Equal(t, len(deployerKps), len(tokenAddresses))
 
 	for i := range deployerKps {
@@ -199,10 +201,10 @@ func SetupAccountsAndContracts(t *testing.T, deployerKps []*keypair.Full, kps []
 			addr, err := types.MakeAccountAddress(kp)
 			require.NoError(t, err)
 			require.NoError(t, MintToken(deployerKps[i], tokenAddresses[i], tokenBalance, addr, HorizonURL))
-
 		}
 	}
 }
+
 func CreateFundersAndAdjudicators(accs []*wallet.Account, cbs []*client.ContractBackend, perunAddress xdr.ScAddress, tokenScAddresses []xdr.ScVal, oneWithdrawer bool) ([]*channel.Funder, []*channel.Adjudicator) {
 	funders := make([]*channel.Funder, len(accs))
 	adjs := make([]*channel.Adjudicator, len(accs))
@@ -251,8 +253,7 @@ func MakeRandPerunAcc() (*wallet.Account, *keypair.Full) {
 	w := wallet.NewEphemeralWallet()
 
 	var b [8]byte
-	_, err := rand.Read(b[:])
-	if err != nil {
+	if _, err := rand.Read(b[:]); err != nil {
 		panic(err)
 	}
 
@@ -271,8 +272,7 @@ func MakeRandPerunAccWallet() (*wallet.Account, *keypair.Full, *wallet.Ephemeral
 	w := wallet.NewEphemeralWallet()
 
 	var b [8]byte
-	_, err := rand.Read(b[:])
-	if err != nil {
+	if _, err := rand.Read(b[:]); err != nil {
 		panic(err)
 	}
 
@@ -288,7 +288,6 @@ func MakeRandPerunAccWallet() (*wallet.Account, *keypair.Full, *wallet.Ephemeral
 }
 
 func CreateFundStellarAccounts(pairs []*keypair.Full, initialBalance string) error {
-
 	numKps := len(pairs)
 
 	masterClient := client.NewHorizonMasterClient(NETWORK_PASSPHRASE, HorizonURL)
@@ -320,10 +319,9 @@ func CreateFundStellarAccounts(pairs []*keypair.Full, initialBalance string) err
 		}
 	}
 
-	txParams := client.GetBaseTransactionParamsWithFee(&masterAccount, txnbuild.MinBaseFee+100, ops...)
+	txParams := client.GetBaseTransactionParamsWithFee(&masterAccount, txnbuild.MinBaseFee+100, ops...) //nolint:gomnd
 
 	txSigned, err := client.CreateSignedTransactionWithParams([]*keypair.Full{sourceKey}, txParams, NETWORK_PASSPHRASE)
-
 	if err != nil {
 		panic(err)
 	}
@@ -352,19 +350,18 @@ func CreateFundStellarAccounts(pairs []*keypair.Full, initialBalance string) err
 }
 
 func NewParamsWithAddressStateWithAsset(t *testing.T, partsAddr []pwallet.Address, assets []pchannel.Asset) (*pchannel.Params, *pchannel.State) {
-
 	rng := pkgtest.Prng(t)
 
 	numParts := 2
 	partsMapSlice := make([]map[pwallet.BackendID]pwallet.Address, len(partsAddr))
 	for i, addr := range partsAddr {
 		partsMapSlice[i] = map[pwallet.BackendID]pwallet.Address{
-			pwallet.BackendID(2): addr,
+			test.StellarBackendID: addr,
 		}
 	}
 	return ptest.NewRandomParamsAndState(rng, ptest.WithNumLocked(0).Append(
 		ptest.WithAssets(assets...),
-		ptest.WithBackend(2),
+		ptest.WithBackend(test.StellarBackendID),
 		ptest.WithNumAssets(len(assets)),
 		ptest.WithVersion(0),
 		ptest.WithNumParts(numParts),
@@ -373,7 +370,7 @@ func NewParamsWithAddressStateWithAsset(t *testing.T, partsAddr []pwallet.Addres
 		ptest.WithLedgerChannel(true),
 		ptest.WithVirtualChannel(false),
 		ptest.WithoutApp(),
-		ptest.WithBalances([]pchannel.Bal{big.NewInt(100), big.NewInt(150)}, []pchannel.Bal{big.NewInt(200), big.NewInt(250)}),
+		ptest.WithBalances([]pchannel.Bal{big.NewInt(100), big.NewInt(150)}, []pchannel.Bal{big.NewInt(200), big.NewInt(250)}), //nolint:gomnd
 	))
 }
 
@@ -392,7 +389,7 @@ const (
 
 func MakeCrossAssetVector(addresses []xdr.ScAddress) ([]xdr.ScVal, error) {
 	var vec []xdr.ScVal
-	lidvalXdrValue := xdr.Uint64(2)
+	lidvalXdrValue := xdr.Uint64(2) //nolint:gomnd
 	lidval, err := scval.WrapUint64(lidvalXdrValue)
 	if err != nil {
 		return nil, err
@@ -408,7 +405,7 @@ func MakeCrossAssetVector(addresses []xdr.ScAddress) ([]xdr.ScVal, error) {
 		if err != nil {
 			return nil, err
 		}
-		defAddr := make([]byte, 20)
+		defAddr := make([]byte, 20) //nolint:gomnd
 		ethAddr, err := scval.WrapScBytes(defAddr)
 		if err != nil {
 			return nil, err

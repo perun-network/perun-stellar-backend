@@ -1,4 +1,4 @@
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,15 +19,16 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"log"
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	xdr3 "github.com/stellar/go-xdr/xdr3"
 	"github.com/stellar/go/xdr"
-	"log"
-	"math/big"
 	"perun.network/go-perun/wire"
+
 	assettypes "perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/wallet/types"
-
 	"perun.network/perun-stellar-backend/wire/scval"
 )
 
@@ -39,22 +40,27 @@ const (
 	SymbolCCAddress     xdr.ScSymbol = "cc_addr"
 )
 
+// WirePart represents a participant on the wire.
+//
+//nolint:golint
 type WirePart struct {
 	*types.Participant
 }
 
+// Equal compares two WirePart addresses.
 func (w WirePart) Equal(address wire.Address) bool {
 	return w.Participant.Equal(address.(*WirePart).Participant)
 }
 
+// Cmp compares two WirePart addresses.
 func (w WirePart) Cmp(address wire.Address) int {
 	if w.Participant.Equal(address.(*WirePart).Participant) {
 		return 0
-	} else {
-		return 1
 	}
+	return 1
 }
 
+// Verify verifies a message signature.
 func (w WirePart) Verify(_ []byte, sig []byte) error {
 	if !bytes.Equal(sig, []byte("Authenticate")) {
 		return errors.New("invalid signature")
@@ -62,14 +68,17 @@ func (w WirePart) Verify(_ []byte, sig []byte) error {
 	return nil
 }
 
+// MarshalBinary encodes a WirePart to an xdr.Encoder.
 func (w WirePart) MarshalBinary() ([]byte, error) {
 	return w.Participant.MarshalBinary()
 }
 
+// UnmarshalBinary decodes a WirePart from binary data.
 func (w *WirePart) UnmarshalBinary(data []byte) error {
 	return w.Participant.UnmarshalBinary(data)
 }
 
+// NewWirePart creates a new WirePart from a Participant.
 func NewWirePart(participant *types.Participant) *WirePart {
 	return &WirePart{participant}
 }
@@ -83,12 +92,14 @@ func (p Participant) Verify(_ []byte, sig []byte) error {
 	return nil
 }
 
+// Participant represents a participant on the soroban-contract.
 type Participant struct {
 	StellarAddr   xdr.ScAddress
 	StellarPubKey xdr.ScBytes
 	CCAddr        xdr.ScBytes // Ethereum Address cannot be encoded as xdr.ScAddress, has to be encoded as xdr.ScBytes
 }
 
+// ToScVal encodes a Participant to an xdr.ScVal.
 func (p Participant) ToScVal() (xdr.ScVal, error) {
 	stellarAddr, err := scval.WrapScAddress(p.StellarAddr)
 	if err != nil {
@@ -127,12 +138,13 @@ func (p Participant) ToScVal() (xdr.ScVal, error) {
 	return scval.WrapScMap(m)
 }
 
+// FromScVal decodes a Participant from an xdr.ScVal.
 func (p *Participant) FromScVal(v xdr.ScVal) error {
 	m, ok := v.GetMap()
 	if !ok {
 		return errors.New("expected map decoding Participant")
 	}
-	if len(*m) != 3 {
+	if len(*m) != 3 { //nolint:gomnd
 		return errors.New("expected map of length 3")
 	}
 	stellarAddrVal, err := GetMapValue(scval.MustWrapScSymbol(SymbolStellarAddr), *m)
@@ -176,6 +188,7 @@ func (p *Participant) FromScVal(v xdr.ScVal) error {
 	return nil
 }
 
+// EncodeTo encodes a Participant to an xdr.Encoder.
 func (p Participant) EncodeTo(e *xdr3.Encoder) error {
 	v, err := p.ToScVal()
 	if err != nil {
@@ -184,6 +197,7 @@ func (p Participant) EncodeTo(e *xdr3.Encoder) error {
 	return v.EncodeTo(e)
 }
 
+// DecodeFrom decodes a Participant from an xdr.Decoder.
 func (p *Participant) DecodeFrom(d *xdr3.Decoder) (int, error) {
 	var v xdr.ScVal
 	i, err := d.Decode(&v)
@@ -193,6 +207,7 @@ func (p *Participant) DecodeFrom(d *xdr3.Decoder) (int, error) {
 	return i, p.FromScVal(v)
 }
 
+// MarshalBinary encodes a Participant to binary data.
 func (p Participant) MarshalBinary() ([]byte, error) {
 	buf := bytes.Buffer{}
 	e := xdr3.NewEncoder(&buf)
@@ -200,43 +215,45 @@ func (p Participant) MarshalBinary() ([]byte, error) {
 	return buf.Bytes(), err
 }
 
+// UnmarshalBinary decodes a Participant from binary data.
 func (p *Participant) UnmarshalBinary(data []byte) error {
 	d := xdr3.NewDecoder(bytes.NewReader(data))
 	_, err := p.DecodeFrom(d)
 	return err
 }
 
+// ParticipantFromScVal creates a Participant from an xdr.ScVal.
 func ParticipantFromScVal(v xdr.ScVal) (Participant, error) {
 	var p Participant
 	err := (&p).FromScVal(v)
 	return p, err
 }
 
-// Convert ECDSA public key to bytes
+// PublicKeyToBytes convert ECDSA public key to bytes.
 func PublicKeyToBytes(pubKey *ecdsa.PublicKey) []byte {
 	// Get the X and Y coordinates
 	xBytes := pubKey.X.Bytes()
 	yBytes := pubKey.Y.Bytes()
 
-	// Calculate the byte lengths for fixed-width representation
+	// Calculate the byte lengths for fixed-width representation.
 	curveBits := pubKey.Curve.Params().BitSize
-	curveByteSize := (curveBits + 7) / 8 // Calculate byte size
+	curveByteSize := (curveBits + 7) / 8 //nolint:gomnd
 
-	// Create fixed-size byte slices for X and Y
+	// Create fixed-size byte slices for X and Y.
 	xPadded := make([]byte, curveByteSize)
 	yPadded := make([]byte, curveByteSize)
 	copy(xPadded[curveByteSize-len(xBytes):], xBytes)
 	copy(yPadded[curveByteSize-len(yBytes):], yBytes)
 
 	// Concatenate the X and Y coordinates
-	pubKeyBytes := make([]byte, 0, 65)
-	pubKeyBytes = append(pubKeyBytes, 0x04) // Uncompressed prefix
+	pubKeyBytes := make([]byte, 0, 65)      //nolint:gomnd
+	pubKeyBytes = append(pubKeyBytes, 0x04) //nolint:gomnd
 	pubKeyBytes = append(pubKeyBytes, xPadded...)
 	pubKeyBytes = append(pubKeyBytes, yPadded...)
 	return pubKeyBytes
 }
 
-// Convert bytes back to ECDSA public key
+// BytesToPublicKey convert bytes back to ECDSA public key.
 func BytesToPublicKey(data []byte) (*big.Int, *big.Int, error) {
 	if len(data) != 65 || data[0] != 0x04 {
 		return nil, nil, errors.New("invalid public key")
@@ -249,17 +266,18 @@ func BytesToPublicKey(data []byte) (*big.Int, *big.Int, error) {
 	return x, y, nil
 }
 
+// MakeParticipant creates a Participant from a types.Participant.
 func MakeParticipant(participant types.Participant) (Participant, error) {
 	stellarAddr, err := assettypes.AccountAddressFromAddress(participant.StellarAddress)
 	if err != nil {
 		return Participant{}, err
 	}
-	if &participant.StellarPubKey == nil {
+	if participant.StellarPubKey == nil {
 		return Participant{}, errors.New("invalid Stellar public key length")
 	}
 
 	if !participant.StellarPubKey.Curve.IsOnCurve(participant.StellarPubKey.X, participant.StellarPubKey.Y) {
-		return Participant{}, errors.New("Stellar public key is not on the curve")
+		return Participant{}, errors.New("stellar public key is not on the curve")
 	}
 	pk := PublicKeyToBytes(participant.StellarPubKey)
 
@@ -272,6 +290,7 @@ func MakeParticipant(participant types.Participant) (Participant, error) {
 	}, nil
 }
 
+// ToParticipant converts a Participant to a types.Participant.
 func ToParticipant(participant Participant) (types.Participant, error) {
 	kp, err := assettypes.ToAccountAddress(participant.StellarAddr)
 	if err != nil {
@@ -281,7 +300,7 @@ func ToParticipant(participant Participant) (types.Participant, error) {
 	var ccAddr [20]byte
 	copy(ccAddr[:], participant.CCAddr[:])
 
-	if len(participant.CCAddr) != 20 {
+	if len(participant.CCAddr) != 20 { //nolint:gomnd
 		return types.Participant{}, errors.New("invalid cross-chain secp256k1 address length")
 	}
 	// Choose the curve (assuming P256 for this example)

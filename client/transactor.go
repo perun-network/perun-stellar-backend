@@ -30,21 +30,18 @@ type TxSender struct {
 
 func NewSender(kp *keypair.Full, hzClient *horizonclient.Client) Sender {
 	return &TxSender{kp: kp, hzClient: hzClient}
-
 }
 
 func (s *TxSender) SignSendTx(txUnsigned txnbuild.Transaction) (xdr.TransactionMeta, error) {
-	passphrase := ""
-	if s.hzClient.HorizonURL == "http://localhost:8000/" {
+	var passphrase string
+	if s.hzClient.HorizonURL == horizonClientURL {
 		passphrase = NETWORK_PASSPHRASE
 	} else {
 		passphrase = NETWORK_PASSPHRASETestNet
-
 	}
 	tx, err := txUnsigned.Sign(passphrase, s.kp)
 	if err != nil {
 		return xdr.TransactionMeta{}, err
-
 	}
 
 	txSent, err := s.hzClient.SubmitTransaction(tx)
@@ -58,7 +55,6 @@ func (s *TxSender) SignSendTx(txUnsigned txnbuild.Transaction) (xdr.TransactionM
 	_ = txMeta.V3.SorobanMeta.ReturnValue
 
 	return txMeta, nil
-
 }
 
 func (s *TxSender) SetHzClient(hzClient *horizonclient.Client) {

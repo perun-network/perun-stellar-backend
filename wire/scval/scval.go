@@ -1,4 +1,4 @@
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,7 +33,6 @@ func MustWrapScAddress(address xdr.ScAddress) (xdr.ScVal, error) {
 }
 
 func MakeScVecFromScAddresses(addresses []xdr.ScAddress) xdr.ScVec {
-
 	var xdrAddresses xdr.ScVec
 
 	for _, val := range addresses {

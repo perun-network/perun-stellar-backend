@@ -1,7 +1,7 @@
 //go:build integration
 // +build integration
 
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,15 +17,17 @@
 package channel_test
 
 import (
-	"github.com/stretchr/testify/require"
 	"log"
+	"testing"
+
+	"github.com/stretchr/testify/require"
 	pchannel "perun.network/go-perun/channel"
 	pwallet "perun.network/go-perun/wallet"
+
 	"perun.network/perun-stellar-backend/channel"
 	chtest "perun.network/perun-stellar-backend/channel/test"
 	"perun.network/perun-stellar-backend/channel/types"
 	wtypes "perun.network/perun-stellar-backend/wallet/types"
-	"testing"
 )
 
 func TestHappyChannel(t *testing.T) {
@@ -76,14 +78,16 @@ func TestHappyChannel(t *testing.T) {
 			Tx:        tx,
 			Acc:       map[pwallet.BackendID]pwallet.Account{2: accs[0]},
 			Idx:       pchannel.Index(0),
-			Secondary: false}
+			Secondary: false,
+		}
 
 		reqBob := pchannel.AdjudicatorReq{
 			Params:    perunParams,
 			Tx:        tx,
 			Acc:       map[pwallet.BackendID]pwallet.Account{2: accs[1]},
 			Idx:       pchannel.Index(1),
-			Secondary: false}
+			Secondary: false,
+		}
 
 		_, err = adjAlice.Subscribe(ctx, next.ID)
 		require.NoError(t, err)
@@ -100,7 +104,6 @@ func TestHappyChannel(t *testing.T) {
 		require.NoError(t, adjBob.Withdraw(ctx, reqBob, nil))
 
 	}
-
 }
 
 func TestHappyChannelOneWithdrawer(t *testing.T) {
@@ -148,7 +151,8 @@ func TestHappyChannelOneWithdrawer(t *testing.T) {
 			Tx:        tx,
 			Acc:       map[pwallet.BackendID]pwallet.Account{wtypes.StellarBackendID: accs[1]},
 			Idx:       pchannel.Index(1),
-			Secondary: false}
+			Secondary: false,
+		}
 
 		// Bob withdraws for both, himself and Alice
 
@@ -179,7 +183,6 @@ func TestHappyChannelOneWithdrawer(t *testing.T) {
 		log.Println("Balance: ", bal0, bal1, " after withdrawing: ", clientAddress, reqBob.Tx.State.Assets)
 
 	}
-
 }
 
 func TestChannel_RegisterFinal(t *testing.T) {
@@ -230,7 +233,8 @@ func TestChannel_RegisterFinal(t *testing.T) {
 			Tx:        tx,
 			Acc:       map[pwallet.BackendID]pwallet.Account{2: accs[0]},
 			Idx:       pchannel.Index(0),
-			Secondary: false}
+			Secondary: false,
+		}
 
 		require.NoError(t, adjAlice.Register(ctxAliceRegister, reqAlice, nil))
 
@@ -242,5 +246,4 @@ func TestChannel_RegisterFinal(t *testing.T) {
 		require.NoError(t, err)
 
 	}
-
 }

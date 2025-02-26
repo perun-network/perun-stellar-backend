@@ -2,8 +2,6 @@ module perun.network/perun-stellar-backend
 
 go 1.22
 
-toolchain go1.22.0
-
 require (
 	github.com/pkg/errors v0.9.1
 	github.com/stellar/go v0.0.0-20241113164517-f09f3e438519
@@ -14,7 +12,7 @@ require (
 	github.com/ethereum/go-ethereum v1.10.12
 	github.com/stellar/go-xdr v0.0.0-20231122183749-b53fb00bcac2
 	github.com/stretchr/testify v1.9.0
-	perun.network/go-perun v0.12.1-0.20250128081648-21d0af4e234b
+	perun.network/go-perun v0.13.0
 	polycry.pt/poly-go v0.0.0-20220301085937-fb9d71b45a37
 )
 

@@ -1,4 +1,4 @@
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,10 +16,12 @@ package test
 
 import (
 	"crypto/rand"
-	"github.com/stellar/go/xdr"
 	mrand "math/rand"
+
+	"github.com/stellar/go/xdr"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/channel/test"
+
 	"perun.network/perun-stellar-backend/channel/types"
 )
 

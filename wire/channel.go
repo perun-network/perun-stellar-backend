@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,8 +17,10 @@ package wire
 import (
 	"bytes"
 	"errors"
+
 	xdr3 "github.com/stellar/go-xdr/xdr3"
 	"github.com/stellar/go/xdr"
+
 	"perun.network/perun-stellar-backend/wire/scval"
 )
 
@@ -66,7 +68,7 @@ func (c *Channel) FromScVal(v xdr.ScVal) error {
 	if !ok {
 		return errors.New("expected map")
 	}
-	if len(*m) != 3 {
+	if len(*m) != 3 { //nolint:gomnd
 		return errors.New("expected map of length 3")
 	}
 	paramsVal, err := GetScMapValueFromSymbol(SymbolChannelParams, *m)

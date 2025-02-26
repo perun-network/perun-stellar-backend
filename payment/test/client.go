@@ -11,6 +11,7 @@ import (
 	pwallet "perun.network/go-perun/wallet"
 	"perun.network/go-perun/watcher/local"
 	pwire "perun.network/go-perun/wire"
+
 	"perun.network/perun-stellar-backend/channel"
 	"perun.network/perun-stellar-backend/wallet"
 	"perun.network/perun-stellar-backend/wire"
@@ -35,7 +36,6 @@ func SetupPaymentClient(
 	bus *pwire.LocalBus,
 	funder *channel.Funder,
 	adj *channel.Adjudicator,
-
 ) (*PaymentClient, error) {
 	watcher, err := local.NewWatcher(adj)
 	if err != nil {
@@ -98,10 +98,10 @@ func (c *PaymentClient) OpenChannel(peer pwire.Address, balances pchannel.Balanc
 		backends[i] = StellarBackendID
 	}
 	participants := []map[pwallet.BackendID]pwire.Address{proposerAddr, peerAddr}
-	initAlloc := pchannel.NewAllocation(2, backends, c.currencies...)
+	initAlloc := pchannel.NewAllocation(2, backends, c.currencies...) //nolint:gomnd
 	initAlloc.Balances = balances
 	// Prepare the channel proposal by defining the channel parameters.
-	challengeDuration := uint64(10) // On-chain challenge duration in seconds.
+	challengeDuration := uint64(10) //nolint:gomnd
 	proposal, err := pclient.NewLedgerChannelProposal(
 		challengeDuration,
 		proposerWalletAddr,
@@ -123,8 +123,8 @@ func (c *PaymentClient) OpenChannel(peer pwire.Address, balances pchannel.Balanc
 	c.Channel = newPaymentChannel(ch, c.currencies)
 }
 
-func (p *PaymentClient) WireAddress() pwire.Address {
-	return p.wAddr
+func (c *PaymentClient) WireAddress() pwire.Address {
+	return c.wAddr
 }
 
 func (c *PaymentClient) AcceptedChannel() *PaymentChannel {

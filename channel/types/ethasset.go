@@ -1,4 +1,4 @@
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,12 +18,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common"
 	"math/big"
-	"perun.network/go-perun/wallet"
 
+	"github.com/ethereum/go-ethereum/common"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/channel/multi"
+	"perun.network/go-perun/wallet"
 	"perun.network/go-perun/wire/perunio"
 )
 
@@ -53,8 +53,8 @@ func (a *EthAddress) MarshalBinary() ([]byte, error) {
 
 // UnmarshalBinary unmarshals the address from its binary representation.
 func (a *EthAddress) UnmarshalBinary(data []byte) error {
-	if len(data) != 20 {
-		return fmt.Errorf("unexpected address length %d, want %d", len(data), 20) //nolint: goerr113
+	if len(data) != 20 { //nolint:gomnd
+		return fmt.Errorf("unexpected address length %d, want %d", len(data), 20) //nolint:gomnd
 	}
 
 	(*common.Address)(a).SetBytes(data)

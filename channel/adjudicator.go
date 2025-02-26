@@ -18,27 +18,29 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/stellar/go/xdr"
 	"math/big"
+	"time"
+
+	"github.com/stellar/go/xdr"
 	pchannel "perun.network/go-perun/channel"
 	"perun.network/go-perun/log"
 	pwallet "perun.network/go-perun/wallet"
+
 	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/wallet"
-	"time"
 )
 
 var ErrChannelAlreadyClosed = errors.New("channel is already closed")
 
-var DefaultChallengeDuration = time.Duration(20) * time.Second
+var DefaultChallengeDuration = time.Duration(20) * time.Second //nolint:gomnd
 
 type Adjudicator struct {
 	challengeDuration *time.Duration
 	log               log.Embedding
 	CB                *client.ContractBackend
 	acc               *wallet.Account
-	assetAddrs        []xdr.ScVal //xdr.ScAddress
+	assetAddrs        []xdr.ScVal // xdr.ScAddress
 	perunAddr         xdr.ScAddress
 	maxIters          int
 	pollingInterval   time.Duration
@@ -47,7 +49,6 @@ type Adjudicator struct {
 
 // NewAdjudicator returns a new Adjudicator.
 func NewAdjudicator(acc *wallet.Account, cb *client.ContractBackend, perunID xdr.ScAddress, assetIDs []xdr.ScVal, oneWithdrawer bool) *Adjudicator {
-
 	return &Adjudicator{
 		challengeDuration: &DefaultChallengeDuration,
 		CB:                cb,
@@ -89,6 +90,7 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 		}
 		return a.handleWithdrawal(ctx, req)
 	}
+	//nolint:nestif
 	if req.Tx.State.IsFinal {
 		log.Println("Channel is final, closing now")
 		withdrawSelf := needWithdraw([]pchannel.Bal{req.Tx.State.Balances[0][req.Idx], req.Tx.State.Balances[1][req.Idx]}, req.Tx.State.Assets)
@@ -101,17 +103,21 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 		if err != nil {
 			chanControl, errChanState = a.CB.GetChannelInfo(ctx, a.perunAddr, req.Tx.State.ID)
 			if errChanState != nil {
+				log.Println("Error getting channel info: ", errChanState)
 				return errChanState
 			}
 
 			if chanControl.Control.Closed {
 				if a.oneWithdrawer && req.Idx == 0 {
+					log.Println("Channel is already closed, A returns nil")
 					return nil
 				}
 				return a.handleWithdrawal(ctx, req)
 			}
+			log.Println("Error closing channel: ", err)
 			return err
 		}
+		log.Println("closed channel, ", err)
 		return err
 	}
 
@@ -123,6 +129,7 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 		return err
 	}
 
+	log.Println("ForceClose called")
 	return a.handleWithdrawal(ctx, req)
 }
 
@@ -131,7 +138,8 @@ func (a *Adjudicator) handleWithdrawal(ctx context.Context, req pchannel.Adjudic
 	if a.oneWithdrawer && withdrawOther {
 		log.Println("Withdrawing other", req.Idx)
 		if err := a.withdrawOther(ctx, req); err != nil {
-			return err
+			log.Println("Error withdrawing other: ", err)
+			return a.withdraw(ctx, req)
 		}
 	}
 	withdrawSelf := needWithdraw([]pchannel.Bal{req.Tx.State.Balances[0][req.Idx], req.Tx.State.Balances[1][req.Idx]}, req.Tx.State.Assets)
@@ -143,7 +151,6 @@ func (a *Adjudicator) handleWithdrawal(ctx context.Context, req pchannel.Adjudic
 }
 
 func (a *Adjudicator) withdraw(ctx context.Context, req pchannel.AdjudicatorReq) error {
-
 	perunAddress := a.GetPerunAddr()
 
 	withdrawerIdx := req.Idx == 1
@@ -158,7 +165,6 @@ func (a *Adjudicator) withdrawOther(ctx context.Context, req pchannel.Adjudicato
 }
 
 func (a *Adjudicator) Close(ctx context.Context, state *pchannel.State, sigs []pwallet.Sig) error {
-
 	log.Println("Close called by Adjudicator")
 	perunAddr := a.GetPerunAddr()
 
@@ -172,6 +178,7 @@ func (a *Adjudicator) Register(ctx context.Context, req pchannel.AdjudicatorReq,
 	if err != nil {
 		return fmt.Errorf("error while disputing channel: %w", err)
 	}
+	log.Println("No withdrawal needed")
 	return nil
 }
 

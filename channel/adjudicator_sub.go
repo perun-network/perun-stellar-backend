@@ -1,4 +1,4 @@
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,14 +17,16 @@ package channel
 import (
 	"context"
 	"errors"
+	"time"
+
 	"github.com/stellar/go/xdr"
 	pchannel "perun.network/go-perun/channel"
 	log "perun.network/go-perun/log"
+	pkgsync "polycry.pt/poly-go/sync"
+
 	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/event"
 	"perun.network/perun-stellar-backend/wire"
-	pkgsync "polycry.pt/poly-go/sync"
-	"time"
 )
 
 const (
@@ -49,7 +51,6 @@ type AdjEventSub struct {
 }
 
 func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, cb *client.ContractBackend, perunAddr xdr.ScAddress, assetAddrs []xdr.ScVal, challengeDuration *time.Duration) (pchannel.AdjudicatorSubscription, error) {
-
 	sub := &AdjEventSub{
 		challengeDuration: challengeDuration,
 		cb:                cb,
@@ -67,7 +68,6 @@ func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, cb *client.Contract
 	ctx, sub.cancel = context.WithCancel(ctx)
 	go sub.run(ctx)
 	return sub, nil
-
 }
 
 func (s *AdjEventSub) run(ctx context.Context) {
@@ -111,7 +111,6 @@ polling:
 				s.chanControl = newChanControl
 				s.log.Log().Debug("No events yet, continuing polling...")
 				continue polling
-
 			} else {
 				s.log.Log().Debug("Contract event detected, evaluating...")
 				s.log.Log().Debugf("Found contract event: %v", adjEvent)
@@ -128,7 +127,6 @@ polling:
 }
 
 func DifferencesInControls(controlCurr, controlNext wire.Control) (event.PerunEvent, error) {
-
 	if controlCurr.FundedA != controlNext.FundedA {
 		if controlCurr.FundedA {
 			return nil, errors.New("channel cannot be unfunded A before withdrawal")

@@ -19,14 +19,15 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
-
 	"perun.network/go-perun/wallet"
 )
 
 // AddressBinaryLen is the length of the binary representation of Address, in
 // bytes.
-const AddressBinaryLen = common.AddressLength
-const EthBackendID = 1
+const (
+	AddressBinaryLen = common.AddressLength
+	EthBackendID     = 1
+)
 
 // compile time check that we implement the perun Address interface.
 var _ wallet.Address = (*Address)(nil)

@@ -1,4 +1,4 @@
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import (
 	"github.com/pkg/errors"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/wallet"
+
 	"perun.network/perun-stellar-backend/channel/types"
 	wtypes "perun.network/perun-stellar-backend/wallet/types"
 	"perun.network/perun-stellar-backend/wire"
@@ -48,7 +49,6 @@ func (b backend) CalcID(params *channel.Params) (channel.ID, error) {
 }
 
 func (b backend) Sign(account wallet.Account, state *channel.State) (wallet.Sig, error) {
-
 	if err := checkBackends(state.Allocation.Backends); err != nil {
 		return nil, errors.New("invalid backends in state allocation: " + err.Error())
 	}
@@ -69,7 +69,6 @@ func (b backend) Sign(account wallet.Account, state *channel.State) (wallet.Sig,
 func (b backend) Verify(addr wallet.Address, state *channel.State, sig wallet.Sig) (bool, error) {
 	ethState := ToEthState(state)
 	bytes, err := EncodeEthState(&ethState)
-
 	if err != nil {
 		return false, err
 	}

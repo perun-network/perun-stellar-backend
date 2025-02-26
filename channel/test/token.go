@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,23 +16,27 @@ package test
 
 import (
 	"errors"
+	"log"
+	"math"
+	"testing"
+
 	"github.com/stellar/go/clients/horizonclient"
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/xdr"
 	"github.com/stretchr/testify/require"
-	"log"
-	"math"
+
 	"perun.network/perun-stellar-backend/channel"
 	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/event"
 	"perun.network/perun-stellar-backend/wire/scval"
-	"testing"
 )
 
-const tokenDecimals = uint32(7)
-const tokenName = "PerunToken"
-const tokenSymbol = "PRN"
+const (
+	tokenDecimals = uint32(7)
+	tokenName     = "PerunToken"
+	tokenSymbol   = "PRN"
+)
 
 type TokenParams struct {
 	decimals uint32
@@ -61,7 +65,6 @@ func (t *TokenParams) GetSymbol() string {
 }
 
 func BuildInitTokenArgs(adminAddr xdr.ScAddress, decimals uint32, tokenName string, tokenSymbol string) (xdr.ScVec, error) {
-
 	adminScAddr, err := scval.WrapScAddress(adminAddr)
 	if err != nil {
 		panic(err)
@@ -91,7 +94,6 @@ func BuildInitTokenArgs(adminAddr xdr.ScAddress, decimals uint32, tokenName stri
 }
 
 func InitTokenContract(kp *keypair.Full, contractIDAddress xdr.ScAddress, url string) error {
-
 	cb := NewContractBackendFromKey(kp, nil, url)
 
 	adminScAddr, err := types.MakeAccountAddress(kp)
@@ -123,7 +125,6 @@ func InitTokenContract(kp *keypair.Full, contractIDAddress xdr.ScAddress, url st
 }
 
 func GetTokenName(kp *keypair.Full, contractAddress xdr.ScAddress, url string) error {
-
 	cb := NewContractBackendFromKey(kp, nil, url)
 	TokenNameArgs := xdr.ScVec{}
 
@@ -136,7 +137,6 @@ func GetTokenName(kp *keypair.Full, contractAddress xdr.ScAddress, url string) e
 }
 
 func BuildGetTokenBalanceArgs(balanceOf xdr.ScAddress) (xdr.ScVec, error) {
-
 	recScAddr, err := scval.WrapScAddress(balanceOf)
 	if err != nil {
 		panic(err)
@@ -150,7 +150,6 @@ func BuildGetTokenBalanceArgs(balanceOf xdr.ScAddress) (xdr.ScVec, error) {
 }
 
 func BuildTransferTokenArgs(from xdr.ScAddress, to xdr.ScAddress, amount xdr.Int128Parts) (xdr.ScVec, error) {
-
 	fromScAddr, err := scval.WrapScAddress(from)
 	if err != nil {
 		panic(err)
@@ -189,7 +188,7 @@ func Deploy(t *testing.T, kp *keypair.Full, contractPath string, url string) (xd
 
 	require.NoError(t, err)
 
-	txParamsInstall := client.GetBaseTransactionParamsWithFee(&deployerAcc, int64(100)+minFeeInstall, &preFlightOp)
+	txParamsInstall := client.GetBaseTransactionParamsWithFee(&deployerAcc, int64(100)+minFeeInstall, &preFlightOp) //nolint:gomnd
 	txSignedInstall, err := client.CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParamsInstall, client.NETWORK_PASSPHRASE)
 	require.NoError(t, err)
 
@@ -204,7 +203,7 @@ func Deploy(t *testing.T, kp *keypair.Full, contractPath string, url string) (xd
 	createContractOp := channel.AssembleCreateContractOp(kp.Address(), contractPath, "a1", client.NETWORK_PASSPHRASE)
 	preFlightOpCreate, minFeeDeploy, err := client.PreflightHostFunctions(hzClient, &deployerAcc, *createContractOp)
 	require.NoError(t, err)
-	txParamsCreate := client.GetBaseTransactionParamsWithFee(&deployerAcc, int64(100)+minFeeDeploy, &preFlightOpCreate)
+	txParamsCreate := client.GetBaseTransactionParamsWithFee(&deployerAcc, int64(100)+minFeeDeploy, &preFlightOpCreate) //nolint:gomnd
 	txSignedCreate, err := client.CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParamsCreate, client.NETWORK_PASSPHRASE)
 
 	require.NoError(t, err)

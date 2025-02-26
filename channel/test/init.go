@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,11 +17,13 @@ package test
 import (
 	pchtest "perun.network/go-perun/channel/test"
 	pwtest "perun.network/go-perun/wallet/test"
+
 	wtest "perun.network/perun-stellar-backend/wallet/test"
+	"perun.network/perun-stellar-backend/wallet/types"
 )
 
 func init() {
-	pchtest.SetRandomizer(&Randomizer{}, 2)
+	pchtest.SetRandomizer(&Randomizer{}, types.StellarBackendID)
 	walletRdz := wtest.Randomizer{}
-	pwtest.SetRandomizer(&walletRdz, 2)
+	pwtest.SetRandomizer(&walletRdz, types.StellarBackendID)
 }

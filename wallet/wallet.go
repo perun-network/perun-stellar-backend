@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,11 +16,13 @@ package wallet
 
 import (
 	"errors"
-	"github.com/stellar/go/keypair"
 	"math/rand"
+
+	"github.com/stellar/go/keypair"
 	"perun.network/go-perun/wallet"
-	"perun.network/perun-stellar-backend/wallet/types"
 	"polycry.pt/poly-go/sync"
+
+	"perun.network/perun-stellar-backend/wallet/types"
 )
 
 type EphemeralWallet struct {
@@ -60,8 +62,7 @@ func (e *EphemeralWallet) AddAccount(acc *Account) error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	k := types.AsParticipant(acc.Address()).String()
-	_, ok := e.accounts[k]
-	if ok {
+	if _, ok := e.accounts[k]; ok {
 		return errors.New("account already exists")
 	}
 	e.accounts[k] = acc

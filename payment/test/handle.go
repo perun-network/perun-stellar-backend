@@ -1,4 +1,4 @@
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,12 +19,13 @@ import (
 	"fmt"
 	"log"
 	"math/big"
-	"perun.network/go-perun/channel"
-	"perun.network/go-perun/wallet"
-	wtypes "perun.network/perun-stellar-backend/wallet/types"
-
-	"perun.network/go-perun/client"
 	"time"
+
+	"perun.network/go-perun/channel"
+	"perun.network/go-perun/client"
+	"perun.network/go-perun/wallet"
+
+	wtypes "perun.network/perun-stellar-backend/wallet/types"
 )
 
 // HandleProposal is the callback for incoming channel proposals.
@@ -33,26 +34,24 @@ func (c *PaymentClient) HandleProposal(p client.ChannelProposal, r *client.Propo
 		// Ensure that we got a ledger channel proposal.
 		lcp, ok := p.(*client.LedgerChannelProposalMsg)
 		if !ok {
-			return nil, fmt.Errorf("Invalid proposal type: %T", p)
+			return nil, fmt.Errorf("invalid proposal type: %T", p)
 		}
 
 		// Check that we have the correct number of participants.
-		if lcp.NumPeers() != 2 {
-			return nil, fmt.Errorf("Invalid number of participants: %d", lcp.NumPeers())
+		if lcp.NumPeers() != 2 { //nolint:gomnd
+			return nil, fmt.Errorf("invalid number of participants: %d", lcp.NumPeers())
 		}
 
 		// Check that the channel has the expected assets and funding balances.
 		const assetIdx, clientIdx, peerIdx = 0, 0, 1
 
 		pAssets := make([]channel.Asset, len(c.currencies))
-		for i, asset := range c.currencies {
-			pAssets[i] = channel.Asset(asset)
-		}
+		copy(c.currencies, pAssets)
 
 		if err := channel.AssertAssetsEqual(lcp.InitBals.Assets, pAssets); err != nil {
-			return nil, fmt.Errorf("Invalid assets: %v", err)
-		} else if lcp.FundingAgreement[assetIdx][peerIdx].Cmp(big.NewInt(0)) != 0 { //lcp.FundingAgreement[assetIdx][clientIdx].Cmp(lcp.FundingAgreement[assetIdx][peerIdx]) != 0
-			return nil, fmt.Errorf("Invalid funding balance")
+			return nil, fmt.Errorf("invalid assets: %v", err)
+		} else if lcp.FundingAgreement[assetIdx][peerIdx].Cmp(big.NewInt(0)) != 0 { // lcp.FundingAgreement[assetIdx][clientIdx].Cmp(lcp.FundingAgreement[assetIdx][peerIdx]) != 0
+			return nil, fmt.Errorf("invalid funding balance")
 		}
 		return lcp, nil
 	}()
@@ -82,7 +81,6 @@ func (c *PaymentClient) HandleProposal(p client.ChannelProposal, r *client.Propo
 
 	// Store channel.
 	c.channels <- newPaymentChannel(ch, c.currencies)
-
 }
 
 // HandleUpdate is the callback for incoming channel updates.
@@ -91,7 +89,7 @@ func (c *PaymentClient) HandleUpdate(cur *channel.State, next client.ChannelUpda
 	err := func() error {
 		err := channel.AssertAssetsEqual(cur.Assets, next.State.Assets)
 		if err != nil {
-			return fmt.Errorf("Invalid assets: %v", err)
+			return fmt.Errorf("invalid assets: %v", err)
 		}
 
 		receiverIdx := 1 - next.ActorIdx // This works because we are in a two-party channel.
@@ -104,7 +102,7 @@ func (c *PaymentClient) HandleUpdate(cur *channel.State, next client.ChannelUpda
 			curBal := cur.Allocation.Balance(receiverIdx, currency)
 			nextBal := next.State.Allocation.Balance(receiverIdx, currency)
 			if nextBal.Cmp(curBal) < 0 {
-				return fmt.Errorf("Invalid balance for asset %v: %v", currency, nextBal)
+				return fmt.Errorf("invalid balance for asset %v: %v", currency, nextBal)
 			}
 		}
 
