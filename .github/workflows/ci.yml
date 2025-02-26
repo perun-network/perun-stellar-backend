@@ -45,7 +45,7 @@ jobs:
             ./quickstart.sh standalone &
             
     - name: Wait for local chain setup
-      run: sleep 25
+      run: sleep 50
 
     - name: Run integration tests
       run: go test -tags=integration ./...
