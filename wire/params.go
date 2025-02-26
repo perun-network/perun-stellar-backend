@@ -17,6 +17,7 @@ package wire
 import (
 	"bytes"
 	"errors"
+
 	xdr3 "github.com/stellar/go-xdr/xdr3"
 	"github.com/stellar/go/xdr"
 	"perun.network/go-perun/channel"
