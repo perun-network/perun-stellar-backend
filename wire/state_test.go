@@ -88,7 +88,7 @@ func checkNoLockedAmount(t *testing.T, state channel.State) {
 
 func checkPerunStateEquality(t *testing.T, first, last channel.State) {
 	require.Equal(t, first.IsFinal, last.IsFinal)
-	require.True(t, first.ID == last.ID)
+	require.Equal(t, first.ID, last.ID)
 	require.Equal(t, first.Version, last.Version)
 }
 

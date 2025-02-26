@@ -17,8 +17,6 @@ package wire
 import (
 	"bytes"
 	"errors"
-	"log"
-
 	xdr3 "github.com/stellar/go-xdr/xdr3"
 	"github.com/stellar/go/xdr"
 	"perun.network/go-perun/channel"
@@ -182,22 +180,18 @@ func MakeParams(params channel.Params) (Params, error) {
 
 	participantA, err := types.ToParticipant(params.Parts[0][types.StellarBackendID])
 	if err != nil {
-		log.Println("Error in MakeParams: ", err)
 		return Params{}, err
 	}
 	a, err := MakeParticipant(*participantA)
 	if err != nil {
-		log.Println("Error2 in MakeParams: ", err)
 		return Params{}, err
 	}
 	participantB, err := types.ToParticipant(params.Parts[1][types.StellarBackendID])
 	if err != nil {
-		log.Println("Error3 in MakeParams: ", err)
 		return Params{}, err
 	}
 	b, err := MakeParticipant(*participantB)
 	if err != nil {
-		log.Println("Error4 in MakeParams: ", err)
 		return Params{}, err
 	}
 	nonce := MakeNonce(params.Nonce)

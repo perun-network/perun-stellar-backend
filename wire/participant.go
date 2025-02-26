@@ -19,7 +19,6 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	"log"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
@@ -107,7 +106,6 @@ func (p Participant) ToScVal() (xdr.ScVal, error) {
 	}
 
 	if len(p.StellarPubKey) != CCPubKeyLength {
-		log.Println(len(p.StellarPubKey))
 		return xdr.ScVal{}, errors.New("invalid Layer 2 public key length")
 	}
 
