@@ -35,6 +35,7 @@ import (
 	"perun.network/perun-stellar-backend/wire/scval"
 )
 
+// MaxBalance is the maximum balance that can be represented in the wire format.
 var MaxBalance = new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 127), big.NewInt(1)) //nolint:gomnd
 
 // Balances represents the balances of a channel.

@@ -29,10 +29,12 @@ type Randomizer struct{}
 
 var _ test.Randomizer = (*Randomizer)(nil)
 
+// NewRandomAsset calls NewRandomStellarAsset.
 func (*Randomizer) NewRandomAsset(*mrand.Rand) channel.Asset {
 	return NewRandomStellarAsset()
 }
 
+// NewRandomStellarAsset creates a new random stellar asset.
 func NewRandomStellarAsset() *types.StellarAsset {
 	var contractID xdr.Hash
 	if _, err := rand.Read(contractID[:]); err != nil {

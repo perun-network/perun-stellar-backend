@@ -35,6 +35,7 @@ var ErrChannelAlreadyClosed = errors.New("channel is already closed")
 
 var DefaultChallengeDuration = time.Duration(20) * time.Second //nolint:gomnd
 
+// Adjudicator implements the Adjudicator interface for Stellar.
 type Adjudicator struct {
 	challengeDuration *time.Duration
 	log               log.Embedding
@@ -62,20 +63,24 @@ func NewAdjudicator(acc *wallet.Account, cb *client.ContractBackend, perunID xdr
 	}
 }
 
+// GetPerunAddr returns the perun address of the adjudicator.
 func (a *Adjudicator) GetPerunAddr() xdr.ScAddress {
 	return a.perunAddr
 }
 
+// GetAssetAddrs returns the asset addresses of the adjudicator.
 func (a *Adjudicator) GetAssetAddrs() []xdr.ScVal {
 	return a.assetAddrs
 }
 
+// Subscribe subscribes to the adjudicator.
 func (a *Adjudicator) Subscribe(ctx context.Context, cid pchannel.ID) (pchannel.AdjudicatorSubscription, error) {
 	perunAddr := a.GetPerunAddr()
 	assetAddrs := a.GetAssetAddrs()
 	return NewAdjudicatorSub(ctx, cid, a.CB, perunAddr, assetAddrs, a.challengeDuration)
 }
 
+// Withdraw withdraws the channel.
 func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq, smap pchannel.StateMap) error {
 	log.Println("Withdraw called by Adjudicator")
 	chanControl, errChanState := a.CB.GetChannelInfo(ctx, a.perunAddr, req.Tx.State.ID)
@@ -164,6 +169,7 @@ func (a *Adjudicator) withdrawOther(ctx context.Context, req pchannel.Adjudicato
 	return a.CB.Withdraw(ctx, perunAddress, req, false, true)
 }
 
+// Close closes the channel.
 func (a *Adjudicator) Close(ctx context.Context, state *pchannel.State, sigs []pwallet.Sig) error {
 	log.Println("Close called by Adjudicator")
 	perunAddr := a.GetPerunAddr()
@@ -182,15 +188,18 @@ func (a *Adjudicator) Register(ctx context.Context, req pchannel.AdjudicatorReq,
 	return nil
 }
 
+// Dispute disputes a channel.
 func (a *Adjudicator) Dispute(ctx context.Context, state *pchannel.State, sigs []pwallet.Sig) error {
 	contractAddress := a.GetPerunAddr()
 	return a.CB.Dispute(ctx, contractAddress, state, sigs)
 }
 
+// ForceClose forces a channel to close.
 func (a *Adjudicator) ForceClose(ctx context.Context, state *pchannel.State, sigs []pwallet.Sig) error {
 	return a.CB.ForceClose(ctx, a.perunAddr, state.ID)
 }
 
+// Progress is not relevant for Stellar channels.
 func (a Adjudicator) Progress(ctx context.Context, req pchannel.ProgressReq) error {
 	// only relevant for AppChannels
 	return nil

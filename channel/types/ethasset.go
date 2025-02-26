@@ -121,12 +121,12 @@ func (id ChainID) MapKey() multi.LedgerIDMapKey {
 }
 
 type (
-	// Asset is an Ethereum asset.
+	// EthAsset is an Ethereum asset.
 	EthAsset struct {
 		assetID     LedgerBackendID
 		AssetHolder wallet.Address
 	}
-	// LedherBackendID holds the ChainID and BackendID of an Asset.
+	// LedgerBackendID holds the ChainID and BackendID of an Asset.
 	LedgerBackendID struct {
 		backendID uint32
 		ledgerID  ChainID
@@ -136,19 +136,22 @@ type (
 	AssetMapKey string
 )
 
+// MakeEthAsset creates a new Ethereum asset with the given id and holder.
 func MakeEthAsset(id *big.Int, holder wallet.Address) EthAsset {
 	return EthAsset{assetID: LedgerBackendID{backendID: 1, ledgerID: MakeChainID(id)}, AssetHolder: holder}
 }
 
+// BackendID returns the identifier for the eth-backend.
 func (id LedgerBackendID) BackendID() uint32 {
 	return id.backendID
 }
 
+// LedgerID returns the ledger ID the asset lives on.
 func (id LedgerBackendID) LedgerID() multi.LedgerID {
 	return &id.ledgerID
 }
 
-// MakeAssetID makes a LedgerBackendID for the given id.
+// MakeLedgerBackendID makes a LedgerBackendID for the given id.
 func MakeLedgerBackendID(id *big.Int) multi.LedgerBackendID {
 	if id.Sign() < 0 {
 		panic("must not be smaller than zero")

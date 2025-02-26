@@ -19,10 +19,12 @@ import (
 	"perun.network/go-perun/wallet"
 )
 
+// Address implements the wallet.Address interface for the Stellar backend.
 type Address keypair.FromAddress
 
 var _ wallet.Address = (*Address)(nil)
 
+// Equal compares two addresses for equality.
 func (a *Address) Equal(addr wallet.Address) bool {
 	other, ok := addr.(*Address)
 	if !ok {
@@ -31,18 +33,22 @@ func (a *Address) Equal(addr wallet.Address) bool {
 	return (*keypair.FromAddress)(a).Equal((*keypair.FromAddress)(other))
 }
 
+// MarshalBinary implements the encoding.BinaryMarshaler interface.
 func (a *Address) MarshalBinary() ([]byte, error) {
 	return (*keypair.FromAddress)(a).MarshalBinary()
 }
 
+// UnmarshalBinary implements the encoding.BinaryUnmarshaler interface.
 func (a *Address) UnmarshalBinary(data []byte) error {
 	return (*keypair.FromAddress)(a).UnmarshalBinary(data)
 }
 
+// String returns the string representation of the address.
 func (a *Address) String() string {
 	return (*keypair.FromAddress)(a).Address()
 }
 
+// BackendID returns the Stellar backend ID.
 func (a *Address) BackendID() wallet.BackendID {
 	return StellarBackendID
 }

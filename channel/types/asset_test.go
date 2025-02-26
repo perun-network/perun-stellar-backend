@@ -24,6 +24,7 @@ import (
 	"perun.network/perun-stellar-backend/channel/types"
 )
 
+// TestAssetMarshalAndUnmarshalBinary tests the marshalling and unmarshalling of a StellarAsset.
 func TestAssetMarshalAndUnmarshalBinary(t *testing.T) {
 	var hash xdr.Hash
 	copy(hash[:], []byte("testhashfortestingonly!testhash"))
@@ -40,6 +41,7 @@ func TestAssetMarshalAndUnmarshalBinary(t *testing.T) {
 	require.Equal(t, asset.Asset.ContractID().HexString(), newAsset.Asset.ContractID().HexString(), "Mismatched ContractID. Expected %x, got %x", asset.Asset.ContractID(), newAsset.Asset.ContractID())
 }
 
+// TestMakeAccountAddress tests the creation of an account address.
 func TestMakeAccountAddress(t *testing.T) {
 	kp, _ := keypair.Random()
 

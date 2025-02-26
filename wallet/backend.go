@@ -36,6 +36,7 @@ func init() {
 	wallet.SetBackend(Backend, types.StellarBackendID)
 }
 
+// NewAddress creates a new address.
 func (b backend) NewAddress() wallet.Address {
 	return &types.Participant{}
 }
@@ -46,6 +47,7 @@ func (b backend) DecodeSig(reader io.Reader) (wallet.Sig, error) {
 	return buf, perunio.Decode(reader, &buf)
 }
 
+// VerifySignature verifies the signature of a message.
 func (b backend) VerifySignature(msg []byte, sig wallet.Sig, a wallet.Address) (bool, error) {
 	p, ok := a.(*types.Participant)
 	if !ok {

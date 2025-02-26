@@ -17,8 +17,10 @@ import (
 	"perun.network/perun-stellar-backend/wire"
 )
 
+// StellarBackendID is the backend ID for the Stellar backend.
 const StellarBackendID pwallet.BackendID = 2
 
+// PaymentClient is a client that can interact with a channel.
 type PaymentClient struct {
 	perunClient *pclient.Client
 	account     *wallet.Account
@@ -29,6 +31,7 @@ type PaymentClient struct {
 	balance     *big.Int
 }
 
+// SetupPaymentClient sets up a payment client.
 func SetupPaymentClient(
 	w *wallet.EphemeralWallet,
 	acc *wallet.Account,
@@ -78,6 +81,7 @@ func (c *PaymentClient) startWatching(ch *pclient.Channel) {
 	}()
 }
 
+// OpenChannel opens a channel with the specified peer and balances.
 func (c *PaymentClient) OpenChannel(peer pwire.Address, balances pchannel.Balances) {
 	// We define the channel participants. The proposer has always index 0. Here
 	// we use the on-chain addresses as off-chain addresses, but we could also
@@ -123,10 +127,12 @@ func (c *PaymentClient) OpenChannel(peer pwire.Address, balances pchannel.Balanc
 	c.Channel = newPaymentChannel(ch, c.currencies)
 }
 
+// WireAddress returns the wire address of the client.
 func (c *PaymentClient) WireAddress() pwire.Address {
 	return c.wAddr
 }
 
+// AcceptedChannel accepts a channel proposal.
 func (c *PaymentClient) AcceptedChannel() *PaymentChannel {
 	return <-c.channels
 }

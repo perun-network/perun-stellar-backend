@@ -28,6 +28,7 @@ import (
 	paytest "perun.network/perun-stellar-backend/payment/test"
 )
 
+// TestHappyPerun tests the happy path of the Perun payment protocol.
 func TestHappyPerun(t *testing.T) {
 	t.Run("Honest Perun Users", func(t *testing.T) {
 		runHappyPerun(t)

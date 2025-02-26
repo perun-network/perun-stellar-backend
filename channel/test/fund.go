@@ -23,6 +23,7 @@ import (
 	"perun.network/perun-stellar-backend/channel"
 )
 
+// FundAll funds all funders with the given funding requests.
 func FundAll(ctx context.Context, funders []*channel.Funder, reqs []*pchannel.FundingReq) error {
 	g := pkgerrors.NewGatherer()
 	for i := range funders {

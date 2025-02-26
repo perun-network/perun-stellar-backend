@@ -45,6 +45,7 @@ type Participant struct {
 	CCAddr [CCAddressLength]byte
 }
 
+// NewParticipant creates a new participant with the given Stellar address, public key, and cross-chain address.
 func NewParticipant(addr keypair.FromAddress, pk *ecdsa.PublicKey, ccAddr [CCAddressLength]byte) *Participant {
 	return &Participant{
 		StellarAddress: addr,
@@ -118,6 +119,7 @@ func (p Participant) String() string {
 	return p.AddressString() // + ":" + p.PublicKeyString()
 }
 
+// Equal checks if the given address is equal to the participant.
 func (p Participant) Equal(other wallet.Address) bool {
 	otherAddress, ok := other.(*Participant)
 	if !ok {
@@ -126,19 +128,23 @@ func (p Participant) Equal(other wallet.Address) bool {
 	return p.StellarAddress.Equal(&otherAddress.StellarAddress) && p.StellarPubKey.Equal(otherAddress.StellarPubKey) && p.CCAddr == otherAddress.CCAddr
 }
 
+// AddressString returns the Stellar address as a string.
 func (p Participant) AddressString() string {
 	return p.StellarAddress.Address()
 }
 
+// PublicKeyString returns the public key as a hex string.
 func (p Participant) PublicKeyString() string {
 	pubKeyBytes, _ := x509.MarshalPKIXPublicKey(&p.StellarPubKey)
 	return hex.EncodeToString(pubKeyBytes)
 }
 
+// BackendID returns the Stellar backend ID.
 func (p Participant) BackendID() wallet.BackendID {
 	return StellarBackendID
 }
 
+// ZeroAddress creates a participant with a zero-value ECDSA public key and a random Stellar keypair.
 func ZeroAddress() (*Participant, error) {
 	// Create a zero-value ECDSA public key (X = 0, Y = 0)
 	zeroPubKey := ecdsa.PublicKey{
@@ -159,6 +165,7 @@ func ZeroAddress() (*Participant, error) {
 	}, nil
 }
 
+// AsParticipant casts the given address to a participant.
 func AsParticipant(address wallet.Address) *Participant {
 	p, ok := address.(*Participant)
 	if !ok {
@@ -167,6 +174,7 @@ func AsParticipant(address wallet.Address) *Participant {
 	return p
 }
 
+// ToParticipant casts the given address to a participant.
 func ToParticipant(address wallet.Address) (*Participant, error) {
 	p, ok := address.(*Participant)
 	if !ok {
@@ -175,6 +183,7 @@ func ToParticipant(address wallet.Address) (*Participant, error) {
 	return p, nil
 }
 
+// PublicKeyFromKeyPair extracts the public key from the given keypair.
 func PublicKeyFromKeyPair(kp keypair.KP) (ed25519.PublicKey, error) {
 	return strkey.Decode(strkey.VersionByteAccountID, kp.Address())
 }

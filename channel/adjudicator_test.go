@@ -30,6 +30,7 @@ import (
 	wtypes "perun.network/perun-stellar-backend/wallet/types"
 )
 
+// TestHappyChannel tests a happy path of a channel.
 func TestHappyChannel(t *testing.T) {
 	setup := chtest.NewTestSetup(t)
 	stellarAsset := setup.GetTokenAsset()
@@ -106,6 +107,7 @@ func TestHappyChannel(t *testing.T) {
 	}
 }
 
+// TestHappyChannelOneWithdrawer tests a happy path of a channel with only one withdrawer.
 func TestHappyChannelOneWithdrawer(t *testing.T) {
 	setup := chtest.NewTestSetup(t, true)
 	stellarAsset := setup.GetTokenAsset()
@@ -185,6 +187,7 @@ func TestHappyChannelOneWithdrawer(t *testing.T) {
 	}
 }
 
+// TestChannel_RegisterFinal tests the RegisterFinal method of the adjudicator.
 func TestChannel_RegisterFinal(t *testing.T) {
 	setup := chtest.NewTestSetup(t)
 	stellarAsset := setup.GetTokenAsset()

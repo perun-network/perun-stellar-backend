@@ -136,6 +136,7 @@ func assetToStellarAsset(asset channel.Asset) ChannelAsset {
 	}
 }
 
+// ToEthParams converts a channel.Params to a ChannelParams struct.
 func ToEthParams(params *channel.Params) (ChannelParams, error) {
 	participants := make([]ChannelParticipant, len(params.Parts))
 	for i, p := range params.Parts {

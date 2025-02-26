@@ -30,18 +30,22 @@ const HashLenXdr = 32
 var _ multi.Asset = (*StellarAsset)(nil)
 
 type (
+	// Asset represents a generic asset.
 	Asset struct {
 		contractID xdr.Hash
 	}
+	// StellarAsset represents a Stellar asset.
 	StellarAsset struct {
 		Asset Asset
 		id    CCID
 	}
+	// CCID is a unique identifier for a channel asset.
 	CCID struct {
 		backendID uint32
 		ledgerID  ContractLID
 	}
 
+	// ContractLID is a unique identifier for a contract.
 	ContractLID struct{ string }
 )
 

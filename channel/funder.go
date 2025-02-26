@@ -35,6 +35,7 @@ const (
 	DefaultPollingInterval  = time.Duration(4) * time.Second
 )
 
+// Funder is a struct that implements the Funder interface for Stellar.
 type Funder struct {
 	cb              *client.ContractBackend
 	perunAddr       xdr.ScAddress
@@ -43,6 +44,7 @@ type Funder struct {
 	pollingInterval time.Duration
 }
 
+// NewFunder returns a new Funder.
 func NewFunder(acc *wallet.Account, contractBackend *client.ContractBackend, perunAddr xdr.ScAddress, assetAddrs []xdr.ScVal) *Funder {
 	return &Funder{
 		cb:              contractBackend,
@@ -53,10 +55,12 @@ func NewFunder(acc *wallet.Account, contractBackend *client.ContractBackend, per
 	}
 }
 
+// GetPerunAddr returns the perun address of the funder.
 func (f *Funder) GetPerunAddr() xdr.ScAddress {
 	return f.perunAddr
 }
 
+// GetAssetAddrs returns the asset addresses of the funder.
 func (f *Funder) GetAssetAddrs() []xdr.ScVal {
 	return f.assetAddrs
 }
@@ -210,6 +214,7 @@ func (f *Funder) openChannel(ctx context.Context, req pchannel.FundingReq) error
 	return nil
 }
 
+// FundChannel funds the channel with the given state.
 func (f *Funder) FundChannel(ctx context.Context, state *pchannel.State, funderIdx bool) error {
 	balsStellar, err := wire.MakeBalances(state.Allocation)
 	if err != nil {
@@ -223,6 +228,7 @@ func (f *Funder) FundChannel(ctx context.Context, state *pchannel.State, funderI
 	return f.cb.Fund(ctx, f.perunAddr, state.ID, funderIdx)
 }
 
+// AbortChannel aborts the channel with the given state.
 func (f *Funder) AbortChannel(ctx context.Context, state *pchannel.State) error {
 	return f.cb.Abort(ctx, f.perunAddr, state)
 }
@@ -274,6 +280,7 @@ func assetSliceToSet(assets []xdr.ScVal) map[string]struct{} {
 	return assetSet
 }
 
+// needFunding checks if a participant needs to fund the channel.
 func needFunding(balances []pchannel.Bal, assets []pchannel.Asset) bool {
 	for i, bal := range balances {
 		_, ok := assets[i].(*types.StellarAsset)

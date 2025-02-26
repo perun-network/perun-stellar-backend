@@ -20,11 +20,13 @@ import (
 
 const stellarDefaultChainID = 1
 
+// Sender is an interface for sending transactions.
 type Sender interface {
 	SignSendTx(txnbuild.Transaction) (xdr.TransactionMeta, error)
 	SetHzClient(*horizonclient.Client)
 }
 
+// ContractBackend is a struct that implements the ContractBackend interface.
 type ContractBackend struct {
 	Invoker
 	tr      StellarSigner
@@ -32,6 +34,7 @@ type ContractBackend struct {
 	cbMutex sync.Mutex
 }
 
+// NewContractBackend creates a new ContractBackend.
 func NewContractBackend(trConfig *TransactorConfig) *ContractBackend {
 	transactor := NewTransactor(*trConfig)
 	return &ContractBackend{
@@ -41,6 +44,7 @@ func NewContractBackend(trConfig *TransactorConfig) *ContractBackend {
 	}
 }
 
+// StellarSigner is a struct that implements the Transactor interface for Stellar.
 type StellarSigner struct {
 	keyPair     *keypair.Full
 	participant *types.Participant
@@ -49,6 +53,7 @@ type StellarSigner struct {
 	sender      Sender
 }
 
+// TransactorConfig is a struct that contains the configuration for the Transactor.
 type TransactorConfig struct {
 	keyPair     *keypair.Full
 	participant *types.Participant
@@ -57,26 +62,32 @@ type TransactorConfig struct {
 	horizonURL  string
 }
 
+// SetKeyPair sets the keypair of the TransactorConfig.
 func (tc *TransactorConfig) SetKeyPair(kp *keypair.Full) {
 	tc.keyPair = kp
 }
 
+// SetParticipant sets the participant of the TransactorConfig.
 func (tc *TransactorConfig) SetParticipant(participant *types.Participant) {
 	tc.participant = participant
 }
 
+// SetAccount sets the account of the TransactorConfig.
 func (tc *TransactorConfig) SetAccount(account wallet.Account) {
 	tc.account = &account
 }
 
+// SetSender sets the sender of the TransactorConfig.
 func (tc *TransactorConfig) SetSender(sender Sender) {
 	tc.sender = sender
 }
 
+// SetHorizonURL sets the horizon URL of the TransactorConfig.
 func (tc *TransactorConfig) SetHorizonURL(url string) {
 	tc.horizonURL = url
 }
 
+// NewTransactor creates a new Transactor using the transactor configuration.
 func NewTransactor(cfg TransactorConfig) *StellarSigner {
 	st := &StellarSigner{}
 
@@ -108,10 +119,12 @@ func NewTransactor(cfg TransactorConfig) *StellarSigner {
 	return st
 }
 
+// GetTransactor returns the transactor of the ContractBackend.
 func (c *ContractBackend) GetTransactor() *StellarSigner {
 	return &c.tr
 }
 
+// GetBalance returns the balance of the contract.
 func (c *ContractBackend) GetBalance(cID xdr.ScAddress) (string, error) {
 	tr := c.GetTransactor()
 	add, err := tr.GetAddress()
@@ -137,6 +150,7 @@ func (c *ContractBackend) GetBalance(cID xdr.ScAddress) (string, error) {
 	return bal, nil
 }
 
+// GetHorizonAccount returns the horizon account of the StellarSigner.
 func (st *StellarSigner) GetHorizonAccount() (horizon.Account, error) {
 	hzAddress, err := st.GetAddress()
 	if err != nil {
@@ -150,6 +164,7 @@ func (st *StellarSigner) GetHorizonAccount() (horizon.Account, error) {
 	return hzAccount, nil
 }
 
+// GetAddress returns the address of the StellarSigner.
 func (st *StellarSigner) GetAddress() (string, error) {
 	if st.keyPair != nil {
 		return st.keyPair.Address(), nil
@@ -164,10 +179,12 @@ func (st *StellarSigner) GetAddress() (string, error) {
 	return "", errors.New("transactor cannot retrieve address")
 }
 
+// GetHorizonClient returns the horizon client of the StellarSigner.
 func (st *StellarSigner) GetHorizonClient() *horizonclient.Client {
 	return st.hzClient
 }
 
+// InvokeUnsignedTx invokes an unsigned transaction.
 func (c *ContractBackend) InvokeUnsignedTx(fname string, callTxArgs xdr.ScVec, contractAddr xdr.ScAddress) (wire.Channel, string, error) { // xdr.TransactionMeta, error
 	c.cbMutex.Lock()
 	defer c.cbMutex.Unlock()
@@ -191,6 +208,7 @@ func (c *ContractBackend) InvokeUnsignedTx(fname string, callTxArgs xdr.ScVec, c
 	return chanInfo, bal, nil
 }
 
+// InvokeSignedTx invokes a signed transaction.
 func (c *ContractBackend) InvokeSignedTx(fname string, callTxArgs xdr.ScVec, contractAddr xdr.ScAddress) (xdr.TransactionMeta, error) {
 	c.cbMutex.Lock()
 	defer c.cbMutex.Unlock()
@@ -222,9 +240,7 @@ func (c *ContractBackend) InvokeSignedTx(fname string, callTxArgs xdr.ScVec, con
 	return txMeta, nil
 }
 
-/*
- * StringToScAddress converts a string to a xdr.ScAddress.
- */
+// StringToScAddress converts a string to a xdr.ScAddress.
 func StringToScAddress(s string) (xdr.ScAddress, error) {
 	hash, err := StringToHash(s)
 	if err != nil {
@@ -233,9 +249,7 @@ func StringToScAddress(s string) (xdr.ScAddress, error) {
 	return chTypes.MakeContractAddress(hash)
 }
 
-/*
- * StringToHash converts a hex string to a xdr.Hash.
- */
+// StringToHash converts a hex string to a xdr.Hash.
 func StringToHash(s string) (xdr.Hash, error) {
 	bytes, err := hex.DecodeString(s)
 	if err != nil {

@@ -30,12 +30,14 @@ const (
 	SymbolChannelControl = "control"
 )
 
+// Channel represents a channel on the soroban-contract.
 type Channel struct {
 	Params  Params
 	State   State
 	Control Control
 }
 
+// ToScVal converts a Channel to an xdr.ScVal.
 func (c Channel) ToScVal() (xdr.ScVal, error) {
 	params, err := c.Params.ToScVal()
 	if err != nil {
@@ -63,6 +65,7 @@ func (c Channel) ToScVal() (xdr.ScVal, error) {
 	return scval.WrapScMap(m)
 }
 
+// FromScVal converts an xdr.ScVal to a Channel.
 func (c *Channel) FromScVal(v xdr.ScVal) error {
 	m, ok := v.GetMap()
 	if !ok {
@@ -101,6 +104,7 @@ func (c *Channel) FromScVal(v xdr.ScVal) error {
 	return nil
 }
 
+// EncodeTo encodes a Channel to an xdr.Encoder.
 func (c Channel) EncodeTo(e *xdr3.Encoder) error {
 	v, err := c.ToScVal()
 	if err != nil {
@@ -109,6 +113,7 @@ func (c Channel) EncodeTo(e *xdr3.Encoder) error {
 	return v.EncodeTo(e)
 }
 
+// DecodeFrom decodes a Channel from an xdr.Decoder.
 func (c *Channel) DecodeFrom(d *xdr3.Decoder) (int, error) {
 	var v xdr.ScVal
 	i, err := d.Decode(&v)
@@ -118,6 +123,7 @@ func (c *Channel) DecodeFrom(d *xdr3.Decoder) (int, error) {
 	return i, c.FromScVal(v)
 }
 
+// MarshalBinary encodes a Channel to a binary format.
 func (c Channel) MarshalBinary() ([]byte, error) {
 	buf := bytes.Buffer{}
 	e := xdr3.NewEncoder(&buf)
@@ -125,18 +131,21 @@ func (c Channel) MarshalBinary() ([]byte, error) {
 	return buf.Bytes(), err
 }
 
+// UnmarshalBinary decodes a Channel from a binary format.
 func (c *Channel) UnmarshalBinary(data []byte) error {
 	d := xdr3.NewDecoder(bytes.NewReader(data))
 	_, err := c.DecodeFrom(d)
 	return err
 }
 
+// ChannelFromScVal converts an xdr.ScVal to a Channel.
 func ChannelFromScVal(v xdr.ScVal) (Channel, error) {
 	var p Channel
 	err := (&p).FromScVal(v)
 	return p, err
 }
 
+// MakeChannel creates a new Channel.
 func MakeChannel(p Params, s State, c Control) Channel {
 	return Channel{
 		Params:  p,

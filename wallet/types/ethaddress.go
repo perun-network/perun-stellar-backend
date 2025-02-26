@@ -32,7 +32,7 @@ const (
 // compile time check that we implement the perun Address interface.
 var _ wallet.Address = (*Address)(nil)
 
-// Address represents an ethereum address as a perun address.
+// EthAddress represents an ethereum address as a perun address.
 type EthAddress common.Address
 
 // bytes returns the address as a byte slice.
@@ -40,6 +40,7 @@ func (a *EthAddress) bytes() []byte {
 	return (*common.Address)(a).Bytes()
 }
 
+// BackendID returns the ethereum backend ID.
 func (a *EthAddress) BackendID() wallet.BackendID {
 	return EthBackendID
 }

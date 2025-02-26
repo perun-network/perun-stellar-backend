@@ -25,11 +25,13 @@ import (
 	"perun.network/perun-stellar-backend/wallet/types"
 )
 
+// EphemeralWallet is a wallet that stores accounts in memory.
 type EphemeralWallet struct {
 	lock     sync.Mutex
 	accounts map[string]*Account
 }
 
+// Unlock unlocks the account associated with the given address.
 func (e *EphemeralWallet) Unlock(a wallet.Address) (wallet.Account, error) {
 	addr, ok := a.(*types.Participant)
 	if !ok {
@@ -44,12 +46,16 @@ func (e *EphemeralWallet) Unlock(a wallet.Address) (wallet.Account, error) {
 	return account, nil
 }
 
+// LockAll locks all accounts.
 func (e *EphemeralWallet) LockAll() {}
 
+// IncrementUsage increments the usage counter of the account associated with the given address.
 func (e *EphemeralWallet) IncrementUsage(address wallet.Address) {}
 
+// DecrementUsage decrements the usage counter of the account associated with the given address.
 func (e *EphemeralWallet) DecrementUsage(address wallet.Address) {}
 
+// AddNewAccount generates a new account and adds it to the wallet.
 func (e *EphemeralWallet) AddNewAccount(rng *rand.Rand) (*Account, *keypair.Full, error) {
 	acc, kp, err := NewRandomAccount(rng)
 	if err != nil {
@@ -58,6 +64,7 @@ func (e *EphemeralWallet) AddNewAccount(rng *rand.Rand) (*Account, *keypair.Full
 	return acc, kp, e.AddAccount(acc)
 }
 
+// AddAccount adds the given account to the wallet.
 func (e *EphemeralWallet) AddAccount(acc *Account) error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
@@ -69,6 +76,7 @@ func (e *EphemeralWallet) AddAccount(acc *Account) error {
 	return nil
 }
 
+// NewEphemeralWallet creates a new EphemeralWallet instance.
 func NewEphemeralWallet() *EphemeralWallet {
 	return &EphemeralWallet{
 		accounts: make(map[string]*Account),

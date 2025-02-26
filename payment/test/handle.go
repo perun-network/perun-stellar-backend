@@ -46,7 +46,7 @@ func (c *PaymentClient) HandleProposal(p client.ChannelProposal, r *client.Propo
 		const assetIdx, clientIdx, peerIdx = 0, 0, 1
 
 		pAssets := make([]channel.Asset, len(c.currencies))
-		copy(c.currencies, pAssets)
+		copy(pAssets, c.currencies)
 
 		if err := channel.AssertAssetsEqual(lcp.InitBals.Assets, pAssets); err != nil {
 			return nil, fmt.Errorf("invalid assets: %v", err)

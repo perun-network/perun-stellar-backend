@@ -34,6 +34,7 @@ const (
 	DefaultSubscriptionPollingInterval = time.Duration(15) * time.Second
 )
 
+// AdjEventSub holds the necessary information for an Adjudicator Subscription.
 type AdjEventSub struct {
 	challengeDuration *time.Duration
 	cb                *client.ContractBackend
@@ -50,6 +51,7 @@ type AdjEventSub struct {
 	log               log.Embedding
 }
 
+// NewAdjudicatorSub creates a new Adjudicator Subscription.
 func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, cb *client.ContractBackend, perunAddr xdr.ScAddress, assetAddrs []xdr.ScVal, challengeDuration *time.Duration) (pchannel.AdjudicatorSubscription, error) {
 	sub := &AdjEventSub{
 		challengeDuration: challengeDuration,
@@ -126,6 +128,7 @@ polling:
 	}
 }
 
+// DifferencesInControls checks the differences between two channel controls.
 func DifferencesInControls(controlCurr, controlNext wire.Control) (event.PerunEvent, error) {
 	if controlCurr.FundedA != controlNext.FundedA {
 		if controlCurr.FundedA {

@@ -23,6 +23,7 @@ const (
 	horizonClientURL = "http://localhost:8000/"
 )
 
+// RPCGetTxResponse represents the type of the RPCGetTxResponse.
 type RPCGetTxResponse struct {
 	Error         string `json:"error,omitempty"`
 	EnvelopeXdr   string `json:"envelopeXdr"`
@@ -106,6 +107,7 @@ func BuildContractCallOp(caller horizon.Account, fName xdr.ScSymbol, callArgs xd
 	}
 }
 
+// RPCSimulateTxResponse represents the type of the RPCSimulateTxResponse.
 type RPCSimulateTxResponse struct {
 	Error           string                          `json:"error,omitempty"`
 	TransactionData string                          `json:"transactionData"`

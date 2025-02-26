@@ -193,6 +193,7 @@ func NewTestSetup(t *testing.T, options ...bool) *Setup {
 	return &setup
 }
 
+// SetupAccountsAndContracts mint tokens for the given accounts.
 func SetupAccountsAndContracts(t *testing.T, deployerKps []*keypair.Full, kps []*keypair.Full, tokenAddresses []xdr.ScAddress, tokenBalance uint64) {
 	require.Equal(t, len(deployerKps), len(tokenAddresses))
 
@@ -205,6 +206,7 @@ func SetupAccountsAndContracts(t *testing.T, deployerKps []*keypair.Full, kps []
 	}
 }
 
+// CreateFundersAndAdjudicators creates funders and adjudicators for the given accounts.
 func CreateFundersAndAdjudicators(accs []*wallet.Account, cbs []*client.ContractBackend, perunAddress xdr.ScAddress, tokenScAddresses []xdr.ScVal, oneWithdrawer bool) ([]*channel.Funder, []*channel.Adjudicator) {
 	funders := make([]*channel.Funder, len(accs))
 	adjs := make([]*channel.Adjudicator, len(accs))
@@ -216,6 +218,7 @@ func CreateFundersAndAdjudicators(accs []*wallet.Account, cbs []*client.Contract
 	return funders, adjs
 }
 
+// NewContractBackendsFromKeys creates contract backends from the given keys.
 func NewContractBackendsFromKeys(kps []*keypair.Full, acc []pwallet.Account, url string) []*client.ContractBackend {
 	cbs := make([]*client.ContractBackend, len(kps))
 	// generate Configs
@@ -225,6 +228,7 @@ func NewContractBackendsFromKeys(kps []*keypair.Full, acc []pwallet.Account, url
 	return cbs
 }
 
+// NewContractBackendFromKey creates a contract backend from the given key.
 func NewContractBackendFromKey(kp *keypair.Full, acc *pwallet.Account, url string) *client.ContractBackend {
 	trConfig := client.TransactorConfig{}
 	trConfig.SetKeyPair(kp)
@@ -235,6 +239,7 @@ func NewContractBackendFromKey(kp *keypair.Full, acc *pwallet.Account, url strin
 	return client.NewContractBackend(&trConfig)
 }
 
+// MakeRandPerunAccsWallets creates random perun accounts and wallets.
 func MakeRandPerunAccsWallets(count int) ([]*wallet.Account, []*keypair.Full, []*wallet.EphemeralWallet) {
 	accs := make([]*wallet.Account, count)
 	kps := make([]*keypair.Full, count)
@@ -249,6 +254,7 @@ func MakeRandPerunAccsWallets(count int) ([]*wallet.Account, []*keypair.Full, []
 	return accs, kps, ws
 }
 
+// MakeRandPerunAcc creates a random perun account.
 func MakeRandPerunAcc() (*wallet.Account, *keypair.Full) {
 	w := wallet.NewEphemeralWallet()
 
@@ -268,6 +274,7 @@ func MakeRandPerunAcc() (*wallet.Account, *keypair.Full) {
 	return acc, kp
 }
 
+// MakeRandPerunAccWallet creates a random perun account and wallet.
 func MakeRandPerunAccWallet() (*wallet.Account, *keypair.Full, *wallet.EphemeralWallet) {
 	w := wallet.NewEphemeralWallet()
 
@@ -287,6 +294,7 @@ func MakeRandPerunAccWallet() (*wallet.Account, *keypair.Full, *wallet.Ephemeral
 	return acc, kp, w
 }
 
+// CreateFundStellarAccounts creates stellar accounts and funds them.
 func CreateFundStellarAccounts(pairs []*keypair.Full, initialBalance string) error {
 	numKps := len(pairs)
 
@@ -349,6 +357,7 @@ func CreateFundStellarAccounts(pairs []*keypair.Full, initialBalance string) err
 	return nil
 }
 
+// NewParamsWithAddressStateWithAsset creates a new channel params and state with the given addresses.
 func NewParamsWithAddressStateWithAsset(t *testing.T, partsAddr []pwallet.Address, assets []pchannel.Asset) (*pchannel.Params, *pchannel.State) {
 	rng := pkgtest.Prng(t)
 
@@ -374,6 +383,7 @@ func NewParamsWithAddressStateWithAsset(t *testing.T, partsAddr []pwallet.Addres
 	))
 }
 
+// NewCtx creates a new context with the given test timeout.
 func (s *Setup) NewCtx(testTimeout float64) context.Context {
 	timeout := time.Duration(testTimeout * float64(time.Second))
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -387,6 +397,7 @@ const (
 	SymbolTokensChain          xdr.ScSymbol = "chain"
 )
 
+// MakeCrossAssetVector creates a cross asset vector from the given addresses.
 func MakeCrossAssetVector(addresses []xdr.ScAddress) ([]xdr.ScVal, error) {
 	var vec []xdr.ScVal
 	lidvalXdrValue := xdr.Uint64(2) //nolint:gomnd

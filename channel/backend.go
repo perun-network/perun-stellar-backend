@@ -35,6 +35,7 @@ func init() {
 	channel.SetBackend(Backend, wtypes.StellarBackendID)
 }
 
+// CalcID calculates the channel ID from the channel parameters.
 func (b backend) CalcID(params *channel.Params) (channel.ID, error) {
 	p, err := ToEthParams(params)
 	if err != nil {
@@ -48,6 +49,7 @@ func (b backend) CalcID(params *channel.Params) (channel.ID, error) {
 	return crypto.Keccak256Hash(bytes), nil
 }
 
+// Sign signs the channel state with the account.
 func (b backend) Sign(account wallet.Account, state *channel.State) (wallet.Sig, error) {
 	if err := checkBackends(state.Allocation.Backends); err != nil {
 		return nil, errors.New("invalid backends in state allocation: " + err.Error())
@@ -66,6 +68,7 @@ func (b backend) Sign(account wallet.Account, state *channel.State) (wallet.Sig,
 	return sig, err
 }
 
+// Verify verifies the signature of the channel state.
 func (b backend) Verify(addr wallet.Address, state *channel.State, sig wallet.Sig) (bool, error) {
 	ethState := ToEthState(state)
 	bytes, err := EncodeEthState(&ethState)
@@ -75,10 +78,12 @@ func (b backend) Verify(addr wallet.Address, state *channel.State, sig wallet.Si
 	return wallet.VerifySignature(bytes, sig, addr)
 }
 
+// NewAsset creates a new Stellar asset.
 func (b backend) NewAsset() channel.Asset {
 	return &types.StellarAsset{}
 }
 
+// EncodeState encodes the channel state.
 func EncodeState(state *channel.State) ([]byte, error) {
 	// check if state also has different backends stored in allocation
 
@@ -93,6 +98,7 @@ func EncodeState(state *channel.State) ([]byte, error) {
 	return ws.MarshalBinary()
 }
 
+// NewAppID creates a new Stellar app ID.
 func (b backend) NewAppID() (channel.AppID, error) {
 	addr := &wtypes.Address{}
 	return &AppID{addr}, nil

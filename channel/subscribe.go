@@ -23,6 +23,7 @@ import (
 	"perun.network/perun-stellar-backend/event"
 )
 
+// Next returns the next event from the event subscription.
 func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 	if s.closer.IsClosed() {
 		return nil
@@ -70,6 +71,7 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 	}
 }
 
+// Close closes the event subscription.
 func (s *AdjEventSub) Close() error {
 	s.closer.Close()
 	return nil
@@ -79,6 +81,7 @@ func (s *AdjEventSub) getEvents() <-chan event.PerunEvent {
 	return s.events
 }
 
+// Err returns the error of the event subscription.
 func (s *AdjEventSub) Err() error {
 	return s.err
 }

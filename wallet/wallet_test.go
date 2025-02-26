@@ -26,6 +26,7 @@ import (
 	"perun.network/perun-stellar-backend/wallet/types"
 )
 
+// TestEphemeralWallet tests the ephemeral wallet implementation.
 func TestEphemeralWallet(t *testing.T) {
 	rng := pkgtest.Prng(t)
 	w := wallet.NewEphemeralWallet()
@@ -74,16 +75,19 @@ func setup(rng *rand.Rand) *gptest.Setup {
 	}
 }
 
+// TestAddress tests the address implementation.
 func TestAddress(t *testing.T) {
 	rng := pkgtest.Prng(t)
 	gptest.TestAddress(t, setup(rng))
 }
 
+// TestSignature tests the signature implementation.
 func TestGenericSignatureSizeTest(t *testing.T) {
 	rng := pkgtest.Prng(t)
 	gptest.GenericSignatureSizeTest(t, setup(rng))
 }
 
+// TestAccountWithWalletAndBackend tests the account implementation.
 func TestAccountWithWalletAndBackend(t *testing.T) {
 	rng := pkgtest.Prng(t)
 	gptest.TestAccountWithWalletAndBackend(t, setup(rng))

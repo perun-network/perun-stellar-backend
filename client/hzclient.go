@@ -12,6 +12,7 @@ const (
 	NETWORK_PASSPHRASETestNet = "Test SDF Network ; September 2015"   //nolint:golint,stylecheck
 )
 
+// NewHorizonClient creates a new horizon client.
 func NewHorizonClient(url string) *horizonclient.Client {
 	return &horizonclient.Client{HorizonURL: url}
 }
@@ -20,6 +21,7 @@ func newKeyHolder(kp *keypair.Full) keyHolder {
 	return keyHolder{kp}
 }
 
+// NewHorizonMasterClient creates a new horizon client with a master keypair.
 func NewHorizonMasterClient(passphrase string, url string) *Client {
 	sourceKey := keypair.Root(passphrase)
 	return &Client{

@@ -70,6 +70,7 @@ func NewRandomAccount(rng *rand.Rand) (*Account, *keypair.Full, error) {
 	return acc, kp, nil
 }
 
+// NewRandomAddress creates a new random address.
 func NewRandomAddress(rng *rand.Rand) wallet.Address {
 	kp, err := keypair.Random()
 	if err != nil {
@@ -94,6 +95,7 @@ func (a Account) Address() wallet.Address {
 	return types.NewParticipant(a.ParticipantAddress, pubKey, a.CCAddr)
 }
 
+// Participant returns the Participant this account belongs to.
 func (a Account) Participant() *types.Participant {
 	return types.NewParticipant(a.ParticipantAddress, a.privateKey.Public().(*ecdsa.PublicKey), a.CCAddr)
 }

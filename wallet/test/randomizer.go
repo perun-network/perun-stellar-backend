@@ -23,6 +23,7 @@ import (
 	swallet "perun.network/perun-stellar-backend/wallet"
 )
 
+// Randomizer implements test.Randomizer.
 type Randomizer struct {
 	Account *swallet.Account
 }

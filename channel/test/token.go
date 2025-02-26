@@ -38,12 +38,14 @@ const (
 	tokenSymbol   = "PRN"
 )
 
+// TokenParams contains the parameters for the token contract.
 type TokenParams struct {
 	decimals uint32
 	name     string
 	symbol   string
 }
 
+// NewTokenParams creates a new TokenParams instance.
 func NewTokenParams() *TokenParams {
 	return &TokenParams{
 		decimals: tokenDecimals,
@@ -64,6 +66,7 @@ func (t *TokenParams) GetSymbol() string {
 	return t.symbol
 }
 
+// BuildInitTokenArgs creates the arguments for the initialize function of the token contract.
 func BuildInitTokenArgs(adminAddr xdr.ScAddress, decimals uint32, tokenName string, tokenSymbol string) (xdr.ScVec, error) {
 	adminScAddr, err := scval.WrapScAddress(adminAddr)
 	if err != nil {
@@ -93,6 +96,7 @@ func BuildInitTokenArgs(adminAddr xdr.ScAddress, decimals uint32, tokenName stri
 	return initTokenArgs, nil
 }
 
+// InitTokenContract initializes the token contract.
 func InitTokenContract(kp *keypair.Full, contractIDAddress xdr.ScAddress, url string) error {
 	cb := NewContractBackendFromKey(kp, nil, url)
 
@@ -124,6 +128,7 @@ func InitTokenContract(kp *keypair.Full, contractIDAddress xdr.ScAddress, url st
 	return nil
 }
 
+// GetTokenName gets the name of the token.
 func GetTokenName(kp *keypair.Full, contractAddress xdr.ScAddress, url string) error {
 	cb := NewContractBackendFromKey(kp, nil, url)
 	TokenNameArgs := xdr.ScVec{}
@@ -136,6 +141,7 @@ func GetTokenName(kp *keypair.Full, contractAddress xdr.ScAddress, url string) e
 	return nil
 }
 
+// BuildGetTokenBalanceArgs creates the arguments for the getTokenBalance function of the token contract.
 func BuildGetTokenBalanceArgs(balanceOf xdr.ScAddress) (xdr.ScVec, error) {
 	recScAddr, err := scval.WrapScAddress(balanceOf)
 	if err != nil {
@@ -149,6 +155,7 @@ func BuildGetTokenBalanceArgs(balanceOf xdr.ScAddress) (xdr.ScVec, error) {
 	return GetTokenBalanceArgs, nil
 }
 
+// BuildTransferTokenArgs creates the arguments for the transferToken function of the token contract.
 func BuildTransferTokenArgs(from xdr.ScAddress, to xdr.ScAddress, amount xdr.Int128Parts) (xdr.ScVec, error) {
 	fromScAddr, err := scval.WrapScAddress(from)
 	if err != nil {
@@ -174,6 +181,7 @@ func BuildTransferTokenArgs(from xdr.ScAddress, to xdr.ScAddress, amount xdr.Int
 	return GetTokenBalanceArgs, nil
 }
 
+// Deploy deploys the token contract.
 func Deploy(t *testing.T, kp *keypair.Full, contractPath string, url string) (xdr.ScAddress, xdr.Hash) {
 	deployerCB := NewContractBackendFromKey(kp, nil, url)
 	tr := deployerCB.GetTransactor()
@@ -221,6 +229,7 @@ func Deploy(t *testing.T, kp *keypair.Full, contractPath string, url string) (xd
 	return contractIDAddress, contractHash
 }
 
+// MintToken mints a token.
 func MintToken(kp *keypair.Full, contractAddr xdr.ScAddress, amount uint64, recipientAddr xdr.ScAddress, url string) error {
 	cb := NewContractBackendFromKey(kp, nil, url)
 

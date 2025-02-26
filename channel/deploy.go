@@ -24,6 +24,7 @@ import (
 
 const PerunContractPath = "../testdata/perun_soroban_multi_contract.wasm"
 
+// AssembleInstallContractCodeOp assembles the operation to install a contract code.
 func AssembleInstallContractCodeOp(sourceAccount string, wasmFileName string) *txnbuild.InvokeHostFunction {
 	// Assemble the InvokeHostFunction UploadContractWasm operation:
 	// CAP-0047 - https://github.com/stellar/stellar-protocol/blob/master/core/cap-0047.md#creating-a-contract-using-invokehostfunctionop
@@ -42,6 +43,7 @@ func AssembleInstallContractCodeOp(sourceAccount string, wasmFileName string) *t
 	}
 }
 
+// AssembleCreateContractOp assembles the operation to create a contract.
 func AssembleCreateContractOp(sourceAccount string, wasmFileName string, contractSalt string, passPhrase string) *txnbuild.InvokeHostFunction {
 	// Assemble the InvokeHostFunction CreateContract operation:
 	// CAP-0047 - https://github.com/stellar/stellar-protocol/blob/master/core/cap-0047.md#creating-a-contract-using-invokehostfunctionop

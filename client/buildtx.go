@@ -121,6 +121,7 @@ func buildSignedStateTxArgs(state pchannel.State, sigs []pwallet.Sig) (xdr.ScVec
 	return signedStateArgs, nil
 }
 
+// BuildMintTokenArgs creates the arguments for the mint function of the token contract.
 func BuildMintTokenArgs(mintTo xdr.ScAddress, amount xdr.ScVal) (xdr.ScVec, error) {
 	mintToSc, err := scval.WrapScAddress(mintTo)
 	if err != nil {
@@ -135,6 +136,7 @@ func BuildMintTokenArgs(mintTo xdr.ScAddress, amount xdr.ScVal) (xdr.ScVec, erro
 	return MintTokenArgs, nil
 }
 
+// BuildGetTokenBalanceArgs creates the arguments for the getTokenBalance function of the token contract.
 func BuildGetTokenBalanceArgs(balanceOf xdr.ScAddress) (xdr.ScVec, error) {
 	balanceOfSc, err := scval.WrapScAddress(balanceOf)
 	if err != nil {

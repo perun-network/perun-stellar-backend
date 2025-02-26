@@ -36,6 +36,7 @@ const (
 	SymbolParamsChallengeDuration = "challenge_duration"
 )
 
+// Params represents the Params struct in the soroban-contract.
 type Params struct {
 	A                 Participant
 	B                 Participant

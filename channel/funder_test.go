@@ -27,6 +27,7 @@ import (
 	chtest "perun.network/perun-stellar-backend/channel/test"
 )
 
+// TestCrossChainFunding tests a happy path of funding a cross-contract channel.
 func TestCrossChainFunding_Happy(t *testing.T) {
 	setup := chtest.NewTestSetup(t)
 	stellarAsset := setup.GetTokenAsset()
@@ -46,6 +47,7 @@ func TestCrossChainFunding_Happy(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// TestFunding_Happy tests a happy path of funding a channel.
 func TestFunding_Happy(t *testing.T) {
 	setup := chtest.NewTestSetup(t)
 	stellarAsset := setup.GetTokenAsset()
@@ -63,6 +65,7 @@ func TestFunding_Happy(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// TestFunding_TimeoutNotFunded tests the case where a funding request times out.
 func TestFunding_TimeoutNotFunded(t *testing.T) {
 	setup := chtest.NewTestSetup(t)
 	stellarAssets := setup.GetTokenAsset()

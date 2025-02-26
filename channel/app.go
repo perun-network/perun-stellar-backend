@@ -27,12 +27,15 @@ import (
 
 var _ channel.AppID = new(AppID)
 
+// AppID is a wrapper around a perun address to implement the AppID interface.
 type AppID struct {
 	wallet.Address
 }
 
+// AppIDKey is the key type for the AppID.
 type AppIDKey string
 
+// Equal compares two AppIDs.
 func (a AppID) Equal(b channel.AppID) bool {
 	bTyped, ok := b.(*AppID)
 	if !ok {
@@ -41,6 +44,7 @@ func (a AppID) Equal(b channel.AppID) bool {
 	return a.Address.Equal(bTyped.Address)
 }
 
+// Key returns the key of the AppID.
 func (a AppID) Key() channel.AppIDKey {
 	b, err := a.MarshalBinary()
 	if err != nil {
@@ -50,6 +54,7 @@ func (a AppID) Key() channel.AppIDKey {
 	return channel.AppIDKey(b)
 }
 
+// MarshalBinary marshals the AppID to binary.
 func (a AppID) MarshalBinary() ([]byte, error) {
 	data, err := a.Address.MarshalBinary()
 	if err != nil {
@@ -58,6 +63,7 @@ func (a AppID) MarshalBinary() ([]byte, error) {
 	return data, nil
 }
 
+// UnmarshalBinary unmarshals the AppID from binary.
 func (a *AppID) UnmarshalBinary(data []byte) error {
 	addr := &types.Address{}
 	err := addr.UnmarshalBinary(data)
@@ -69,6 +75,7 @@ func (a *AppID) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
+// NewRandomAppID creates a new random AppID.
 func NewRandomAppID(rng *rand.Rand) *AppID {
 	addr := stwallet.NewRandomAddress(rng)
 	return &AppID{addr}
