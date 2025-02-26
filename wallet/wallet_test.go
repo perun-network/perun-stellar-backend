@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,15 +15,18 @@
 package wallet_test
 
 import (
-	"github.com/stretchr/testify/require"
 	"math/rand"
+	"testing"
+
+	"github.com/stretchr/testify/require"
 	gptest "perun.network/go-perun/wallet/test"
+	pkgtest "polycry.pt/poly-go/test"
+
 	"perun.network/perun-stellar-backend/wallet"
 	"perun.network/perun-stellar-backend/wallet/types"
-	pkgtest "polycry.pt/poly-go/test"
-	"testing"
 )
 
+// TestEphemeralWallet tests the ephemeral wallet implementation.
 func TestEphemeralWallet(t *testing.T) {
 	rng := pkgtest.Prng(t)
 	w := wallet.NewEphemeralWallet()
@@ -72,16 +75,19 @@ func setup(rng *rand.Rand) *gptest.Setup {
 	}
 }
 
+// TestAddress tests the address implementation.
 func TestAddress(t *testing.T) {
 	rng := pkgtest.Prng(t)
 	gptest.TestAddress(t, setup(rng))
 }
 
+// TestSignature tests the signature implementation.
 func TestGenericSignatureSizeTest(t *testing.T) {
 	rng := pkgtest.Prng(t)
 	gptest.GenericSignatureSizeTest(t, setup(rng))
 }
 
+// TestAccountWithWalletAndBackend tests the account implementation.
 func TestAccountWithWalletAndBackend(t *testing.T) {
 	rng := pkgtest.Prng(t)
 	gptest.TestAccountWithWalletAndBackend(t, setup(rng))

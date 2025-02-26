@@ -1,0 +1,52 @@
+run:
+  timeout: 2m
+
+# Skip the contract wasm files.
+skip-dirs-use-default: true
+
+# Do not change go.{mod,sum}.
+modules-download-mode: readonly
+
+linters:
+  enable-all: true
+  disable:
+    - lll
+    - interfacer
+    - gosec
+    - deadcode
+    - varnamelen
+    - wrapcheck
+    - dogsled
+    - paralleltest
+    - depguard
+    - cyclop
+    - exhaustruct
+    - exhaustivestruct
+    - goerr113
+    - gochecknoglobals
+    - forcetypeassert
+    - ireturn
+    - nlreturn
+    - nonamedreturns
+    - nosnakecase
+    - thelper
+    - gochecknoinits
+    - gocognit
+    - errorlint
+    - wsl
+    - contextcheck
+    - exhaustive
+    - prealloc
+    - revive
+
+linters-settings:
+  forbidigo:
+    forbid:
+      - ^print$  # Blocks raw `print()`
+      - ^println$  # Blocks raw `println()`
+  gci:
+    sections:
+      - standard
+      - default
+      - prefix(perun.network/perun-stellar-backend)
+    skip-generated: true

@@ -1,4 +1,4 @@
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,11 +16,14 @@ package channel
 
 import (
 	"log"
-	pchannel "perun.network/go-perun/channel"
-	"perun.network/perun-stellar-backend/event"
 	"reflect"
+
+	pchannel "perun.network/go-perun/channel"
+
+	"perun.network/perun-stellar-backend/event"
 )
 
+// Next returns the next event from the event subscription.
 func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 	if s.closer.IsClosed() {
 		return nil
@@ -48,7 +51,7 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 
 		case *event.CloseEvent:
 
-			log.Println("CloseEvent received - build ConcludedEvent")
+			log.Println("CloseEvent received - build ConcludedEvent, ", e.ID())
 
 			conclEvent := pchannel.AdjudicatorEventBase{
 				VersionV: e.Version(),
@@ -68,6 +71,7 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 	}
 }
 
+// Close closes the event subscription.
 func (s *AdjEventSub) Close() error {
 	s.closer.Close()
 	return nil
@@ -77,6 +81,7 @@ func (s *AdjEventSub) getEvents() <-chan event.PerunEvent {
 	return s.events
 }
 
+// Err returns the error of the event subscription.
 func (s *AdjEventSub) Err() error {
 	return s.err
 }

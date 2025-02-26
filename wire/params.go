@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 	"github.com/stellar/go/xdr"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/wallet"
+
 	"perun.network/perun-stellar-backend/wallet/types"
 	"perun.network/perun-stellar-backend/wire/scval"
 )
@@ -33,6 +34,7 @@ const (
 	SymbolParamsChallengeDuration = "challenge_duration"
 )
 
+// Params represents the Params struct in the soroban-contract.
 type Params struct {
 	A                 Participant
 	B                 Participant
@@ -78,9 +80,9 @@ func (p Params) ToScVal() (xdr.ScVal, error) {
 func (p *Params) FromScVal(v xdr.ScVal) error {
 	m, ok := v.GetMap()
 	if !ok {
-		return errors.New("expected map")
+		return errors.New("expected map decoding Params")
 	}
-	if len(*m) != 4 {
+	if len(*m) != 4 { //nolint:gomnd
 		return errors.New("expected map of length 4")
 	}
 	aVal, err := GetMapValue(scval.MustWrapScSymbol(SymbolParamsA), *m)
@@ -105,7 +107,7 @@ func (p *Params) FromScVal(v xdr.ScVal) error {
 	}
 	nonce, ok := nonceVal.GetBytes()
 	if !ok {
-		return errors.New("expected bytes")
+		return errors.New("expected bytes decoding nonce")
 	}
 	if len(nonce) != NonceLength {
 		return errors.New("invalid nonce length")
@@ -172,11 +174,11 @@ func MakeParams(params channel.Params) (Params, error) {
 		return Params{}, errors.New("expected no app")
 	}
 
-	if len(params.Parts) != 2 {
+	if len(params.Parts) != 2 { //nolint:gomnd
 		return Params{}, errors.New("expected exactly two participants")
 	}
 
-	participantA, err := types.ToParticipant(params.Parts[0])
+	participantA, err := types.ToParticipant(params.Parts[0][types.StellarBackendID])
 	if err != nil {
 		return Params{}, err
 	}
@@ -184,7 +186,7 @@ func MakeParams(params channel.Params) (Params, error) {
 	if err != nil {
 		return Params{}, err
 	}
-	participantB, err := types.ToParticipant(params.Parts[1])
+	participantB, err := types.ToParticipant(params.Parts[1][types.StellarBackendID])
 	if err != nil {
 		return Params{}, err
 	}
@@ -201,12 +203,12 @@ func MakeParams(params channel.Params) (Params, error) {
 	}, nil
 }
 
-func MustMakeParams(params channel.Params) Params {
+func MustMakeParams(params channel.Params) (Params, error) {
 	p, err := MakeParams(params)
 	if err != nil {
-		panic(err)
+		return Params{}, err
 	}
-	return p
+	return p, nil
 }
 
 func ToParams(params Params) (channel.Params, error) {
@@ -220,7 +222,10 @@ func ToParams(params Params) (channel.Params, error) {
 	}
 
 	challengeDuration := uint64(params.ChallengeDuration)
-	parts := []wallet.Address{&participantA, &participantB}
+	parts := []map[wallet.BackendID]wallet.Address{
+		{types.StellarBackendID: &participantA},
+		{types.StellarBackendID: &participantB},
+	}
 	app := channel.NoApp()
 	nonce := ToNonce(params.Nonce)
 	ledgerChannel := true

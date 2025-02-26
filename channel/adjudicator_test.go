@@ -1,7 +1,7 @@
 //go:build integration
 // +build integration
 
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,14 +17,20 @@
 package channel_test
 
 import (
+	"log"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	pchannel "perun.network/go-perun/channel"
 	pwallet "perun.network/go-perun/wallet"
+
 	"perun.network/perun-stellar-backend/channel"
 	chtest "perun.network/perun-stellar-backend/channel/test"
-	"testing"
+	"perun.network/perun-stellar-backend/channel/types"
+	wtypes "perun.network/perun-stellar-backend/wallet/types"
 )
 
+// TestHappyChannel tests a happy path of a channel.
 func TestHappyChannel(t *testing.T) {
 	setup := chtest.NewTestSetup(t)
 	stellarAsset := setup.GetTokenAsset()
@@ -57,7 +63,83 @@ func TestHappyChannel(t *testing.T) {
 		next := adjState.Clone()
 		next.Version++
 		next.IsFinal = true
-		encodedState, err := channel.EncodeState(next)
+		ethState := channel.ToEthState(next)
+		bytes, err := channel.EncodeEthState(&ethState)
+		require.NoError(t, err)
+
+		signAlice, err := accs[0].SignData(bytes)
+		require.NoError(t, err)
+		signBob, err := accs[1].SignData(bytes)
+		require.NoError(t, err)
+		sigs := []pwallet.Sig{signAlice, signBob}
+		tx := pchannel.Transaction{State: next, Sigs: sigs}
+
+		reqAlice := pchannel.AdjudicatorReq{
+			Params:    perunParams,
+			Tx:        tx,
+			Acc:       map[pwallet.BackendID]pwallet.Account{2: accs[0]},
+			Idx:       pchannel.Index(0),
+			Secondary: false,
+		}
+
+		reqBob := pchannel.AdjudicatorReq{
+			Params:    perunParams,
+			Tx:        tx,
+			Acc:       map[pwallet.BackendID]pwallet.Account{2: accs[1]},
+			Idx:       pchannel.Index(1),
+			Secondary: false,
+		}
+
+		_, err = adjAlice.Subscribe(ctx, next.ID)
+		require.NoError(t, err)
+
+		_, err = adjBob.Subscribe(ctx, next.ID)
+
+		require.NoError(t, err)
+		require.NoError(t, adjAlice.Withdraw(ctxAliceWithdraw, reqAlice, nil))
+
+		perunAddrAlice := adjAlice.GetPerunAddr()
+		stellarChanAlice, err := adjAlice.CB.GetChannelInfo(ctx, perunAddrAlice, next.ID)
+		require.True(t, stellarChanAlice.Control.WithdrawnA)
+		require.NoError(t, err)
+		require.NoError(t, adjBob.Withdraw(ctx, reqBob, nil))
+
+	}
+}
+
+// TestHappyChannelOneWithdrawer tests a happy path of a channel with only one withdrawer.
+func TestHappyChannelOneWithdrawer(t *testing.T) {
+	setup := chtest.NewTestSetup(t, true)
+	stellarAsset := setup.GetTokenAsset()
+	accs := setup.GetAccounts()
+	addrAlice := accs[0].Address()
+	addrBob := accs[1].Address()
+	addrList := []pwallet.Address{addrAlice, addrBob}
+	perunParams, perunState := chtest.NewParamsWithAddressStateWithAsset(t, addrList, stellarAsset)
+
+	freqAlice := pchannel.NewFundingReq(perunParams, perunState, 0, perunState.Balances)
+	freqBob := pchannel.NewFundingReq(perunParams, perunState, 1, perunState.Balances)
+
+	freqs := []*pchannel.FundingReq{freqAlice, freqBob}
+
+	funders := setup.GetFunders()
+	ctx := setup.NewCtx(chtest.DefaultTestTimeout)
+	err := chtest.FundAll(ctx, funders, freqs)
+	require.NoError(t, err)
+
+	// funding complete
+
+	// Withdrawal
+	{
+		adjAlice := setup.GetAdjudicators()[0]
+		adjBob := setup.GetAdjudicators()[1]
+
+		adjState := perunState
+		next := adjState.Clone()
+		next.Version++
+		next.IsFinal = true
+		ethState := channel.ToEthState(next)
+		encodedState, err := channel.EncodeEthState(&ethState)
 		require.NoError(t, err)
 		signAlice, err := accs[0].SignData(encodedState)
 		require.NoError(t, err)
@@ -66,35 +148,46 @@ func TestHappyChannel(t *testing.T) {
 		sigs := []pwallet.Sig{signAlice, signBob}
 		tx := pchannel.Transaction{State: next, Sigs: sigs}
 
-		reqAlice := pchannel.AdjudicatorReq{
-			Params:    perunParams,
-			Tx:        tx,
-			Acc:       accs[0],
-			Idx:       pchannel.Index(0),
-			Secondary: false}
-
 		reqBob := pchannel.AdjudicatorReq{
 			Params:    perunParams,
 			Tx:        tx,
-			Acc:       accs[1],
+			Acc:       map[pwallet.BackendID]pwallet.Account{wtypes.StellarBackendID: accs[1]},
 			Idx:       pchannel.Index(1),
-			Secondary: false}
+			Secondary: false,
+		}
 
-		_, err = adjAlice.Subscribe(ctx, next.ID)
-		require.NoError(t, err)
-		require.NoError(t, adjAlice.Withdraw(ctxAliceWithdraw, reqAlice, nil))
-
-		perunAddrAlice := adjAlice.GetPerunAddr()
-		stellarChanAlice, err := adjAlice.CB.GetChannelInfo(ctx, perunAddrAlice, next.ID)
-		require.True(t, stellarChanAlice.Control.WithdrawnA)
+		// Bob withdraws for both, himself and Alice
 
 		require.NoError(t, err)
 		require.NoError(t, adjBob.Withdraw(ctx, reqBob, nil))
+		cb := adjAlice.CB
+		tr := cb.GetTransactor()
+		clientAddress, err := tr.GetAddress()
+		if err != nil {
+			log.Println("Error while getting client address: ", err)
+		}
+		tokenAddr0, ok := reqBob.Tx.State.Assets[0].(*types.StellarAsset)
+		bal0 := "bal0"
+		bal1 := "bal1"
+		if ok {
+			cAdd0, err := types.MakeContractAddress(tokenAddr0.Asset.ContractID())
+			require.NoError(t, err)
+			bal0, err = cb.GetBalance(cAdd0)
+			require.NoError(t, err)
+		}
+		tokenAddr1, ok := reqBob.Tx.State.Assets[1].(*types.StellarAsset)
+		if ok {
+			cAdd1, err := types.MakeContractAddress(tokenAddr1.Asset.ContractID())
+			require.NoError(t, err)
+			bal1, err = cb.GetBalance(cAdd1)
+			require.NoError(t, err)
+		}
+		log.Println("Balance: ", bal0, bal1, " after withdrawing: ", clientAddress, reqBob.Tx.State.Assets)
 
 	}
-
 }
 
+// TestChannel_RegisterFinal tests the RegisterFinal method of the adjudicator.
 func TestChannel_RegisterFinal(t *testing.T) {
 	setup := chtest.NewTestSetup(t)
 	stellarAsset := setup.GetTokenAsset()
@@ -126,11 +219,14 @@ func TestChannel_RegisterFinal(t *testing.T) {
 		next := adjState.Clone()
 		next.Version++
 		next.IsFinal = true
-		encodedState, err := channel.EncodeState(next)
+		ethState := channel.ToEthState(next)
+		bytes, err := channel.EncodeEthState(&ethState)
 		require.NoError(t, err)
-		signAlice, err := accs[0].SignData(encodedState)
+
+		signAlice, err := accs[0].SignData(bytes)
 		require.NoError(t, err)
-		signBob, err := accs[1].SignData(encodedState)
+		signBob, err := accs[1].SignData(bytes)
+		require.NoError(t, err)
 		require.NoError(t, err)
 		sigs := []pwallet.Sig{signAlice, signBob}
 		tx := pchannel.Transaction{State: next, Sigs: sigs}
@@ -138,9 +234,10 @@ func TestChannel_RegisterFinal(t *testing.T) {
 		reqAlice := pchannel.AdjudicatorReq{
 			Params:    perunParams,
 			Tx:        tx,
-			Acc:       accs[0],
+			Acc:       map[pwallet.BackendID]pwallet.Account{2: accs[0]},
 			Idx:       pchannel.Index(0),
-			Secondary: false}
+			Secondary: false,
+		}
 
 		require.NoError(t, adjAlice.Register(ctxAliceRegister, reqAlice, nil))
 
@@ -152,5 +249,4 @@ func TestChannel_RegisterFinal(t *testing.T) {
 		require.NoError(t, err)
 
 	}
-
 }

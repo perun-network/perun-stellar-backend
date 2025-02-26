@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,10 +16,12 @@ package wire
 
 import (
 	"errors"
-	"github.com/stellar/go/xdr"
-	"perun.network/perun-stellar-backend/wire/scval"
 	"sort"
 	"strings"
+
+	"github.com/stellar/go/xdr"
+
+	"perun.network/perun-stellar-backend/wire/scval"
 )
 
 // MakeSymbolScMap creates a xdr.ScMap from a slice of symbols and a slice of values.
@@ -41,6 +43,7 @@ func MakeSymbolScMap(keys []xdr.ScSymbol, values []xdr.ScVal) (xdr.ScMap, error)
 	return m, nil
 }
 
+// GetScMapEntry returns the map entry with the given key from the given map.
 func GetScMapEntry(key xdr.ScVal, m xdr.ScMap) (xdr.ScMapEntry, error) {
 	for _, v := range m {
 		if v.Key.Equals(key) {
@@ -51,6 +54,7 @@ func GetScMapEntry(key xdr.ScVal, m xdr.ScMap) (xdr.ScMapEntry, error) {
 	return xdr.ScMapEntry{}, errors.New("key not found")
 }
 
+// GetMapValue returns the value of the given key from the given map.
 func GetMapValue(key xdr.ScVal, m xdr.ScMap) (xdr.ScVal, error) {
 	entry, err := GetScMapEntry(key, m)
 	if err != nil {
@@ -59,6 +63,7 @@ func GetMapValue(key xdr.ScVal, m xdr.ScMap) (xdr.ScVal, error) {
 	return entry.Val, nil
 }
 
+// GetScMapValueFromSymbol returns the value of the given key from the given map.
 func GetScMapValueFromSymbol(key xdr.ScSymbol, m xdr.ScMap) (xdr.ScVal, error) {
 	keyVal, err := scval.WrapScSymbol(key)
 	if err != nil {

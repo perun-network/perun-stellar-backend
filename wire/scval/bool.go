@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,42 +16,46 @@ package scval
 
 import "github.com/stellar/go/xdr"
 
+// WrapTrue wraps a true into an xdr.ScVal.
 func WrapTrue() (xdr.ScVal, error) {
 	return xdr.NewScVal(xdr.ScValTypeScvBool, true)
 }
 
-func MustWrapTrue() xdr.ScVal {
+// MustWrapTrue wraps a true into a xdr.ScVal.
+func MustWrapTrue() (xdr.ScVal, error) {
 	v, err := WrapTrue()
 	if err != nil {
-		panic(err)
+		return xdr.ScVal{}, err
 	}
-	return v
+	return v, nil
 }
 
+// WrapFalse wraps a false into an xdr.ScVal.
 func WrapFalse() (xdr.ScVal, error) {
 	return xdr.NewScVal(xdr.ScValTypeScvBool, false)
 }
 
-func MustWrapFalse() xdr.ScVal {
+// MustWrapFalse wraps a false into a xdr.ScVal.
+func MustWrapFalse() (xdr.ScVal, error) {
 	v, err := WrapFalse()
 	if err != nil {
-		panic(err)
+		return xdr.ScVal{}, err
 	}
-	return v
+	return v, nil
 }
 
+// WrapBool wraps a bool into an xdr.ScVal.
 func WrapBool(b bool) (xdr.ScVal, error) {
 	if b {
 		return WrapTrue()
-	} else {
-		return WrapFalse()
 	}
+	return WrapFalse()
 }
 
-func MustWrapBool(b bool) xdr.ScVal {
+// MustWrapBool wraps a bool into a xdr.ScVal.
+func MustWrapBool(b bool) (xdr.ScVal, error) {
 	if b {
 		return MustWrapTrue()
-	} else {
-		return MustWrapFalse()
 	}
+	return MustWrapFalse()
 }
