@@ -52,7 +52,7 @@ func TestParamsConversion(t *testing.T) {
 
 	perunFirstParams := *ptest.NewRandomParams(rng, ptest.WithNumLocked(0).Append(
 		ptest.WithNumParts(numParts),
-		ptest.WithBackend(2),
+		ptest.WithBackend(StellarBackendID),
 		ptest.WithBalancesInRange(big.NewInt(0), big.NewInt(1<<60)),
 		ptest.WithLedgerChannel(true),
 		ptest.WithVirtualChannel(false),

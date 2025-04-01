@@ -77,7 +77,7 @@ func TestHappyChannel(t *testing.T) {
 		reqAlice := pchannel.AdjudicatorReq{
 			Params:    perunParams,
 			Tx:        tx,
-			Acc:       map[pwallet.BackendID]pwallet.Account{2: accs[0]},
+			Acc:       map[pwallet.BackendID]pwallet.Account{wtypes.StellarBackendID: accs[0]},
 			Idx:       pchannel.Index(0),
 			Secondary: false,
 		}
@@ -85,7 +85,7 @@ func TestHappyChannel(t *testing.T) {
 		reqBob := pchannel.AdjudicatorReq{
 			Params:    perunParams,
 			Tx:        tx,
-			Acc:       map[pwallet.BackendID]pwallet.Account{2: accs[1]},
+			Acc:       map[pwallet.BackendID]pwallet.Account{wtypes.StellarBackendID: accs[1]},
 			Idx:       pchannel.Index(1),
 			Secondary: false,
 		}
@@ -234,7 +234,7 @@ func TestChannel_RegisterFinal(t *testing.T) {
 		reqAlice := pchannel.AdjudicatorReq{
 			Params:    perunParams,
 			Tx:        tx,
-			Acc:       map[pwallet.BackendID]pwallet.Account{2: accs[0]},
+			Acc:       map[pwallet.BackendID]pwallet.Account{wtypes.StellarBackendID: accs[0]},
 			Idx:       pchannel.Index(0),
 			Secondary: false,
 		}

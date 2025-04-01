@@ -18,6 +18,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"log"
+	"perun.network/perun-stellar-backend/wallet/types"
 
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/xdr"
@@ -25,7 +26,10 @@ import (
 	"perun.network/go-perun/channel/multi"
 )
 
-const HashLenXdr = 32
+const (
+	HashLenXdr        = 32
+	StellarContractID = "2"
+)
 
 var _ multi.Asset = (*StellarAsset)(nil)
 
@@ -66,7 +70,7 @@ func MakeContractID(id string) ContractLID {
 
 // MakeCCID makes a CCID for the given id.
 func MakeCCID(ledgerID ContractLID) CCID {
-	return CCID{2, ledgerID}
+	return CCID{types.StellarBackendID, ledgerID}
 }
 
 // UnmarshalBinary unmarshals the contractID from its binary representation.
@@ -99,7 +103,7 @@ func (a Asset) ContractID() xdr.Hash {
 
 // NewStellarAsset creates a new Stellar asset with the given contract ID.
 func NewStellarAsset(contractID xdr.Hash) *StellarAsset {
-	return &StellarAsset{Asset: Asset{contractID}, id: MakeCCID(MakeContractID("2"))}
+	return &StellarAsset{Asset: Asset{contractID}, id: MakeCCID(MakeContractID(StellarContractID))}
 }
 
 // MarshalBinary marshals the Stellar asset into its binary representation.
@@ -115,7 +119,7 @@ func (s *StellarAsset) UnmarshalBinary(data []byte) error {
 	if err != nil {
 		return errors.New("could not unmarshal contract id")
 	}
-	s.id = MakeCCID(MakeContractID("2"))
+	s.id = MakeCCID(MakeContractID(StellarContractID))
 	return nil
 }
 
@@ -195,7 +199,7 @@ func (s *StellarAsset) FromScAddress(address xdr.ScAddress) error {
 	}
 
 	s.Asset.contractID = *address.ContractId
-	s.id = MakeCCID(MakeContractID("2"))
+	s.id = MakeCCID(MakeContractID(StellarContractID))
 	return nil
 }
 
@@ -206,7 +210,7 @@ func NewStellarAssetFromScAddress(address xdr.ScAddress) (*StellarAsset, error) 
 	if err != nil {
 		return nil, err
 	}
-	s.id = MakeCCID(MakeContractID("2"))
+	s.id = MakeCCID(MakeContractID(StellarContractID))
 	return s, nil
 }
 

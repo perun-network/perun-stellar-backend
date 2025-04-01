@@ -18,7 +18,7 @@ import (
 	"perun.network/perun-stellar-backend/wire"
 )
 
-const stellarDefaultChainID = 1
+const stellarDefaultChainID = 2
 
 // Sender is an interface for sending transactions.
 type Sender interface {

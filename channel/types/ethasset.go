@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"perun.network/perun-stellar-backend/wallet/types"
 
 	"github.com/ethereum/go-ethereum/common"
 	"perun.network/go-perun/channel"
@@ -138,7 +139,7 @@ type (
 
 // MakeEthAsset creates a new Ethereum asset with the given id and holder.
 func MakeEthAsset(id *big.Int, holder wallet.Address) EthAsset {
-	return EthAsset{assetID: LedgerBackendID{backendID: 1, ledgerID: MakeChainID(id)}, AssetHolder: holder}
+	return EthAsset{assetID: LedgerBackendID{backendID: types.EthBackendID, ledgerID: MakeChainID(id)}, AssetHolder: holder}
 }
 
 // BackendID returns the identifier for the eth-backend.
@@ -156,7 +157,7 @@ func MakeLedgerBackendID(id *big.Int) multi.LedgerBackendID {
 	if id.Sign() < 0 {
 		panic("must not be smaller than zero")
 	}
-	return LedgerBackendID{backendID: 1, ledgerID: MakeChainID(id)}
+	return LedgerBackendID{backendID: types.EthBackendID, ledgerID: MakeChainID(id)}
 }
 
 // MapKey returns the asset's map key representation.
