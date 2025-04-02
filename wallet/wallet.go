@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,18 +16,22 @@ package wallet
 
 import (
 	"errors"
-	"github.com/stellar/go/keypair"
 	"math/rand"
+
+	"github.com/stellar/go/keypair"
 	"perun.network/go-perun/wallet"
-	"perun.network/perun-stellar-backend/wallet/types"
 	"polycry.pt/poly-go/sync"
+
+	"perun.network/perun-stellar-backend/wallet/types"
 )
 
+// EphemeralWallet is a wallet that stores accounts in memory.
 type EphemeralWallet struct {
 	lock     sync.Mutex
 	accounts map[string]*Account
 }
 
+// Unlock unlocks the account associated with the given address.
 func (e *EphemeralWallet) Unlock(a wallet.Address) (wallet.Account, error) {
 	addr, ok := a.(*types.Participant)
 	if !ok {
@@ -42,12 +46,16 @@ func (e *EphemeralWallet) Unlock(a wallet.Address) (wallet.Account, error) {
 	return account, nil
 }
 
+// LockAll locks all accounts.
 func (e *EphemeralWallet) LockAll() {}
 
+// IncrementUsage increments the usage counter of the account associated with the given address.
 func (e *EphemeralWallet) IncrementUsage(address wallet.Address) {}
 
+// DecrementUsage decrements the usage counter of the account associated with the given address.
 func (e *EphemeralWallet) DecrementUsage(address wallet.Address) {}
 
+// AddNewAccount generates a new account and adds it to the wallet.
 func (e *EphemeralWallet) AddNewAccount(rng *rand.Rand) (*Account, *keypair.Full, error) {
 	acc, kp, err := NewRandomAccount(rng)
 	if err != nil {
@@ -56,18 +64,19 @@ func (e *EphemeralWallet) AddNewAccount(rng *rand.Rand) (*Account, *keypair.Full
 	return acc, kp, e.AddAccount(acc)
 }
 
+// AddAccount adds the given account to the wallet.
 func (e *EphemeralWallet) AddAccount(acc *Account) error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 	k := types.AsParticipant(acc.Address()).String()
-	_, ok := e.accounts[k]
-	if ok {
+	if _, ok := e.accounts[k]; ok {
 		return errors.New("account already exists")
 	}
 	e.accounts[k] = acc
 	return nil
 }
 
+// NewEphemeralWallet creates a new EphemeralWallet instance.
 func NewEphemeralWallet() *EphemeralWallet {
 	return &EphemeralWallet{
 		accounts: make(map[string]*Account),

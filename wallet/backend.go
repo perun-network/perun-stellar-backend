@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,10 +15,13 @@
 package wallet
 
 import (
-	"crypto/ed25519"
-	"errors"
 	"io"
+
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/pkg/errors"
 	"perun.network/go-perun/wallet"
+	"perun.network/go-perun/wire/perunio"
+
 	"perun.network/perun-stellar-backend/wallet/types"
 )
 
@@ -30,29 +33,37 @@ type backend struct{}
 var Backend = backend{}
 
 func init() {
-	wallet.SetBackend(Backend)
+	wallet.SetBackend(Backend, types.StellarBackendID)
 }
 
+// NewAddress creates a new address.
 func (b backend) NewAddress() wallet.Address {
 	return &types.Participant{}
 }
 
 // DecodeSig decodes a signature of length SignatureLength from the reader.
 func (b backend) DecodeSig(reader io.Reader) (wallet.Sig, error) {
-	sig := make([]byte, SignatureLength)
-	if _, err := io.ReadFull(reader, sig); err != nil {
-		return nil, err
-	}
-	return sig, nil
+	buf := make(wallet.Sig, 65) //nolint:gomnd
+	return buf, perunio.Decode(reader, &buf)
 }
 
+// VerifySignature verifies the signature of a message.
 func (b backend) VerifySignature(msg []byte, sig wallet.Sig, a wallet.Address) (bool, error) {
 	p, ok := a.(*types.Participant)
 	if !ok {
 		return false, errors.New("participant has invalid type")
 	}
-	if len(sig) != ed25519.SignatureSize {
-		return false, errors.New("invalid signature size")
+	hash := crypto.Keccak256(msg)
+	prefix := []byte("\x19Ethereum Signed Message:\n32")
+	hash = crypto.Keccak256(prefix, hash)
+	sigCopy := make([]byte, 65) //nolint:gomnd
+	copy(sigCopy, sig)
+	if len(sigCopy) == 65 && (sigCopy[65-1] >= 27) { //nolint:gomnd
+		sigCopy[65-1] -= 27
 	}
-	return ed25519.Verify(p.PublicKey, msg, sig), nil
+	pk, err := crypto.SigToPub(hash, sigCopy)
+	if err != nil {
+		return false, errors.WithStack(err)
+	}
+	return pk.X.Cmp(p.StellarPubKey.X) == 0 && pk.Y.Cmp(p.StellarPubKey.Y) == 0 && pk.Curve == p.StellarPubKey.Curve, nil
 }

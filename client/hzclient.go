@@ -5,21 +5,27 @@ import (
 	"github.com/stellar/go/keypair"
 )
 
-const HorizonURL = "http://localhost:8000"
-const NETWORK_PASSPHRASE = "Standalone Network ; February 2017"
+const (
+	HorizonURL                = "http://localhost:8000"
+	NETWORK_PASSPHRASE        = "Standalone Network ; February 2017"  //nolint:golint,stylecheck
+	HorizonURLTestNet         = "https://horizon-testnet.stellar.org" //nolint:golint,stylecheck
+	NETWORK_PASSPHRASETestNet = "Test SDF Network ; September 2015"   //nolint:golint,stylecheck
+)
 
-func NewHorizonClient() *horizonclient.Client {
-	return &horizonclient.Client{HorizonURL: HorizonURL}
+// NewHorizonClient creates a new horizon client.
+func NewHorizonClient(url string) *horizonclient.Client {
+	return &horizonclient.Client{HorizonURL: url}
 }
 
 func newKeyHolder(kp *keypair.Full) keyHolder {
 	return keyHolder{kp}
 }
 
-func NewHorizonMasterClient() *Client {
-	sourceKey := keypair.Root(NETWORK_PASSPHRASE)
+// NewHorizonMasterClient creates a new horizon client with a master keypair.
+func NewHorizonMasterClient(passphrase string, url string) *Client {
+	sourceKey := keypair.Root(passphrase)
 	return &Client{
-		hzClient:  &horizonclient.Client{HorizonURL: HorizonURL},
+		hzClient:  &horizonclient.Client{HorizonURL: url},
 		keyHolder: newKeyHolder(sourceKey),
 	}
 }

@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,28 +16,36 @@ package test
 
 import (
 	"errors"
+	"log"
+	"math"
+	"testing"
+
 	"github.com/stellar/go/clients/horizonclient"
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/xdr"
 	"github.com/stretchr/testify/require"
+
 	"perun.network/perun-stellar-backend/channel"
 	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/event"
 	"perun.network/perun-stellar-backend/wire/scval"
-	"testing"
 )
 
-const tokenDecimals = uint32(7)
-const tokenName = "PerunToken"
-const tokenSymbol = "PRN"
+const (
+	tokenDecimals = uint32(7)
+	tokenName     = "PerunToken"
+	tokenSymbol   = "PRN"
+)
 
+// TokenParams contains the parameters for the token contract.
 type TokenParams struct {
 	decimals uint32
 	name     string
 	symbol   string
 }
 
+// NewTokenParams creates a new TokenParams instance.
 func NewTokenParams() *TokenParams {
 	return &TokenParams{
 		decimals: tokenDecimals,
@@ -58,8 +66,8 @@ func (t *TokenParams) GetSymbol() string {
 	return t.symbol
 }
 
+// BuildInitTokenArgs creates the arguments for the initialize function of the token contract.
 func BuildInitTokenArgs(adminAddr xdr.ScAddress, decimals uint32, tokenName string, tokenSymbol string) (xdr.ScVec, error) {
-
 	adminScAddr, err := scval.WrapScAddress(adminAddr)
 	if err != nil {
 		panic(err)
@@ -73,10 +81,10 @@ func BuildInitTokenArgs(adminAddr xdr.ScAddress, decimals uint32, tokenName stri
 	}
 
 	tokenNameScString := xdr.ScString(tokenName)
-	tokenNameXdr := scval.MustWrapScString(tokenNameScString)
+	tokenNameXdr, _ := scval.MustWrapScString(tokenNameScString)
 
 	tokenSymbolString := xdr.ScString(tokenSymbol)
-	tokenSymbolXdr := scval.MustWrapScString(tokenSymbolString)
+	tokenSymbolXdr, _ := scval.MustWrapScString(tokenSymbolString)
 
 	initTokenArgs := xdr.ScVec{
 		adminScAddr,
@@ -88,9 +96,9 @@ func BuildInitTokenArgs(adminAddr xdr.ScAddress, decimals uint32, tokenName stri
 	return initTokenArgs, nil
 }
 
-func InitTokenContract(kp *keypair.Full, contractIDAddress xdr.ScAddress) error {
-
-	cb := NewContractBackendFromKey(kp)
+// InitTokenContract initializes the token contract.
+func InitTokenContract(kp *keypair.Full, contractIDAddress xdr.ScAddress, url string) error {
+	cb := NewContractBackendFromKey(kp, nil, url)
 
 	adminScAddr, err := types.MakeAccountAddress(kp)
 	if err != nil {
@@ -120,9 +128,9 @@ func InitTokenContract(kp *keypair.Full, contractIDAddress xdr.ScAddress) error 
 	return nil
 }
 
-func GetTokenName(kp *keypair.Full, contractAddress xdr.ScAddress) error {
-
-	cb := NewContractBackendFromKey(kp)
+// GetTokenName gets the name of the token.
+func GetTokenName(kp *keypair.Full, contractAddress xdr.ScAddress, url string) error {
+	cb := NewContractBackendFromKey(kp, nil, url)
 	TokenNameArgs := xdr.ScVec{}
 
 	_, err := cb.InvokeSignedTx("name", TokenNameArgs, contractAddress)
@@ -133,8 +141,8 @@ func GetTokenName(kp *keypair.Full, contractAddress xdr.ScAddress) error {
 	return nil
 }
 
+// BuildGetTokenBalanceArgs creates the arguments for the getTokenBalance function of the token contract.
 func BuildGetTokenBalanceArgs(balanceOf xdr.ScAddress) (xdr.ScVec, error) {
-
 	recScAddr, err := scval.WrapScAddress(balanceOf)
 	if err != nil {
 		panic(err)
@@ -147,8 +155,8 @@ func BuildGetTokenBalanceArgs(balanceOf xdr.ScAddress) (xdr.ScVec, error) {
 	return GetTokenBalanceArgs, nil
 }
 
+// BuildTransferTokenArgs creates the arguments for the transferToken function of the token contract.
 func BuildTransferTokenArgs(from xdr.ScAddress, to xdr.ScAddress, amount xdr.Int128Parts) (xdr.ScVec, error) {
-
 	fromScAddr, err := scval.WrapScAddress(from)
 	if err != nil {
 		panic(err)
@@ -173,8 +181,9 @@ func BuildTransferTokenArgs(from xdr.ScAddress, to xdr.ScAddress, amount xdr.Int
 	return GetTokenBalanceArgs, nil
 }
 
-func Deploy(t *testing.T, kp *keypair.Full, contractPath string) (xdr.ScAddress, xdr.Hash) {
-	deployerCB := NewContractBackendFromKey(kp)
+// Deploy deploys the token contract.
+func Deploy(t *testing.T, kp *keypair.Full, contractPath string, url string) (xdr.ScAddress, xdr.Hash) {
+	deployerCB := NewContractBackendFromKey(kp, nil, url)
 	tr := deployerCB.GetTransactor()
 	hzClient := tr.GetHorizonClient()
 	deployerAccReq := horizonclient.AccountRequest{AccountID: kp.Address()}
@@ -183,21 +192,27 @@ func Deploy(t *testing.T, kp *keypair.Full, contractPath string) (xdr.ScAddress,
 	require.NoError(t, err)
 
 	installContractOpInstall := channel.AssembleInstallContractCodeOp(kp.Address(), contractPath)
-	preFlightOp, _ := client.PreflightHostFunctions(hzClient, &deployerAcc, *installContractOpInstall)
+	preFlightOp, minFeeInstall, err := client.PreflightHostFunctions(hzClient, &deployerAcc, *installContractOpInstall)
 
-	minFeeInstallCustom := 500000
-	txParamsInstall := client.GetBaseTransactionParamsWithFee(&deployerAcc, int64(minFeeInstallCustom), &preFlightOp)
-	txSignedInstall, err := client.CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParamsInstall)
+	require.NoError(t, err)
+
+	txParamsInstall := client.GetBaseTransactionParamsWithFee(&deployerAcc, int64(100)+minFeeInstall, &preFlightOp) //nolint:gomnd
+	txSignedInstall, err := client.CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParamsInstall, client.NETWORK_PASSPHRASE)
 	require.NoError(t, err)
 
 	_, err = hzClient.SubmitTransaction(txSignedInstall)
+	var hErr *horizonclient.Error
+	if errors.As(err, &hErr) {
+		log.Println(hErr.Problem, "fee: ", minFeeInstall)
+	}
 
 	require.NoError(t, err)
 
 	createContractOp := channel.AssembleCreateContractOp(kp.Address(), contractPath, "a1", client.NETWORK_PASSPHRASE)
-	preFlightOpCreate, _ := client.PreflightHostFunctions(hzClient, &deployerAcc, *createContractOp)
-	txParamsCreate := client.GetBaseTransactionParamsWithFee(&deployerAcc, int64(minFeeInstallCustom), &preFlightOpCreate)
-	txSignedCreate, err := client.CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParamsCreate)
+	preFlightOpCreate, minFeeDeploy, err := client.PreflightHostFunctions(hzClient, &deployerAcc, *createContractOp)
+	require.NoError(t, err)
+	txParamsCreate := client.GetBaseTransactionParamsWithFee(&deployerAcc, int64(100)+minFeeDeploy, &preFlightOpCreate) //nolint:gomnd
+	txSignedCreate, err := client.CreateSignedTransactionWithParams([]*keypair.Full{kp}, txParamsCreate, client.NETWORK_PASSPHRASE)
 
 	require.NoError(t, err)
 
@@ -214,8 +229,13 @@ func Deploy(t *testing.T, kp *keypair.Full, contractPath string) (xdr.ScAddress,
 	return contractIDAddress, contractHash
 }
 
-func MintToken(kp *keypair.Full, contractAddr xdr.ScAddress, amount uint64, recipientAddr xdr.ScAddress) error {
-	cb := NewContractBackendFromKey(kp)
+// MintToken mints a token.
+func MintToken(kp *keypair.Full, contractAddr xdr.ScAddress, amount uint64, recipientAddr xdr.ScAddress, url string) error {
+	cb := NewContractBackendFromKey(kp, nil, url)
+
+	if amount > math.MaxInt64 {
+		return errors.New("amount represents negative number")
+	}
 
 	amountTo128Xdr := xdr.Int128Parts{Hi: 0, Lo: xdr.Uint64(amount)}
 

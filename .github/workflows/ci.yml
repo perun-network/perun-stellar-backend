@@ -22,7 +22,13 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
-        go-version: '1.21'
+        go-version: '1.22'
+
+    - name: Run GolangCI-Lint
+      uses: golangci/golangci-lint-action@v3
+      with:
+        version: v1.54.2
+        args: --timeout=5m
 
     - name: Run unit tests
       run: go test ./...
@@ -39,7 +45,10 @@ jobs:
             ./quickstart.sh standalone &
             
     - name: Wait for local chain setup
-      run: sleep 25
+      run: sleep 50
 
     - name: Run integration tests
-      run: go test -tags=integration ./...
+      run: go test -tags=integration -p 1 ./channel ./payment
+
+    - name: Stop local chain
+      run: docker stop stellar

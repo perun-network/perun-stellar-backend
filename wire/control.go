@@ -1,4 +1,4 @@
-// Copyright 2023 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,8 +17,10 @@ package wire
 import (
 	"bytes"
 	"errors"
+
 	xdr3 "github.com/stellar/go-xdr/xdr3"
 	"github.com/stellar/go/xdr"
+
 	"perun.network/perun-stellar-backend/wire/scval"
 )
 
@@ -32,6 +34,7 @@ const (
 	SymbolControlTimestamp  = "timestamp"
 )
 
+// Control is a struct that represents the control state of a channel.
 type Control struct {
 	FundedA    bool
 	FundedB    bool
@@ -42,6 +45,7 @@ type Control struct {
 	Timestamp  xdr.Uint64
 }
 
+// ToScVal encodes the Control struct to an ScVal.
 func (c Control) ToScVal() (xdr.ScVal, error) {
 	fundedA, err := scval.WrapBool(c.FundedA)
 	if err != nil {
@@ -90,12 +94,15 @@ func (c Control) ToScVal() (xdr.ScVal, error) {
 	return scval.WrapScMap(m)
 }
 
+// FromScVal decodes the Control struct from an ScVal.
+//
+//nolint:funlen
 func (c *Control) FromScVal(v xdr.ScVal) error {
 	m, ok := v.GetMap()
 	if !ok {
 		return errors.New("expected map")
 	}
-	if len(*m) != 7 {
+	if len(*m) != 7 { //nolint:gomnd
 		return errors.New("expected map of length 7")
 	}
 	fundedAVal, err := GetScMapValueFromSymbol(SymbolControlFundedA, *m)
@@ -164,6 +171,7 @@ func (c *Control) FromScVal(v xdr.ScVal) error {
 	return nil
 }
 
+// EncodeTo encodes the Control struct to a xdr.Encoder.
 func (c Control) EncodeTo(e *xdr3.Encoder) error {
 	v, err := c.ToScVal()
 	if err != nil {
@@ -172,6 +180,7 @@ func (c Control) EncodeTo(e *xdr3.Encoder) error {
 	return v.EncodeTo(e)
 }
 
+// DecodeFrom decodes the Control struct from a xdr.Decoder.
 func (c *Control) DecodeFrom(d *xdr3.Decoder) (int, error) {
 	var v xdr.ScVal
 	i, err := d.Decode(&v)
@@ -181,6 +190,7 @@ func (c *Control) DecodeFrom(d *xdr3.Decoder) (int, error) {
 	return i, c.FromScVal(v)
 }
 
+// MarshalBinary encodes the Control struct to a binary representation.
 func (c Control) MarshalBinary() ([]byte, error) {
 	buf := bytes.Buffer{}
 	e := xdr3.NewEncoder(&buf)
@@ -188,12 +198,14 @@ func (c Control) MarshalBinary() ([]byte, error) {
 	return buf.Bytes(), err
 }
 
+// UnmarshalBinary decodes the Control struct from a binary representation.
 func (c *Control) UnmarshalBinary(data []byte) error {
 	d := xdr3.NewDecoder(bytes.NewReader(data))
 	_, err := c.DecodeFrom(d)
 	return err
 }
 
+// ControlFromScVal decodes a Control struct from an ScVal.
 func ControlFromScVal(v xdr.ScVal) (Control, error) {
 	var p Control
 	err := (&p).FromScVal(v)

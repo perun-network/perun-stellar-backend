@@ -1,4 +1,4 @@
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,13 +15,16 @@
 package types_test
 
 import (
+	"testing"
+
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/xdr"
 	"github.com/stretchr/testify/require"
+
 	"perun.network/perun-stellar-backend/channel/types"
-	"testing"
 )
 
+// TestAssetMarshalAndUnmarshalBinary tests the marshalling and unmarshalling of a StellarAsset.
 func TestAssetMarshalAndUnmarshalBinary(t *testing.T) {
 	var hash xdr.Hash
 	copy(hash[:], []byte("testhashfortestingonly!testhash"))
@@ -35,9 +38,10 @@ func TestAssetMarshalAndUnmarshalBinary(t *testing.T) {
 	err = newAsset.UnmarshalBinary(data)
 	require.NoError(t, err)
 
-	require.Equal(t, asset.ContractID().HexString(), newAsset.ContractID().HexString(), "Mismatched ContractID. Expected %x, got %x", asset.ContractID(), newAsset.ContractID())
+	require.Equal(t, asset.Asset.ContractID().HexString(), newAsset.Asset.ContractID().HexString(), "Mismatched ContractID. Expected %x, got %x", asset.Asset.ContractID(), newAsset.Asset.ContractID())
 }
 
+// TestMakeAccountAddress tests the creation of an account address.
 func TestMakeAccountAddress(t *testing.T) {
 	kp, _ := keypair.Random()
 

@@ -1,4 +1,4 @@
-// Copyright 2024 PolyCrypt GmbH
+// Copyright 2025 PolyCrypt GmbH
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,28 +17,31 @@ package channel
 import (
 	"context"
 	"errors"
+	"time"
+
 	"github.com/stellar/go/xdr"
 	pchannel "perun.network/go-perun/channel"
 	log "perun.network/go-perun/log"
+	pkgsync "polycry.pt/poly-go/sync"
+
 	"perun.network/perun-stellar-backend/client"
 	"perun.network/perun-stellar-backend/event"
 	"perun.network/perun-stellar-backend/wire"
-	pkgsync "polycry.pt/poly-go/sync"
-	"time"
 )
 
 const (
 	DefaultBufferSize                  = 1024
-	DefaultSubscriptionPollingInterval = time.Duration(5) * time.Second
+	DefaultSubscriptionPollingInterval = time.Duration(15) * time.Second
 )
 
+// AdjEventSub holds the necessary information for an Adjudicator Subscription.
 type AdjEventSub struct {
 	challengeDuration *time.Duration
 	cb                *client.ContractBackend
 	chanControl       wire.Control
 	cid               pchannel.ID
 	perunAddr         xdr.ScAddress
-	assetAddrs        []xdr.ScAddress
+	assetAddrs        []xdr.ScVal
 	events            chan event.PerunEvent
 	subErrors         chan error
 	err               error
@@ -48,8 +51,8 @@ type AdjEventSub struct {
 	log               log.Embedding
 }
 
-func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, cb *client.ContractBackend, perunAddr xdr.ScAddress, assetAddrs []xdr.ScAddress, challengeDuration *time.Duration) (pchannel.AdjudicatorSubscription, error) {
-
+// NewAdjudicatorSub creates a new Adjudicator Subscription.
+func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, cb *client.ContractBackend, perunAddr xdr.ScAddress, assetAddrs []xdr.ScVal, challengeDuration *time.Duration) (pchannel.AdjudicatorSubscription, error) {
 	sub := &AdjEventSub{
 		challengeDuration: challengeDuration,
 		cb:                cb,
@@ -67,7 +70,6 @@ func NewAdjudicatorSub(ctx context.Context, cid pchannel.ID, cb *client.Contract
 	ctx, sub.cancel = context.WithCancel(ctx)
 	go sub.run(ctx)
 	return sub, nil
-
 }
 
 func (s *AdjEventSub) run(ctx context.Context) {
@@ -95,6 +97,7 @@ polling:
 			finish(nil)
 			return
 		case <-time.After(s.pollInterval):
+			log.Println("Polling for contract events...", s.cid)
 			newChanInfo, err := s.cb.GetChannelInfo(ctx, s.perunAddr, s.cid)
 			newChanControl = newChanInfo.Control
 
@@ -110,18 +113,23 @@ polling:
 				s.chanControl = newChanControl
 				s.log.Log().Debug("No events yet, continuing polling...")
 				continue polling
-
 			} else {
 				s.log.Log().Debug("Contract event detected, evaluating...")
 				s.log.Log().Debugf("Found contract event: %v", adjEvent)
+				adjEvent.SetID(s.cid)
 				s.events <- adjEvent
+				etype, _ := adjEvent.GetType()
+				if etype == event.EventTypeWithdrawn {
+					log.Println("Withdrawn event detected, closing subscription")
+					return
+				}
 			}
 		}
 	}
 }
 
+// DifferencesInControls checks the differences between two channel controls.
 func DifferencesInControls(controlCurr, controlNext wire.Control) (event.PerunEvent, error) {
-
 	if controlCurr.FundedA != controlNext.FundedA {
 		if controlCurr.FundedA {
 			return nil, errors.New("channel cannot be unfunded A before withdrawal")
