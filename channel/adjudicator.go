@@ -208,7 +208,7 @@ func (a Adjudicator) Progress(ctx context.Context, req pchannel.ProgressReq) err
 func needWithdraw(balances []pchannel.Bal, assets []pchannel.Asset) bool {
 	for i, bal := range balances {
 		_, ok := assets[i].(*types.StellarAsset)
-		if bal.Cmp(big.NewInt(0)) != 0 && ok { // if balance is 0 or asset is not stellar asset, participant does not need to withdraw
+		if bal.Cmp(big.NewInt(0)) != 0 && ok { // if balance is larger than 0 and asset is a stellar asset, participant needs to withdraw
 			return true
 		}
 	}

@@ -284,7 +284,7 @@ func assetSliceToSet(assets []xdr.ScVal) map[string]struct{} {
 func needFunding(balances []pchannel.Bal, assets []pchannel.Asset) bool {
 	for i, bal := range balances {
 		_, ok := assets[i].(*types.StellarAsset)
-		if bal.Cmp(big.NewInt(0)) != 0 && ok { // if balance is 0 or asset is not stellar asset, participant does not need to fund
+		if bal.Cmp(big.NewInt(0)) != 0 && ok { // if balance is non 0 and asset is a stellar asset, participant needs to fund
 			return true
 		}
 	}
