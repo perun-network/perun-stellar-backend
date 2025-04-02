@@ -19,13 +19,14 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"perun.network/perun-stellar-backend/wallet/types"
 
 	"github.com/ethereum/go-ethereum/common"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/channel/multi"
 	"perun.network/go-perun/wallet"
 	"perun.network/go-perun/wire/perunio"
+
+	"perun.network/perun-stellar-backend/wallet/types"
 )
 
 var _ channel.Asset = new(EthAsset)

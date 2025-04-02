@@ -18,12 +18,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"log"
-	"perun.network/perun-stellar-backend/wallet/types"
 
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/xdr"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/channel/multi"
+
+	"perun.network/perun-stellar-backend/wallet/types"
 )
 
 const (
