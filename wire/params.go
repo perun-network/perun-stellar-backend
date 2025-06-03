@@ -232,7 +232,7 @@ func ToParams(params Params) (channel.Params, error) {
 	ledgerChannel := true
 	virtualChannel := false
 
-	perunParams, err := channel.NewParams(challengeDuration, parts, app, nonce, ledgerChannel, virtualChannel)
+	perunParams, err := channel.NewParams(challengeDuration, parts, app, nonce, ledgerChannel, virtualChannel, channel.ZeroAux)
 	if err != nil {
 		return channel.Params{}, err
 	}

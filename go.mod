@@ -12,7 +12,7 @@ require (
 	github.com/ethereum/go-ethereum v1.10.12
 	github.com/stellar/go-xdr v0.0.0-20231122183749-b53fb00bcac2
 	github.com/stretchr/testify v1.9.0
-	perun.network/go-perun v0.13.0
+	perun.network/go-perun v0.13.1-0.20250425102308-22cdc688710b
 	polycry.pt/poly-go v0.0.0-20220301085937-fb9d71b45a37
 )
 
