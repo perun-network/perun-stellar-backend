@@ -17,7 +17,6 @@ package wire
 import (
 	"bytes"
 	"errors"
-
 	xdr3 "github.com/stellar/go-xdr/xdr3"
 	"github.com/stellar/go/xdr"
 	"perun.network/go-perun/channel"
@@ -221,18 +220,25 @@ func ToParams(params Params) (channel.Params, error) {
 	if err != nil {
 		return channel.Params{}, err
 	}
-
 	challengeDuration := uint64(params.ChallengeDuration)
 	parts := []map[wallet.BackendID]wallet.Address{
 		{types.StellarBackendID: &participantA},
 		{types.StellarBackendID: &participantB},
+	}
+	if participantA.CCAddr != [20]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} {
+		ethAddr := types.EthAddress(participantA.CCAddr)
+		parts[0][types.EthBackendID] = &ethAddr
+	}
+	if participantB.CCAddr != [20]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} {
+		ethAddr := types.EthAddress(participantB.CCAddr)
+		parts[1][types.EthBackendID] = &ethAddr
 	}
 	app := channel.NoApp()
 	nonce := ToNonce(params.Nonce)
 	ledgerChannel := true
 	virtualChannel := false
 
-	perunParams, err := channel.NewParams(challengeDuration, parts, app, nonce, ledgerChannel, virtualChannel)
+	perunParams, err := channel.NewParams(challengeDuration, parts, app, nonce, ledgerChannel, virtualChannel, channel.ZeroAux)
 	if err != nil {
 		return channel.Params{}, err
 	}

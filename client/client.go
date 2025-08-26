@@ -50,12 +50,15 @@ func (c *ContractBackend) Open(ctx context.Context, perunAddr xdr.ScAddress, par
 	if err != nil {
 		return errors.New("error while building open tx")
 	}
-	txMeta, err := c.InvokeSignedTx("open", openTxArgs, perunAddr)
+	txMeta, txHashHex, err := c.InvokeSignedTx("open", openTxArgs, perunAddr)
 	if err != nil {
 		return errors.Join(errors.New("error while invoking and processing host function: open"), err)
 	}
 
-	evs, err := event.DecodeEventsPerun(txMeta)
+	_ = txMeta
+
+	// fetch committed events for this transaction via RPC
+	evs, err := c.FetchTxDiagEvents(ctx, txHashHex)
 	if err != nil {
 		return err
 	}
@@ -74,12 +77,13 @@ func (c *ContractBackend) Abort(ctx context.Context, perunAddr xdr.ScAddress, st
 	if err != nil {
 		return errors.New("error while building abort_funding tx")
 	}
-	txMeta, err := c.InvokeSignedTx("abort_funding", abortTxArgs, perunAddr)
+	txMeta, txHashHex, err := c.InvokeSignedTx("abort_funding", abortTxArgs, perunAddr)
 	if err != nil {
 		return errors.New("error while invoking and processing host function: abort_funding")
 	}
 
-	_, err = event.DecodeEventsPerun(txMeta)
+	_ = txMeta
+	_, err = c.FetchTxDiagEvents(ctx, txHashHex)
 	if err != nil {
 		return err
 	}
@@ -95,12 +99,13 @@ func (c *ContractBackend) Fund(ctx context.Context, perunAddr xdr.ScAddress, cha
 		return errors.New("error while building fund tx")
 	}
 
-	txMeta, err := c.InvokeSignedTx("fund", fundTxArgs, perunAddr)
+	txMeta, txHashHex, err := c.InvokeSignedTx("fund", fundTxArgs, perunAddr)
 	if err != nil {
 		return err
 	}
 
-	evs, err := event.DecodeEventsPerun(txMeta)
+	_ = txMeta
+	evs, err := c.FetchTxDiagEvents(ctx, txHashHex)
 	if err != nil {
 		return err
 	}
@@ -132,12 +137,13 @@ func (c *ContractBackend) Close(ctx context.Context, perunAddr xdr.ScAddress, st
 	if err != nil {
 		return errors.New("error while building fund tx")
 	}
-	txMeta, err := c.InvokeSignedTx("close", closeTxArgs, perunAddr)
+	txMeta, txHashHex, err := c.InvokeSignedTx("close", closeTxArgs, perunAddr)
 	if err != nil {
 		return errors.New("error while invoking and processing host function: close")
 	}
 
-	evs, err := event.DecodeEventsPerun(txMeta)
+	_ = txMeta
+	evs, err := c.FetchTxDiagEvents(ctx, txHashHex)
 	if err != nil {
 		return err
 	}
@@ -164,11 +170,12 @@ func (c *ContractBackend) ForceClose(ctx context.Context, perunAddr xdr.ScAddres
 	if err != nil {
 		return errors.New("error while building fund tx")
 	}
-	txMeta, err := c.InvokeSignedTx("force_close", forceCloseTxArgs, perunAddr)
+	txMeta, txHashHex, err := c.InvokeSignedTx("force_close", forceCloseTxArgs, perunAddr)
 	if err != nil {
 		return errors.New("error while invoking and processing host function")
 	}
-	evs, err := event.DecodeEventsPerun(txMeta)
+	_ = txMeta
+	evs, err := c.FetchTxDiagEvents(ctx, txHashHex)
 	if err != nil {
 		return err
 	}
@@ -197,11 +204,12 @@ func (c *ContractBackend) Dispute(ctx context.Context, perunAddr xdr.ScAddress, 
 	if err != nil {
 		return errors.Join(errors.New("error while building dispute tx"), err)
 	}
-	txMeta, err := c.InvokeSignedTx("dispute", disputeTxArgs, perunAddr)
+	txMeta, txHashHex, err := c.InvokeSignedTx("dispute", disputeTxArgs, perunAddr)
 	if err != nil {
 		return errors.Join(errors.New("error while invoking and processing host function: dispute"), err)
 	}
-	evs, err := event.DecodeEventsPerun(txMeta)
+	_ = txMeta
+	evs, err := c.FetchTxDiagEvents(ctx, txHashHex)
 	if err != nil {
 		return err
 	}
@@ -234,7 +242,7 @@ func (c *ContractBackend) Withdraw(ctx context.Context, perunAddr xdr.ScAddress,
 	if err != nil {
 		return errors.New("error building fund tx")
 	}
-	txMeta, err := c.InvokeSignedTx("withdraw", withdrawTxArgs, perunAddr)
+	txMeta, txHashHex, err := c.InvokeSignedTx("withdraw", withdrawTxArgs, perunAddr)
 	if err != nil {
 		return errors.New("error in host function: withdraw")
 	}
@@ -268,7 +276,8 @@ func (c *ContractBackend) Withdraw(ctx context.Context, perunAddr xdr.ScAddress,
 		}
 	}
 	log.Println("Balance: ", bal0, bal1, " after withdrawing: ", clientAddress, req.Tx.State.Assets)
-	evs, err := event.DecodeEventsPerun(txMeta)
+	_ = txMeta
+	evs, err := c.FetchTxDiagEvents(ctx, txHashHex)
 	if err != nil {
 		return err
 	}
@@ -325,9 +334,9 @@ func (c *ContractBackend) GetBalanceUser(cID xdr.ScAddress) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	tx, err := c.InvokeSignedTx("balance", TokenNameArgs, cID)
+	tx, _, err := c.InvokeSignedTx("balance", TokenNameArgs, cID)
 	if err != nil {
 		return "", err
 	}
-	return tx.V3.SorobanMeta.ReturnValue.String(), nil
+	return tx.V4.SorobanMeta.ReturnValue.String(), nil
 }

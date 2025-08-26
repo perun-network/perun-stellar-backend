@@ -495,6 +495,6 @@ func randomScAddress() (xdr.ScAddress, error) {
 	// Return the random xdr.ScAddress for a contract
 	return xdr.ScAddress{
 		Type:       xdr.ScAddressTypeScAddressTypeContract,
-		ContractId: (*xdr.Hash)(&contractIDBytes),
+		ContractId: (*xdr.ContractId)(&contractIDBytes),
 	}, nil
 }

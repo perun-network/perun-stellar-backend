@@ -290,7 +290,7 @@ func MakeParticipant(participant types.Participant) (Participant, error) {
 
 // ToParticipant converts a Participant to a types.Participant.
 func ToParticipant(participant Participant) (types.Participant, error) {
-	kp, err := assettypes.ToAccountAddress(participant.StellarAddr)
+	kp, err := assettypes.ToAccountKeypair(participant.StellarAddr)
 	if err != nil {
 		return types.Participant{}, err
 	}
@@ -316,5 +316,5 @@ func ToParticipant(participant Participant) (types.Participant, error) {
 		X:     x,
 		Y:     y,
 	}
-	return *types.NewParticipant(kp, pubKey, ccAddr), nil
+	return *types.NewParticipant(*kp, pubKey, ccAddr), nil
 }
