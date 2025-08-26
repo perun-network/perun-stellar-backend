@@ -17,10 +17,10 @@ package types
 import (
 	"encoding/hex"
 	"errors"
-	"log"
-
+	"fmt"
 	"github.com/stellar/go/keypair"
 	"github.com/stellar/go/xdr"
+	"log"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/channel/multi"
 
@@ -37,7 +37,7 @@ var _ multi.Asset = (*StellarAsset)(nil)
 type (
 	// Asset represents a generic asset.
 	Asset struct {
-		contractID xdr.Hash
+		contractID xdr.ContractId
 	}
 	// StellarAsset represents a Stellar asset.
 	StellarAsset struct {
@@ -98,13 +98,13 @@ func (id ContractLID) MapKey() multi.LedgerIDMapKey {
 }
 
 // ContractID returns the contract ID of the asset.
-func (a Asset) ContractID() xdr.Hash {
+func (a Asset) ContractID() xdr.ContractId {
 	return a.contractID
 }
 
 // NewStellarAsset creates a new Stellar asset with the given contract ID.
 func NewStellarAsset(contractID xdr.Hash) *StellarAsset {
-	return &StellarAsset{Asset: Asset{contractID}, id: MakeCCID(MakeContractID(StellarContractID))}
+	return &StellarAsset{Asset: Asset{xdr.ContractId(contractID)}, id: MakeCCID(MakeContractID(StellarContractID))}
 }
 
 // MarshalBinary marshals the Stellar asset into its binary representation.
@@ -186,7 +186,7 @@ func (s StellarAsset) LedgerID() multi.LedgerID {
 // MakeScAddress generates a ScAddress from the Stellar asset.
 func (s StellarAsset) MakeScAddress() (xdr.ScAddress, error) {
 	hash := s.Asset.contractID
-	scvAddr, err := MakeContractAddress(hash)
+	scvAddr, err := MakeContractAddress(xdr.ContractId(hash))
 	if err != nil {
 		return xdr.ScAddress{}, errors.New("could not generate contract address")
 	}
@@ -196,7 +196,7 @@ func (s StellarAsset) MakeScAddress() (xdr.ScAddress, error) {
 // FromScAddress generates a Stellar asset from the given ScAddress.
 func (s *StellarAsset) FromScAddress(address xdr.ScAddress) error {
 	if addrType := address.Type; addrType != xdr.ScAddressTypeScAddressTypeContract {
-		return errors.New("invalid address type")
+		return errors.New("invalid address type for asset")
 	}
 
 	s.Asset.contractID = *address.ContractId
@@ -252,18 +252,14 @@ func AccountAddressFromAddress(addr keypair.FromAddress) (xdr.ScAddress, error) 
 }
 
 // MakeContractAddress generates a contract address from the given contract ID.
-func MakeContractAddress(contractID xdr.Hash) (xdr.ScAddress, error) {
+func MakeContractAddress(contractID xdr.ContractId) (xdr.ScAddress, error) {
 	return xdr.NewScAddress(xdr.ScAddressTypeScAddressTypeContract, contractID)
 }
 
-// ToAccountAddress converts the given ScAddress to an account address.
-func ToAccountAddress(address xdr.ScAddress) (keypair.FromAddress, error) {
-	if address.Type != xdr.ScAddressTypeScAddressTypeAccount {
-		return keypair.FromAddress{}, errors.New("invalid address type")
+// ToAccountKeypair is only for account addresses; returns a keypair to verify signatures etc.
+func ToAccountKeypair(addr xdr.ScAddress) (*keypair.FromAddress, error) {
+	if addr.Type != xdr.ScAddressTypeScAddressTypeAccount || addr.AccountId == nil {
+		return nil, fmt.Errorf("need ACCOUNT, got %v", addr.Type)
 	}
-	kp, err := keypair.ParseAddress(address.AccountId.Address())
-	if err != nil {
-		return keypair.FromAddress{}, err
-	}
-	return *kp, nil
+	return keypair.ParseAddress(addr.AccountId.Address())
 }

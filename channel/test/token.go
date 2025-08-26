@@ -15,6 +15,7 @@
 package test
 
 import (
+	"context"
 	"errors"
 	"log"
 	"math"
@@ -28,7 +29,6 @@ import (
 	"perun.network/perun-stellar-backend/channel"
 	"perun.network/perun-stellar-backend/channel/types"
 	"perun.network/perun-stellar-backend/client"
-	"perun.network/perun-stellar-backend/event"
 	"perun.network/perun-stellar-backend/wire/scval"
 )
 
@@ -115,12 +115,13 @@ func InitTokenContract(kp *keypair.Full, contractIDAddress xdr.ScAddress, url st
 		panic(err)
 	}
 
-	txMeta, err := cb.InvokeSignedTx("initialize", initArgs, contractIDAddress)
+	txMeta, txHashHex, err := cb.InvokeSignedTx("initialize", initArgs, contractIDAddress)
 	if err != nil {
 		return errors.New("error while invoking and processing host function: initialize" + err.Error())
 	}
 
-	_, err = event.DecodeEventsPerun(txMeta)
+	_ = txMeta
+	_, err = cb.FetchTxDiagEvents(context.Background(), txHashHex)
 	if err != nil {
 		return err
 	}
@@ -133,7 +134,7 @@ func GetTokenName(kp *keypair.Full, contractAddress xdr.ScAddress, url string) e
 	cb := NewContractBackendFromKey(kp, nil, url)
 	TokenNameArgs := xdr.ScVec{}
 
-	_, err := cb.InvokeSignedTx("name", TokenNameArgs, contractAddress)
+	_, _, err := cb.InvokeSignedTx("name", TokenNameArgs, contractAddress)
 	if err != nil {
 		panic(err)
 	}
@@ -247,7 +248,7 @@ func MintToken(kp *keypair.Full, contractAddr xdr.ScAddress, amount uint64, reci
 	if err != nil {
 		panic(err)
 	}
-	_, err = cb.InvokeSignedTx("mint", mintTokenArgs, contractAddr)
+	_, _, err = cb.InvokeSignedTx("mint", mintTokenArgs, contractAddr)
 	if err != nil {
 		panic(err)
 	}
