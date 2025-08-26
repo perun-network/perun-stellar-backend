@@ -303,9 +303,19 @@ func (e *DisputedEvent) SetID(id pchannel.ID) {
 func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 	evs := make([]PerunEvent, 0)
 
-	txEvents := txMeta.V3.SorobanMeta.Events
+	var diag []xdr.ContractEvent
+	switch txMeta.V {
+	case 3: // older path (keep for compatibility)
+		if txMeta.V3 == nil || txMeta.V3.SorobanMeta == nil {
+			return evs, nil
+		}
+		diag = txMeta.V3.SorobanMeta.Events
+	default:
+		// Not a Soroban tx or meta not populated.
+		return evs, nil
+	}
 
-	for _, ev := range txEvents {
+	for _, ev := range diag {
 		sev := StellarEvent{}
 		topics := ev.Body.V0.Topics
 
@@ -420,6 +430,181 @@ func DecodeEventsPerun(txMeta xdr.TransactionMeta) ([]PerunEvent, error) {
 		}
 	}
 	return evs, nil
+}
+
+// DecodeDiagEventsB64 base64 -> DiagnosticEvent[].
+func DecodeDiagEventsB64(b64s []string) ([]xdr.DiagnosticEvent, error) {
+	out := make([]xdr.DiagnosticEvent, 0, len(b64s))
+	for _, s := range b64s {
+		var ev xdr.DiagnosticEvent
+		if err := xdr.SafeUnmarshalBase64(s, &ev); err != nil {
+			return nil, err
+		}
+		out = append(out, ev)
+	}
+	return out, nil
+}
+
+// DecodePerunFromDiag decodes the events from a Stellar transaction meta data.
+//
+//nolint:funlen
+func DecodePerunFromDiag(diag []xdr.DiagnosticEvent) ([]PerunEvent, error) {
+	evs := make([]PerunEvent, 0)
+	for _, ev := range diag {
+		if ev.Event.Body.V != 0 || ev.Event.Body.V0 == nil {
+			continue
+		}
+		topics := ev.Event.Body.V0.Topics
+		if len(topics) < 2 {
+			continue
+		}
+
+		ns, ok := topics[0].GetSym()
+		if !ok || ns != AssertPerunSymbol {
+			continue
+		}
+
+		fn, ok := topics[1].GetSym()
+		if !ok {
+			continue
+		}
+		eventType, found := STELLAR_PERUN_CHANNEL_CONTRACT_TOPICS[fn]
+		if !found {
+			continue
+		}
+
+		switch eventType {
+		case EventTypeOpen:
+			ch, err := GetChannelFromEvents(ev.Event.Body.V0.Data)
+			if err != nil {
+				return nil, err
+			}
+			if err := checkOpen(initControlState(ch.Control)); err != nil {
+				log.Println(err)
+			}
+			evs = append(evs, &OpenEvent{channel: ch})
+		case EventTypeFundChannel:
+			ch, _, err := GetChannelBoolFromEvents(ev.Event.Body.V0.Data)
+			if err != nil {
+				return nil, err
+			}
+			st, err := wire.ToState(ch.State)
+			if err != nil {
+				return nil, err
+			}
+			evs = append(evs, &FundEvent{channel: ch, idv: st.ID})
+		case EventTypeClosed:
+			ch, err := GetChannelFromEvents(ev.Event.Body.V0.Data)
+			if err != nil {
+				return nil, err
+			}
+			st, err := wire.ToState(ch.State)
+			if err != nil {
+				return nil, err
+			}
+			evs = append(evs, &CloseEvent{channel: ch, idv: st.ID})
+		case EventTypeWithdrawn:
+			ch, err := GetChannelFromEvents(ev.Event.Body.V0.Data)
+			if err != nil {
+				return nil, err
+			}
+			st, err := wire.ToState(ch.State)
+			if err != nil {
+				return nil, err
+			}
+			evs = append(evs, &WithdrawnEvent{channel: ch, idv: st.ID})
+		case EventTypeDisputed:
+			ch, err := GetChannelFromEvents(ev.Event.Body.V0.Data)
+			if err != nil {
+				return nil, err
+			}
+			if _, err := wire.ToState(ch.State); err != nil {
+				return nil, err
+			}
+			evs = append(evs, &DisputedEvent{channel: ch})
+		}
+	}
+	return evs, nil
+}
+
+func DecodePerunFromContract(contractEvents []xdr.ContractEvent) ([]PerunEvent, error) {
+	out := make([]PerunEvent, 0, len(contractEvents))
+	for _, ev := range contractEvents {
+		body := ev.Body
+		if body.V != 0 || body.V0 == nil {
+			continue
+		}
+		topics := body.V0.Topics
+		if len(topics) < 2 {
+			continue
+		}
+
+		ns, ok := topics[0].GetSym()
+		if !ok || ns == "transfer" || ns != AssertPerunSymbol {
+			continue
+		}
+
+		fn, ok := topics[1].GetSym()
+		if !ok {
+			continue
+		}
+		etype, ok := STELLAR_PERUN_CHANNEL_CONTRACT_TOPICS[fn]
+		if !ok {
+			continue
+		}
+
+		switch etype {
+		case EventTypeOpen:
+			ch, err := GetChannelFromEvents(body.V0.Data)
+			if err != nil {
+				return nil, err
+			}
+			if err := checkOpen(initControlState(ch.Control)); err != nil {
+				log.Println(err)
+			}
+			out = append(out, &OpenEvent{channel: ch})
+		case EventTypeFundChannel:
+			ch, _, err := GetChannelBoolFromEvents(body.V0.Data)
+			if err != nil {
+				return nil, err
+			}
+			st, err := wire.ToState(ch.State)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, &FundEvent{channel: ch, idv: st.ID})
+		case EventTypeClosed:
+			ch, err := GetChannelFromEvents(body.V0.Data)
+			if err != nil {
+				return nil, err
+			}
+			st, err := wire.ToState(ch.State)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, &CloseEvent{channel: ch, idv: st.ID})
+		case EventTypeWithdrawn:
+			ch, err := GetChannelFromEvents(body.V0.Data)
+			if err != nil {
+				return nil, err
+			}
+			st, err := wire.ToState(ch.State)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, &WithdrawnEvent{channel: ch, idv: st.ID})
+		case EventTypeDisputed:
+			ch, err := GetChannelFromEvents(body.V0.Data)
+			if err != nil {
+				return nil, err
+			}
+			if _, err := wire.ToState(ch.State); err != nil {
+				return nil, err
+			}
+			out = append(out, &DisputedEvent{channel: ch})
+		}
+	}
+	return out, nil
 }
 
 func initControlState(control wire.Control) controlsState {

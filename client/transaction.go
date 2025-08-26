@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"math/big"
 	"time"
@@ -18,7 +19,7 @@ import (
 )
 
 const (
-	sorobanRPCLink   = "http://localhost:8000/soroban/rpc"
+	sorobanRPCLink   = "http://localhost:8000/rpc"
 	sorobanTestnet   = "https://soroban-testnet.stellar.org"
 	horizonClientURL = "http://localhost:8000/"
 )
@@ -107,12 +108,19 @@ func BuildContractCallOp(caller horizon.Account, fName xdr.ScSymbol, callArgs xd
 	}
 }
 
-// RPCSimulateTxResponse represents the type of the RPCSimulateTxResponse.
+type RPCRestorePreamble struct {
+	MinResourceFee  int64  `json:"minResourceFee,string"`
+	TransactionData string `json:"transactionData"`
+}
+
 type RPCSimulateTxResponse struct {
+	LatestLedger    uint32                          `json:"latestLedger,omitempty"`
+	MinResourceFee  int64                           `json:"minResourceFee,string,omitempty"` // for *your original tx*
+	TransactionData string                          `json:"transactionData,omitempty"`       // for *your original tx*
+	Results         []RPCSimulateHostFunctionResult `json:"results,omitempty"`
+	Events          []string                        `json:"events,omitempty"`
+	RestorePreamble *RPCRestorePreamble             `json:"restorePreamble,omitempty"`
 	Error           string                          `json:"error,omitempty"`
-	TransactionData string                          `json:"transactionData"`
-	Results         []RPCSimulateHostFunctionResult `json:"results"`
-	MinResourceFee  int64                           `json:"minResourceFee,string"`
 }
 
 // RPCSimulateHostFunctionResult represents the return value of RPCSimulateHostFunctionResult.
@@ -128,6 +136,12 @@ func PreflightHostFunctions(hzClient *horizonclient.Client,
 	result, transactionData, err := simulateTransaction(hzClient, sourceAccount, &function)
 	if err != nil {
 		return txnbuild.InvokeHostFunction{}, 0, err
+	}
+	if result.Error != "" {
+		return txnbuild.InvokeHostFunction{}, 0, fmt.Errorf("simulate failed: %s", result.Error)
+	}
+	if result.RestorePreamble != nil {
+		return txnbuild.InvokeHostFunction{}, 0, fmt.Errorf("state restore required (preamble fee=%d)", result.RestorePreamble.MinResourceFee)
 	}
 
 	function.Ext = xdr.TransactionExt{
@@ -245,8 +259,12 @@ func simulateTransaction(hzClient *horizonclient.Client,
 		Transaction string `json:"transaction"`
 	}{base64}, &result)
 	if err != nil {
-		log.Println("Error calling simulateTransaction", err)
+		log.Println("Error calling simulateTransaction:", err)
 		return RPCSimulateTxResponse{}, xdr.SorobanTransactionData{}, err
+	}
+	if result.Error != "" {
+		log.Println("Error in simulateTransaction response:", result.Error)
+		return RPCSimulateTxResponse{}, xdr.SorobanTransactionData{}, fmt.Errorf("simulate failed: %s", result.Error)
 	}
 	var transactionData xdr.SorobanTransactionData
 	err = xdr.SafeUnmarshalBase64(result.TransactionData, &transactionData)

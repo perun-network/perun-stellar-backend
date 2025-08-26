@@ -41,7 +41,7 @@ func (s *TxSender) SetHzClient(hzClient *horizonclient.Client) {
 }
 
 // SignSendTx signs and sends the transaction.
-func (s *TxSender) SignSendTx(txUnsigned txnbuild.Transaction) (xdr.TransactionMeta, error) {
+func (s *TxSender) SignSendTx(txUnsigned txnbuild.Transaction) (xdr.TransactionMeta, string, error) {
 	var passphrase string
 	if s.hzClient.HorizonURL == horizonClientURL {
 		passphrase = NETWORK_PASSPHRASE
@@ -50,18 +50,21 @@ func (s *TxSender) SignSendTx(txUnsigned txnbuild.Transaction) (xdr.TransactionM
 	}
 	tx, err := txUnsigned.Sign(passphrase, s.kp)
 	if err != nil {
-		return xdr.TransactionMeta{}, err
+		return xdr.TransactionMeta{}, "", err
 	}
 
 	txSent, err := s.hzClient.SubmitTransaction(tx)
 	if err != nil {
-		return xdr.TransactionMeta{}, err
+		return xdr.TransactionMeta{}, "", err
 	}
 	txMeta, err := DecodeTxMeta(txSent, s.hzClient)
 	if err != nil {
-		return xdr.TransactionMeta{}, ErrCouldNotDecodeTxMeta
+		return xdr.TransactionMeta{}, "", ErrCouldNotDecodeTxMeta
 	}
-	_ = txMeta.V3.SorobanMeta.ReturnValue
-
-	return txMeta, nil
+	_ = txMeta.V4.SorobanMeta.ReturnValue
+	hashHex, err := tx.HashHex(passphrase)
+	if err != nil {
+		return xdr.TransactionMeta{}, "", err
+	}
+	return txMeta, hashHex, nil
 }

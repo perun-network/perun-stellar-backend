@@ -17,11 +17,6 @@ futurenet)
     ;;
 esac
 
-# this is set to the quickstart `soroban-dev` image annointed as the release 
-# for a given Soroban Release, it is captured on Soroban Releases - https://soroban.stellar.org/docs/reference/releases 
-# QUICKSTART_SOROBAN_DOCKER_SHA=stellar/quickstart:soroban-dev
-QUICKSTART_SOROBAN_DOCKER_SHA=stellar/quickstart:testing@sha256:274395daab6fa8033b9213f152d56699358917fb01d7c7e95392a37fc00c9d01
-
 shift
 
 # Run the soroban-preview container
@@ -60,7 +55,9 @@ docker run --rm \
   --pull always \
   --network soroban-network \
   -p 8000:8000 \
-  "$QUICKSTART_SOROBAN_DOCKER_SHA" \
+  docker.io/stellar/quickstart@sha256:d4f752eece1e8780d19f4bd2726845996c413c0f4c4f57d1e4a9ff450442fc29 \
   $ARGS \
   --enable-soroban-rpc \
+  --protocol-version 23 \
+  --limits testnet \
   "$@" # Pass through args from the CLI
