@@ -139,5 +139,5 @@ func (c *PaymentClient) AcceptedChannel() *PaymentChannel {
 
 // Shutdown gracefully shuts down the client.
 func (c *PaymentClient) Shutdown() {
-	c.perunClient.Close()
+	c.perunClient.Close() //nolint:errcheck
 }

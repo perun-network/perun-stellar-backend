@@ -99,8 +99,8 @@ func (c *PaymentClient) HandleUpdate(cur *channel.State, next client.ChannelUpda
 		// 	return fmt.Errorf("Invalid balance: %v", nextBal0)
 		// }
 		for _, currency := range c.currencies {
-			curBal := cur.Allocation.Balance(receiverIdx, currency)
-			nextBal := next.State.Allocation.Balance(receiverIdx, currency)
+			curBal := cur.Balance(receiverIdx, currency)
+			nextBal := next.State.Balance(receiverIdx, currency)
 			if nextBal.Cmp(curBal) < 0 {
 				return fmt.Errorf("invalid balance for asset %v: %v", currency, nextBal)
 			}

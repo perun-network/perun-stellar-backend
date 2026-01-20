@@ -74,5 +74,5 @@ func (c PaymentChannel) Settle() {
 	}
 
 	// Close frees up channel resources.
-	c.ch.Close()
+	c.ch.Close() //nolint:errcheck
 }

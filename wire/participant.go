@@ -274,7 +274,7 @@ func MakeParticipant(participant types.Participant) (Participant, error) {
 		return Participant{}, errors.New("invalid Stellar public key length")
 	}
 
-	if !participant.StellarPubKey.Curve.IsOnCurve(participant.StellarPubKey.X, participant.StellarPubKey.Y) {
+	if !participant.StellarPubKey.IsOnCurve(participant.StellarPubKey.X, participant.StellarPubKey.Y) {
 		return Participant{}, errors.New("stellar public key is not on the curve")
 	}
 	pk := PublicKeyToBytes(participant.StellarPubKey)

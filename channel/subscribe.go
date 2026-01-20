@@ -73,7 +73,7 @@ func (s *AdjEventSub) Next() pchannel.AdjudicatorEvent {
 
 // Close closes the event subscription.
 func (s *AdjEventSub) Close() error {
-	s.closer.Close()
+	s.closer.Close() //nolint:errcheck
 	return nil
 }
 

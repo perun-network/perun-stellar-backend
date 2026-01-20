@@ -83,7 +83,7 @@ func (a *Adjudicator) Subscribe(ctx context.Context, cid pchannel.ID) (pchannel.
 // Withdraw withdraws the channel.
 func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq, smap pchannel.StateMap) error {
 	log.Println("Withdraw called by Adjudicator")
-	chanControl, errChanState := a.CB.GetChannelInfo(ctx, a.perunAddr, req.Tx.State.ID)
+	chanControl, errChanState := a.CB.GetChannelInfo(ctx, a.perunAddr, req.Tx.ID)
 	if errChanState != nil {
 		return errChanState
 	}
@@ -96,17 +96,17 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 		return a.handleWithdrawal(ctx, req)
 	}
 	//nolint:nestif
-	if req.Tx.State.IsFinal {
+	if req.Tx.IsFinal {
 		log.Println("Channel is final, closing now")
-		withdrawSelf := needWithdraw([]pchannel.Bal{req.Tx.State.Balances[0][req.Idx], req.Tx.State.Balances[1][req.Idx]}, req.Tx.State.Assets)
-		withdrawOther := needWithdraw([]pchannel.Bal{req.Tx.State.Balances[0][1-req.Idx], req.Tx.State.Balances[1][1-req.Idx]}, req.Tx.State.Assets)
+		withdrawSelf := needWithdraw([]pchannel.Bal{req.Tx.Balances[0][req.Idx], req.Tx.Balances[1][req.Idx]}, req.Tx.Assets)
+		withdrawOther := needWithdraw([]pchannel.Bal{req.Tx.Balances[0][1-req.Idx], req.Tx.Balances[1][1-req.Idx]}, req.Tx.Assets)
 		if req.Idx == 0 && a.oneWithdrawer && (!withdrawSelf || !withdrawOther) { // If one participant does not need to withdraw, the swap is cross-chain which means A does not need to close
 			log.Println("A only closes when A & B have to withdraw")
 			return nil
 		}
 		err := a.Close(ctx, req.Tx.State, req.Tx.Sigs)
 		if err != nil {
-			chanControl, errChanState = a.CB.GetChannelInfo(ctx, a.perunAddr, req.Tx.State.ID)
+			chanControl, errChanState = a.CB.GetChannelInfo(ctx, a.perunAddr, req.Tx.ID)
 			if errChanState != nil {
 				log.Println("Error getting channel info: ", errChanState)
 				return errChanState
@@ -139,7 +139,7 @@ func (a *Adjudicator) Withdraw(ctx context.Context, req pchannel.AdjudicatorReq,
 }
 
 func (a *Adjudicator) handleWithdrawal(ctx context.Context, req pchannel.AdjudicatorReq) error {
-	withdrawOther := needWithdraw([]pchannel.Bal{req.Tx.State.Balances[0][1-req.Idx], req.Tx.State.Balances[1][1-req.Idx]}, req.Tx.State.Assets)
+	withdrawOther := needWithdraw([]pchannel.Bal{req.Tx.Balances[0][1-req.Idx], req.Tx.Balances[1][1-req.Idx]}, req.Tx.Assets)
 	if a.oneWithdrawer && withdrawOther {
 		log.Println("Withdrawing other", req.Idx)
 		if err := a.withdrawOther(ctx, req); err != nil {
@@ -147,7 +147,7 @@ func (a *Adjudicator) handleWithdrawal(ctx context.Context, req pchannel.Adjudic
 			return a.withdraw(ctx, req)
 		}
 	}
-	withdrawSelf := needWithdraw([]pchannel.Bal{req.Tx.State.Balances[0][req.Idx], req.Tx.State.Balances[1][req.Idx]}, req.Tx.State.Assets)
+	withdrawSelf := needWithdraw([]pchannel.Bal{req.Tx.Balances[0][req.Idx], req.Tx.Balances[1][req.Idx]}, req.Tx.Assets)
 	if withdrawSelf {
 		log.Println("Withdrawing self", req.Idx)
 		return a.withdraw(ctx, req)
