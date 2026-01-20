@@ -51,7 +51,7 @@ func (b backend) CalcID(params *channel.Params) (channel.ID, error) {
 
 // Sign signs the channel state with the account.
 func (b backend) Sign(account wallet.Account, state *channel.State) (wallet.Sig, error) {
-	if err := checkBackends(state.Allocation.Backends); err != nil {
+	if err := checkBackends(state.Backends); err != nil {
 		return nil, errors.New("invalid backends in state allocation: " + err.Error())
 	}
 
@@ -87,7 +87,7 @@ func (b backend) NewAsset() channel.Asset {
 func EncodeState(state *channel.State) ([]byte, error) {
 	// check if state also has different backends stored in allocation
 
-	if err := checkBackends(state.Allocation.Backends); err != nil {
+	if err := checkBackends(state.Backends); err != nil {
 		return nil, errors.New("invalid backends in state allocation: " + err.Error())
 	}
 

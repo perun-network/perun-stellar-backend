@@ -33,9 +33,9 @@ import (
 
 // ToEthState converts a channel.State to a ChannelState struct.
 func ToEthState(s *channel.State) EthChannelState {
-	backends := make([]*big.Int, len(s.Allocation.Assets))
-	for i := range s.Allocation.Assets { // we assume that for each asset there is an element in backends corresponding to the backendID the asset belongs to.
-		backends[i] = big.NewInt(int64(s.Allocation.Backends[i]))
+	backends := make([]*big.Int, len(s.Assets))
+	for i := range s.Assets { // we assume that for each asset there is an element in backends corresponding to the backendID the asset belongs to.
+		backends[i] = big.NewInt(int64(s.Backends[i]))
 	}
 	locked := make([]ChannelSubAlloc, len(s.Locked))
 	for i, sub := range s.Locked {
@@ -57,15 +57,15 @@ func ToEthState(s *channel.State) EthChannelState {
 	// iterate over s.Allocation.Backends and check if they are of type EthAsset
 	// if not, panic
 
-	assets := make([]ChannelAsset, len(s.Allocation.Assets))
+	assets := make([]ChannelAsset, len(s.Assets))
 
-	for i, backendID := range s.Allocation.Backends {
+	for i, backendID := range s.Backends {
 		switch backendID {
 		case EthBackendID:
-			assets[i] = assetToEthAsset(s.Allocation.Assets[i])
+			assets[i] = assetToEthAsset(s.Assets[i])
 
 		case wtypes.StellarBackendID:
-			assets[i] = assetToStellarAsset(s.Allocation.Assets[i])
+			assets[i] = assetToStellarAsset(s.Assets[i])
 
 		default:
 			log.Panicf("wrong backend ID: %d", backendID)

@@ -77,13 +77,13 @@ func validatePerunStates(t *testing.T, first, last channel.State) {
 }
 
 func checkAssetsEquality(t *testing.T, first, last channel.State) {
-	for i, asset := range first.Allocation.Assets {
-		require.True(t, asset.Equal(last.Allocation.Assets[i]))
+	for i, asset := range first.Assets {
+		require.True(t, asset.Equal(last.Assets[i]))
 	}
 }
 
 func checkNoLockedAmount(t *testing.T, state channel.State) {
-	if len(state.Allocation.Locked) != 0 {
+	if len(state.Locked) != 0 {
 		t.Fatal("locked amount should be empty")
 	}
 }

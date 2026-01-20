@@ -228,7 +228,7 @@ func (c *ContractBackend) Dispute(ctx context.Context, perunAddr xdr.ScAddress, 
 func (c *ContractBackend) Withdraw(ctx context.Context, perunAddr xdr.ScAddress, req pchannel.AdjudicatorReq, withdrawerIdx bool, oneWithdrawer bool) error {
 	log.Println("Withdraw called by ContractBackend")
 
-	chanID := req.Tx.State.ID
+	chanID := req.Tx.ID
 
 	withdrawTxArgs, err := buildWithdrawTxArgs(chanID, withdrawerIdx, oneWithdrawer)
 	if err != nil {
@@ -243,7 +243,7 @@ func (c *ContractBackend) Withdraw(ctx context.Context, perunAddr xdr.ScAddress,
 	if err != nil {
 		log.Println("Error while getting client address: ", err)
 	}
-	tokenAddr0, ok := req.Tx.State.Assets[0].(*types.StellarAsset)
+	tokenAddr0, ok := req.Tx.Assets[0].(*types.StellarAsset)
 	bal0 := "bal0"
 	bal1 := "bal1"
 	if ok {
@@ -256,7 +256,7 @@ func (c *ContractBackend) Withdraw(ctx context.Context, perunAddr xdr.ScAddress,
 			log.Println("Error while getting balance: ", err)
 		}
 	}
-	tokenAddr1, ok := req.Tx.State.Assets[1].(*types.StellarAsset)
+	tokenAddr1, ok := req.Tx.Assets[1].(*types.StellarAsset)
 	if ok {
 		cAdd1, err := types.MakeContractAddress(tokenAddr1.Asset.ContractID())
 		if err != nil {
@@ -267,7 +267,7 @@ func (c *ContractBackend) Withdraw(ctx context.Context, perunAddr xdr.ScAddress,
 			log.Println("Error while getting balance: ", err)
 		}
 	}
-	log.Println("Balance: ", bal0, bal1, " after withdrawing: ", clientAddress, req.Tx.State.Assets)
+	log.Println("Balance: ", bal0, bal1, " after withdrawing: ", clientAddress, req.Tx.Assets)
 	evs, err := event.DecodeEventsPerun(txMeta)
 	if err != nil {
 		return err
